@@ -887,7 +887,13 @@ fn should_render_paragraph_as_heading(
             if let ContentElement::Paragraph(p) = &doc.kids[idx] {
                 if let Some(fs) = p.base.font_size {
                     if fs >= 1.15 * body_font_size
-                        && should_rescue_as_heading(doc, idx, text)
+                        && is_heading_rescue_candidate(doc, idx, text)
+                        && has_substantive_follow_up(
+                            doc,
+                            idx,
+                            text.split_whitespace().count(),
+                            4,
+                        )
                     {
                         return true;
                     }
@@ -968,13 +974,23 @@ fn should_rescue_as_heading(
     idx: usize,
     text: &str,
 ) -> bool {
+    is_heading_rescue_candidate(doc, idx, text)
+        && has_substantive_follow_up(doc, idx, text.split_whitespace().count(), 4)
+}
 
+/// Pure text-criteria check for title-case heading rescue.
+/// Returns true when the text looks like a heading based on casing,
+/// length, and character composition — without any lookahead.
+fn is_heading_rescue_candidate(
+    doc: &PdfDocument,
+    idx: usize,
+    text: &str,
+) -> bool {
     let trimmed = text.trim();
     if trimmed.is_empty() {
         return false;
     }
 
-    let word_count = trimmed.split_whitespace().count();
     let has_alpha = trimmed.chars().any(char::is_alphabetic);
 
     // Must have alphabetic chars and not end with sentence/continuation punctuation
@@ -993,6 +1009,7 @@ fn should_rescue_as_heading(
     }
 
     // Must be short: ≤ 6 words, ≤ 60 chars
+    let word_count = trimmed.split_whitespace().count();
     if word_count > 6 || trimmed.len() > 60 {
         return false;
     }
@@ -1009,9 +1026,19 @@ fn should_rescue_as_heading(
         }
     }
 
-    // Look ahead for substantive content — require at least 3x longer or > 15 words
-    let mut found_substantive = false;
-    for offset in 1..=4 {
+    true
+}
+
+/// Check the next `max_lookahead` elements for substantive body content.
+/// Returns true when at least one element is a long paragraph (≥ word_count*3
+/// or > 15 words) or a structural element (list, table, image, figure).
+fn has_substantive_follow_up(
+    doc: &PdfDocument,
+    idx: usize,
+    word_count: usize,
+    max_lookahead: usize,
+) -> bool {
+    for offset in 1..=max_lookahead {
         let lookahead_idx = idx + offset;
         if lookahead_idx >= doc.kids.len() {
             break;
@@ -1022,36 +1049,32 @@ fn should_rescue_as_heading(
                 let next_text = p.base.value();
                 let nw = next_text.trim().split_whitespace().count();
                 if nw >= word_count * 3 || nw > 15 {
-                    found_substantive = true;
-                    break;
+                    return true;
                 }
             }
             ContentElement::TextBlock(tb) => {
                 let next_text = tb.value();
                 let nw = next_text.trim().split_whitespace().count();
                 if nw >= word_count * 3 || nw > 15 {
-                    found_substantive = true;
-                    break;
+                    return true;
                 }
             }
             ContentElement::TextLine(tl) => {
                 let next_text = tl.value();
                 let nw = next_text.trim().split_whitespace().count();
                 if nw >= word_count * 3 || nw > 15 {
-                    found_substantive = true;
-                    break;
+                    return true;
                 }
             }
             ContentElement::List(_) | ContentElement::Table(_) | ContentElement::TableBorder(_)
             | ContentElement::Image(_) | ContentElement::Figure(_) => {
-                found_substantive = true;
-                break;
+                return true;
             }
             _ => continue,
         }
     }
 
-    found_substantive
+    false
 }
 
 /// Rescue numbered section headings like "01 - Find Open Educational Resources"
