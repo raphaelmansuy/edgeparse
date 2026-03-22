@@ -879,6 +879,21 @@ fn should_render_paragraph_as_heading(
         if should_rescue_numbered_heading(doc, idx, text) {
             return true;
         }
+        // Font-size-gated title-case rescue: when the paragraph is rendered
+        // in a noticeably larger font than body text, apply the same
+        // title-case rescue used in tier 1.  A 15 % size increase is a
+        // reliable visual heading signal straight from the PDF font metrics.
+        if body_font_size > 0.0 {
+            if let ContentElement::Paragraph(p) = &doc.kids[idx] {
+                if let Some(fs) = p.base.font_size {
+                    if fs >= 1.15 * body_font_size
+                        && should_rescue_as_heading(doc, idx, text)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
     }
     false
 }
@@ -1019,6 +1034,14 @@ fn should_rescue_as_heading(
                     break;
                 }
             }
+            ContentElement::TextLine(tl) => {
+                let next_text = tl.value();
+                let nw = next_text.trim().split_whitespace().count();
+                if nw >= word_count * 3 || nw > 15 {
+                    found_substantive = true;
+                    break;
+                }
+            }
             ContentElement::List(_) | ContentElement::Table(_) | ContentElement::TableBorder(_)
             | ContentElement::Image(_) | ContentElement::Figure(_) => {
                 found_substantive = true;
@@ -1074,6 +1097,12 @@ fn should_rescue_numbered_heading(
             }
             ContentElement::TextBlock(tb) => {
                 let nw = tb.value().trim().split_whitespace().count();
+                if nw > 10 {
+                    return true;
+                }
+            }
+            ContentElement::TextLine(tl) => {
+                let nw = tl.value().trim().split_whitespace().count();
                 if nw > 10 {
                     return true;
                 }
@@ -1250,6 +1279,12 @@ fn should_rescue_allcaps_heading(
             }
             ContentElement::TextBlock(tb) => {
                 let nw = tb.value().trim().split_whitespace().count();
+                if nw > 6 {
+                    return true;
+                }
+            }
+            ContentElement::TextLine(tl) => {
+                let nw = tl.value().trim().split_whitespace().count();
                 if nw > 6 {
                     return true;
                 }
