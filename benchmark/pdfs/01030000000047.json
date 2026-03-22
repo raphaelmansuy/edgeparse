@@ -1,0 +1,945 @@
+{
+  "file name": "01030000000047.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "paragraph",
+      "id": 1,
+      "page number": 1,
+      "bounding box": [
+        46.8,
+        375.1033,
+        224.78000000000006,
+        386.0233
+      ],
+      "font": "ArialMT",
+      "font size": 8.0,
+      "text color": "[0.0, 0.0, 0.0, 0.699999988079071]",
+      "content": "ANFREL Pre-Election Assessment Mission Report"
+    },
+    {
+      "type": "table",
+      "id": 2,
+      "level": "3",
+      "page number": 1,
+      "bounding box": [
+        56.5546,
+        163.9461,
+        524.3611000000001,
+        294.8708
+      ],
+      "number of rows": 8,
+      "number of columns": 7,
+      "next table id": 0,
+      "rows": [
+        {
+          "type": "table row",
+          "row number": 1,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                56.5546,
+                276.2947,
+                72.94229999999999,
+                294.8708
+              ],
+              "row number": 1,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.94229999999999,
+                276.2947,
+                208.95960000000002,
+                294.8708
+              ],
+              "row number": 1,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.95960000000002,
+                276.2947,
+                293.6264,
+                294.8708
+              ],
+              "row number": 1,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                293.6264,
+                276.2947,
+                357.72749999999996,
+                294.8708
+              ],
+              "row number": 1,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                357.72749999999996,
+                276.2947,
+                416.82460000000003,
+                294.8708
+              ],
+              "row number": 1,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                416.82460000000003,
+                276.2947,
+                480.17645000000005,
+                294.8708
+              ],
+              "row number": 1,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                480.17645000000005,
+                276.2947,
+                524.3611000000001,
+                294.8708
+              ],
+              "row number": 1,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 2,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                56.5546,
+                260.74244999999996,
+                72.94229999999999,
+                276.2947
+              ],
+              "row number": 2,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.94229999999999,
+                260.74244999999996,
+                208.95960000000002,
+                276.2947
+              ],
+              "row number": 2,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.95960000000002,
+                260.74244999999996,
+                293.6264,
+                276.2947
+              ],
+              "row number": 2,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                293.6264,
+                260.74244999999996,
+                357.72749999999996,
+                276.2947
+              ],
+              "row number": 2,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                357.72749999999996,
+                260.74244999999996,
+                416.82460000000003,
+                276.2947
+              ],
+              "row number": 2,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                416.82460000000003,
+                260.74244999999996,
+                480.17645000000005,
+                276.2947
+              ],
+              "row number": 2,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                480.17645000000005,
+                260.74244999999996,
+                524.3611000000001,
+                276.2947
+              ],
+              "row number": 2,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 3,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                56.5546,
+                245.1902,
+                72.94229999999999,
+                260.74244999999996
+              ],
+              "row number": 3,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.94229999999999,
+                245.1902,
+                208.95960000000002,
+                260.74244999999996
+              ],
+              "row number": 3,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.95960000000002,
+                245.1902,
+                293.6264,
+                260.74244999999996
+              ],
+              "row number": 3,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                293.6264,
+                245.1902,
+                357.72749999999996,
+                260.74244999999996
+              ],
+              "row number": 3,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                357.72749999999996,
+                245.1902,
+                416.82460000000003,
+                260.74244999999996
+              ],
+              "row number": 3,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                416.82460000000003,
+                245.1902,
+                480.17645000000005,
+                260.74244999999996
+              ],
+              "row number": 3,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                480.17645000000005,
+                245.1902,
+                524.3611000000001,
+                260.74244999999996
+              ],
+              "row number": 3,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 4,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                56.5546,
+                224.23794999999998,
+                72.94229999999999,
+                245.1902
+              ],
+              "row number": 4,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.94229999999999,
+                224.23794999999998,
+                208.95960000000002,
+                245.1902
+              ],
+              "row number": 4,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.95960000000002,
+                224.23794999999998,
+                293.6264,
+                245.1902
+              ],
+              "row number": 4,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                293.6264,
+                224.23794999999998,
+                357.72749999999996,
+                245.1902
+              ],
+              "row number": 4,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                357.72749999999996,
+                224.23794999999998,
+                416.82460000000003,
+                245.1902
+              ],
+              "row number": 4,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                416.82460000000003,
+                224.23794999999998,
+                480.17645000000005,
+                245.1902
+              ],
+              "row number": 4,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                480.17645000000005,
+                224.23794999999998,
+                524.3611000000001,
+                245.1902
+              ],
+              "row number": 4,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 5,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                56.5546,
+                203.28569999999996,
+                72.94229999999999,
+                224.23794999999998
+              ],
+              "row number": 5,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.94229999999999,
+                203.28569999999996,
+                208.95960000000002,
+                224.23794999999998
+              ],
+              "row number": 5,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.95960000000002,
+                203.28569999999996,
+                293.6264,
+                224.23794999999998
+              ],
+              "row number": 5,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                293.6264,
+                203.28569999999996,
+                357.72749999999996,
+                224.23794999999998
+              ],
+              "row number": 5,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                357.72749999999996,
+                203.28569999999996,
+                416.82460000000003,
+                224.23794999999998
+              ],
+              "row number": 5,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                416.82460000000003,
+                203.28569999999996,
+                480.17645000000005,
+                224.23794999999998
+              ],
+              "row number": 5,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                480.17645000000005,
+                203.28569999999996,
+                524.3611000000001,
+                224.23794999999998
+              ],
+              "row number": 5,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 6,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                56.5546,
+                187.73344999999998,
+                72.94229999999999,
+                203.28569999999996
+              ],
+              "row number": 6,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.94229999999999,
+                187.73344999999998,
+                208.95960000000002,
+                203.28569999999996
+              ],
+              "row number": 6,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.95960000000002,
+                187.73344999999998,
+                293.6264,
+                203.28569999999996
+              ],
+              "row number": 6,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                293.6264,
+                187.73344999999998,
+                357.72749999999996,
+                203.28569999999996
+              ],
+              "row number": 6,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                357.72749999999996,
+                187.73344999999998,
+                416.82460000000003,
+                203.28569999999996
+              ],
+              "row number": 6,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                416.82460000000003,
+                187.73344999999998,
+                480.17645000000005,
+                203.28569999999996
+              ],
+              "row number": 6,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                480.17645000000005,
+                187.73344999999998,
+                524.3611000000001,
+                203.28569999999996
+              ],
+              "row number": 6,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 7,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                56.5546,
+                171.9517,
+                72.94229999999999,
+                187.73344999999998
+              ],
+              "row number": 7,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.94229999999999,
+                171.9517,
+                208.95960000000002,
+                187.73344999999998
+              ],
+              "row number": 7,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.95960000000002,
+                171.9517,
+                293.6264,
+                187.73344999999998
+              ],
+              "row number": 7,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                293.6264,
+                171.9517,
+                357.72749999999996,
+                187.73344999999998
+              ],
+              "row number": 7,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                357.72749999999996,
+                171.9517,
+                416.82460000000003,
+                187.73344999999998
+              ],
+              "row number": 7,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                416.82460000000003,
+                171.9517,
+                480.17645000000005,
+                187.73344999999998
+              ],
+              "row number": 7,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                480.17645000000005,
+                171.9517,
+                524.3611000000001,
+                187.73344999999998
+              ],
+              "row number": 7,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 8,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                56.5546,
+                163.9461,
+                72.94229999999999,
+                171.9517
+              ],
+              "row number": 8,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.94229999999999,
+                163.9461,
+                208.95960000000002,
+                171.9517
+              ],
+              "row number": 8,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.95960000000002,
+                163.9461,
+                293.6264,
+                171.9517
+              ],
+              "row number": 8,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                293.6264,
+                163.9461,
+                357.72749999999996,
+                171.9517
+              ],
+              "row number": 8,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                357.72749999999996,
+                163.9461,
+                416.82460000000003,
+                171.9517
+              ],
+              "row number": 8,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                416.82460000000003,
+                163.9461,
+                480.17645000000005,
+                171.9517
+              ],
+              "row number": 8,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                480.17645000000005,
+                163.9461,
+                524.3611000000001,
+                171.9517
+              ],
+              "row number": 8,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": 3,
+      "page number": 1,
+      "bounding box": [
+        46.8,
+        33.4,
+        55.696,
+        44.32
+      ],
+      "font": "ArialMT",
+      "font size": 8.0,
+      "text color": "[0.0, 0.0, 0.0, 0.75]",
+      "content": "24"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@edgeparse/pdf-darwin-arm64",
+  "version": "0.1.0",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "main": "edgeparse-node.darwin-arm64.node",
+  "files": ["edgeparse-node.darwin-arm64.node"],
+  "description": "edgeparse native addon for darwin-arm64",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opendataloader-project/edgeparse.git",
+    "directory": "sdks/node/npm/darwin-arm64"
+  }
+}

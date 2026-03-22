@@ -1,0 +1,61 @@
+[project]
+name = "edgeparse-benchmark"
+version = "0.1.0"
+description = "Benchmark suite for EdgeParse — Rust PDF extraction engine"
+requires-python = ">=3.11"
+dependencies = [
+    "apted>=1.0.3",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    "py-cpuinfo>=9.0.0",
+    "rapidfuzz>=3.0.0",
+]
+
+[project.optional-dependencies]
+# Install when comparing against the published OpenDataLoader engine:
+#   cd benchmark && uv sync --extra opendataloader
+#   or: make bench-odl-setup
+opendataloader = [
+    "opendataloader-pdf>=2.0.0",
+]
+# Third-party PDF engines for comparison benchmarks:
+#   cd benchmark && uv sync --extra <engine>
+#   or: make bench-install-tools TOOLS=pymupdf4llm,markitdown
+docling = [
+    "docling",
+]
+# NOTE: marker and mineru have conflicting pillow version requirements
+# and cannot be installed in the same environment. Install individually:
+#   uv sync --extra marker   OR   uv sync --extra mineru
+marker = [
+    "marker-pdf",
+]
+mineru = [
+    "mineru[all]",
+]
+pymupdf4llm = [
+    "pymupdf4llm",
+]
+markitdown = [
+    "markitdown[all]",
+]
+# Lightweight comparison engines (no version conflicts):
+#   cd benchmark && uv sync --extra compare-light
+compare-light = [
+    "pymupdf4llm",
+    "markitdown[all]",
+]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.uv]
+package = false
+# marker-pdf and mineru have conflicting pillow requirements
+# They cannot be resolved together in a single lockfile
+conflicts = [
+    [
+        { extra = "marker" },
+        { extra = "mineru" },
+    ],
+]

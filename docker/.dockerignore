@@ -1,0 +1,9 @@
+target/
+sdks/python/edgeparse/*.so
+sdks/node/node_modules/
+sdks/node/dist/
+benchmark/
+docs/
+logs/
+*.pdf
+.git/

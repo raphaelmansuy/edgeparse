@@ -1,0 +1,2271 @@
+{
+  "file name": "01030000000089.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "paragraph",
+      "id": 1,
+      "page number": 1,
+      "bounding box": [
+        140.72,
+        742.959,
+        473.905,
+        755.6115
+      ],
+      "font": "BookAntiqua",
+      "font size": 10.5,
+      "text color": "[0.5019999742507935]",
+      "content": "Restrictions on Land Ownership by Foreigners in Selected Jurisdictions"
+    },
+    {
+      "type": "table",
+      "id": 2,
+      "level": "2",
+      "page number": 1,
+      "bounding box": [
+        71.98,
+        75.1,
+        540.55998,
+        720.02
+      ],
+      "number of rows": 9,
+      "number of columns": 16,
+      "next table id": 0,
+      "rows": [
+        {
+          "type": "table row",
+          "row number": 1,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.48,
+                706.26,
+                77.64,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                77.64,
+                706.26,
+                138.14,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                138.14,
+                706.26,
+                143.3,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.3,
+                706.26,
+                143.84,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.84,
+                706.26,
+                148.94,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                148.94,
+                706.26,
+                208.88,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.88,
+                706.26,
+                214.04000000000002,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                214.04000000000002,
+                706.26,
+                219.68,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 8,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                219.68,
+                706.26,
+                277.82,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 9,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                277.82,
+                706.26,
+                282.98,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 10,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                282.98,
+                706.26,
+                288.62,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 11,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                288.62,
+                706.26,
+                442.65999999999997,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 12,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                442.65999999999997,
+                706.26,
+                447.82,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 13,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                447.82,
+                706.26,
+                453.46,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 14,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                453.46,
+                706.26,
+                534.42,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 15,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                534.42,
+                706.26,
+                539.58,
+                719.52
+              ],
+              "row number": 1,
+              "column number": 16,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 2,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.48,
+                693.0,
+                77.64,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                77.64,
+                693.0,
+                138.14,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                138.14,
+                693.0,
+                143.3,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.3,
+                693.0,
+                143.84,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.84,
+                693.0,
+                148.94,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                148.94,
+                693.0,
+                208.88,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.88,
+                693.0,
+                214.04000000000002,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                214.04000000000002,
+                693.0,
+                219.68,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 8,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                219.68,
+                693.0,
+                277.82,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 9,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                277.82,
+                693.0,
+                282.98,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 10,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                282.98,
+                693.0,
+                288.62,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 11,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                288.62,
+                693.0,
+                442.65999999999997,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 12,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                442.65999999999997,
+                693.0,
+                447.82,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 13,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                447.82,
+                693.0,
+                453.46,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 14,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                453.46,
+                693.0,
+                534.42,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 15,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                534.42,
+                693.0,
+                539.58,
+                706.26
+              ],
+              "row number": 2,
+              "column number": 16,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 3,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.48,
+                679.74,
+                77.64,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                77.64,
+                679.74,
+                138.14,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                138.14,
+                679.74,
+                143.3,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.3,
+                679.74,
+                143.84,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.84,
+                679.74,
+                148.94,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                148.94,
+                679.74,
+                208.88,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.88,
+                679.74,
+                214.04000000000002,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                214.04000000000002,
+                679.74,
+                219.68,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 8,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                219.68,
+                679.74,
+                277.82,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 9,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                277.82,
+                679.74,
+                282.98,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 10,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                282.98,
+                679.74,
+                288.62,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 11,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                288.62,
+                679.74,
+                442.65999999999997,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 12,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                442.65999999999997,
+                679.74,
+                447.82,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 13,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                447.82,
+                679.74,
+                453.46,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 14,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                453.46,
+                679.74,
+                534.42,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 15,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                534.42,
+                679.74,
+                539.58,
+                693.0
+              ],
+              "row number": 3,
+              "column number": 16,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 4,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.48,
+                666.48,
+                77.64,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                77.64,
+                666.48,
+                138.14,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                138.14,
+                666.48,
+                143.3,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.3,
+                666.48,
+                143.84,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.84,
+                666.48,
+                148.94,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                148.94,
+                666.48,
+                208.88,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.88,
+                666.48,
+                214.04000000000002,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                214.04000000000002,
+                666.48,
+                219.68,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 8,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                219.68,
+                666.48,
+                277.82,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 9,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                277.82,
+                666.48,
+                282.98,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 10,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                282.98,
+                666.48,
+                288.62,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 11,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                288.62,
+                666.48,
+                442.65999999999997,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 12,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                442.65999999999997,
+                666.48,
+                447.82,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 13,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                447.82,
+                666.48,
+                453.46,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 14,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                453.46,
+                666.48,
+                534.42,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 15,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                534.42,
+                666.48,
+                539.58,
+                679.74
+              ],
+              "row number": 4,
+              "column number": 16,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 5,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.48,
+                624.7,
+                77.64,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                77.64,
+                624.7,
+                138.14,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                138.14,
+                624.7,
+                143.3,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.3,
+                624.7,
+                143.84,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.84,
+                624.7,
+                148.94,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                148.94,
+                624.7,
+                208.88,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.88,
+                624.7,
+                214.04000000000002,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                214.04000000000002,
+                624.7,
+                219.68,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 8,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                219.68,
+                624.7,
+                277.82,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 9,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                277.82,
+                624.7,
+                282.98,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 10,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                282.98,
+                624.7,
+                288.62,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 11,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                288.62,
+                624.7,
+                442.65999999999997,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 12,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                442.65999999999997,
+                624.7,
+                447.82,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 13,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                447.82,
+                624.7,
+                453.46,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 14,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                453.46,
+                624.7,
+                534.42,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 15,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                534.42,
+                624.7,
+                539.58,
+                666.48
+              ],
+              "row number": 5,
+              "column number": 16,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 6,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.48,
+                555.820005,
+                77.64,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                77.64,
+                555.820005,
+                138.14,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                138.14,
+                555.820005,
+                143.3,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.3,
+                555.820005,
+                143.84,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.84,
+                555.820005,
+                148.94,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                148.94,
+                555.820005,
+                208.88,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.88,
+                555.820005,
+                214.04000000000002,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                214.04000000000002,
+                555.820005,
+                219.68,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 8,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                219.68,
+                555.820005,
+                277.82,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 9,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                277.82,
+                555.820005,
+                282.98,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 10,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                282.98,
+                555.820005,
+                288.62,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 11,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                288.62,
+                555.820005,
+                442.65999999999997,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 12,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                442.65999999999997,
+                555.820005,
+                447.82,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 13,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                447.82,
+                555.820005,
+                453.46,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 14,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                453.46,
+                555.820005,
+                534.42,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 15,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                534.42,
+                555.820005,
+                539.58,
+                624.7
+              ],
+              "row number": 6,
+              "column number": 16,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 7,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.48,
+                377.59999000000005,
+                77.64,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                77.64,
+                377.59999000000005,
+                138.14,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                138.14,
+                377.59999000000005,
+                143.3,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.3,
+                377.59999000000005,
+                143.84,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.84,
+                377.59999000000005,
+                148.94,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                148.94,
+                377.59999000000005,
+                208.88,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.88,
+                377.59999000000005,
+                214.04000000000002,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                214.04000000000002,
+                377.59999000000005,
+                219.68,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 8,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                219.68,
+                377.59999000000005,
+                277.82,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 9,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                277.82,
+                377.59999000000005,
+                282.98,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 10,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                282.98,
+                377.59999000000005,
+                288.62,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 11,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                288.62,
+                377.59999000000005,
+                442.65999999999997,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 12,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                442.65999999999997,
+                377.59999000000005,
+                447.82,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 13,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                447.82,
+                377.59999000000005,
+                453.46,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 14,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                453.46,
+                377.59999000000005,
+                534.42,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 15,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                534.42,
+                377.59999000000005,
+                539.58,
+                555.820005
+              ],
+              "row number": 7,
+              "column number": 16,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 8,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.48,
+                226.75999000000002,
+                77.64,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                77.64,
+                226.75999000000002,
+                138.14,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                138.14,
+                226.75999000000002,
+                143.3,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.3,
+                226.75999000000002,
+                143.84,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.84,
+                226.75999000000002,
+                148.94,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                148.94,
+                226.75999000000002,
+                208.88,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.88,
+                226.75999000000002,
+                214.04000000000002,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                214.04000000000002,
+                226.75999000000002,
+                219.68,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 8,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                219.68,
+                226.75999000000002,
+                277.82,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 9,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                277.82,
+                226.75999000000002,
+                282.98,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 10,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                282.98,
+                226.75999000000002,
+                288.62,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 11,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                288.62,
+                226.75999000000002,
+                442.65999999999997,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 12,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                442.65999999999997,
+                226.75999000000002,
+                447.82,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 13,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                447.82,
+                226.75999000000002,
+                453.46,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 14,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                453.46,
+                226.75999000000002,
+                534.42,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 15,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                534.42,
+                226.75999000000002,
+                539.58,
+                377.59999000000005
+              ],
+              "row number": 8,
+              "column number": 16,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 9,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                72.48,
+                75.83999,
+                77.64,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                77.64,
+                75.83999,
+                138.14,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                138.14,
+                75.83999,
+                143.3,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.3,
+                75.83999,
+                143.84,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                143.84,
+                75.83999,
+                148.94,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                148.94,
+                75.83999,
+                208.88,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                208.88,
+                75.83999,
+                214.04000000000002,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 7,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                214.04000000000002,
+                75.83999,
+                219.68,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 8,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                219.68,
+                75.83999,
+                277.82,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 9,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                277.82,
+                75.83999,
+                282.98,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 10,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                282.98,
+                75.83999,
+                288.62,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 11,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                288.62,
+                75.83999,
+                442.65999999999997,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 12,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                442.65999999999997,
+                75.83999,
+                447.82,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 13,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                447.82,
+                75.83999,
+                453.46,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 14,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                453.46,
+                75.83999,
+                534.42,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 15,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                534.42,
+                75.83999,
+                539.58,
+                226.75999000000002
+              ],
+              "row number": 9,
+              "column number": 16,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": 3,
+      "page number": 1,
+      "bounding box": [
+        72.0,
+        35.919000000000004,
+        537.645,
+        48.5715
+      ],
+      "font": "BookAntiqua",
+      "font size": 10.5,
+      "text color": "[0.5019999742507935]",
+      "content": "The Law Library of Congress 6"
+    }
+  ]
+}

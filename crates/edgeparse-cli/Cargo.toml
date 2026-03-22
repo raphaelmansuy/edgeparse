@@ -1,0 +1,25 @@
+[package]
+name = "edgeparse-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "EdgeParse CLI — convert PDFs to Markdown, JSON, HTML"
+readme = "README.md"
+keywords = ["pdf", "cli", "markdown", "extraction"]
+categories = ["command-line-utilities", "text-processing"]
+documentation = "https://docs.rs/edgeparse"
+
+[[bin]]
+name = "edgeparse"
+path = "src/main.rs"
+
+[dependencies]
+edgeparse-core = { path = "../edgeparse-core" }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }

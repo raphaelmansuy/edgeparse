@@ -1,0 +1,41 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "edgeparse"
+requires-python = ">=3.9"
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Text Processing",
+]
+keywords = ["pdf", "extraction", "markdown", "rag", "llm"]
+description = "High-performance PDF-to-structured-data extraction — Rust engine, Python interface"
+
+[project.urls]
+Homepage = "https://github.com/opendataloader-project/edgeparse"
+Repository = "https://github.com/opendataloader-project/edgeparse"
+Documentation = "https://opendataloader-project.github.io/edgeparse"
+
+[project.scripts]
+edgeparse = "edgeparse.cli:main"
+
+[tool.maturin]
+manifest-path = "../../crates/edgeparse-python/Cargo.toml"
+python-source = "."
+module-name = "edgeparse._edgeparse"
+features = ["pyo3/extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

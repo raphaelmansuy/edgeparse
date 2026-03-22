@@ -1,0 +1,90 @@
+{
+  "file name": "01030000000198.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "table",
+      "id": 1,
+      "level": "1",
+      "page number": 1,
+      "bounding box": [
+        -146.249998584,
+        -0.5000129599999923,
+        865.87525783248,
+        405.5
+      ],
+      "number of rows": 3,
+      "number of columns": 1,
+      "next table id": 0,
+      "rows": [
+        {
+          "type": "table row",
+          "row number": 1,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                0.0,
+                365.999998752,
+                720.00002304,
+                405.0
+              ],
+              "row number": 1,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 2,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                0.0,
+                271.49999572800004,
+                720.00002304,
+                365.999998752
+              ],
+              "row number": 2,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 3,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                0.0,
+                -0.00001295999999229025,
+                720.00002304,
+                271.49999572800004
+              ],
+              "row number": 3,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

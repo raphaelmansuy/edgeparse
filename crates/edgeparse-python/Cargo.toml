@@ -1,0 +1,14 @@
+[package]
+name = "edgeparse-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "_edgeparse"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeparse-core = { path = "../edgeparse-core" }
+pyo3 = { version = "0.23", features = ["extension-module"] }
+serde_json = { workspace = true }

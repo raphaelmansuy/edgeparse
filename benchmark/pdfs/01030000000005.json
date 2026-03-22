@@ -1,0 +1,41 @@
+{
+  "file name" : "01030000000005.pdf",
+  "number of pages" : 1,
+  "author" : null,
+  "title" : null,
+  "creation date" : null,
+  "modification date" : null,
+  "kids" : [ {
+    "type" : "image",
+    "id" : 1,
+    "page number" : 1,
+    "bounding box" : [ 66.0, 365.02, 378.0, 579.26 ],
+    "source" : "01030000000005_images/imageFile1.png"
+  }, {
+    "type" : "caption",
+    "id" : 2,
+    "page number" : 1,
+    "bounding box" : [ 126.141, 334.705, 317.851, 359.11 ],
+    "linked content id" : 1,
+    "font" : "GaramondPremrPro",
+    "font size" : 9.5,
+    "text color" : "[0.0, 0.0, 0.0, 1.0]",
+    "content" : "        . .  e San Mateo Ixtatán men’s jacket, lopil (Spanish capixay). Photo by Elizabeth Purdum."
+  }, {
+    "type" : "image",
+    "id" : 3,
+    "page number" : 1,
+    "bounding box" : [ 66.0, 98.61, 378.0, 298.059 ],
+    "source" : "01030000000005_images/imageFile2.png"
+  }, {
+    "type" : "caption",
+    "id" : 4,
+    "page number" : 1,
+    "bounding box" : [ 123.469, 69.13, 320.527, 92.424 ],
+    "linked content id" : 3,
+    "font" : "GaramondPremrPro",
+    "font size" : 9.5,
+    "text color" : "[0.0, 0.0, 0.0, 1.0]",
+    "content" : "        . . Vegetation along the trail from San Mateo Ixtatán to Bulej, May     . Photo by author."
+  } ]
+}

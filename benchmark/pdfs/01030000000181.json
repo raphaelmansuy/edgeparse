@@ -1,0 +1,124 @@
+{
+  "file name": "01030000000181.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "heading",
+      "id": 1,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        70.30921,
+        433.7620004304,
+        523.0251770752002,
+        491.5840084768
+      ],
+      "heading level": 1,
+      "font": "Calibri",
+      "font size": 21.9999984,
+      "text color": "[0.0, 0.0, 0.0]",
+      "content": "Upstage aims to enrich your business by providing Easy-to-Apply AI solutions"
+    },
+    {
+      "type": "list",
+      "id": 6,
+      "level": "1",
+      "page number": 1,
+      "bounding box": [
+        544.6431,
+        123.0410002152,
+        869.3776771611199,
+        202.4719992384
+      ],
+      "numbering style": "bullets",
+      "number of list items": 4,
+      "next list id": 0,
+      "previous list id": 0,
+      "list items": [
+        {
+          "type": "list item",
+          "id": 2,
+          "page number": 1,
+          "bounding box": [
+            544.6431,
+            189.0410002152,
+            742.4850957624001,
+            202.4719992384
+          ],
+          "font": "Calibri",
+          "font size": 10.9999992,
+          "text color": "[0.0, 0.0, 0.0]",
+          "content": "• Plug-and-play to cross/multi-cloud system",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 3,
+          "page number": 1,
+          "bounding box": [
+            544.6431,
+            172.00100021519998,
+            831.8695899708,
+            185.43199923839998
+          ],
+          "font": "Calibri",
+          "font size": 10.9999992,
+          "text color": "[0.0, 0.0, 0.0]",
+          "content": "• Ensuring performance tailored to customer data via retraining",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 4,
+          "page number": 1,
+          "bounding box": [
+            544.6431,
+            139.12100021519998,
+            869.3776771611199,
+            169.5919992384
+          ],
+          "font": "Calibri",
+          "font size": 10.9999992,
+          "text color": "[0.0, 0.0, 0.0]",
+          "content": "• Providing a platform that allows easy distribution and management of AI solutions",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 5,
+          "page number": 1,
+          "bounding box": [
+            544.6431,
+            123.0410002152,
+            761.7730861687199,
+            136.4719992384
+          ],
+          "font": "Calibri",
+          "font size": 10.9999992,
+          "text color": "[0.0, 0.0, 0.0]",
+          "content": "• AI consulting service to help AI transformation",
+          "kids": []
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": 7,
+      "page number": 1,
+      "bounding box": [
+        932.7896,
+        18.190000430399998,
+        937.8595991888,
+        30.399998476799993
+      ],
+      "font": "Calibri",
+      "font size": 9.999998399999999,
+      "text color": "[0.42352938652038574, 0.41568630933761597, 0.42352938652038574]",
+      "content": "3"
+    }
+  ]
+}

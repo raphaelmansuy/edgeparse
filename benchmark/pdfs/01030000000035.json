@@ -1,0 +1,220 @@
+{
+  "file name": "01030000000035.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "image",
+      "id": 1,
+      "page number": 1,
+      "bounding box": [
+        83.748,
+        748.908,
+        84.348,
+        768.948
+      ],
+      "source": "01030000000035_images/imageFile1.png"
+    },
+    {
+      "type": "image",
+      "id": 2,
+      "page number": 1,
+      "bounding box": [
+        59.028,
+        743.6279999999999,
+        79.068,
+        744.228
+      ],
+      "source": "01030000000035_images/imageFile2.png"
+    },
+    {
+      "type": "paragraph",
+      "id": 3,
+      "page number": 1,
+      "bounding box": [
+        144.0,
+        666.991849,
+        157.930294,
+        688.159947
+      ],
+      "font": "CMBX12",
+      "font size": 24.787,
+      "text color": "[0.0]",
+      "content": "4"
+    },
+    {
+      "type": "paragraph",
+      "id": 4,
+      "page number": 1,
+      "bounding box": [
+        144.0,
+        643.3417049999999,
+        244.556258,
+        658.043315
+      ],
+      "font": "CMBX12",
+      "font size": 17.215,
+      "text color": "[0.0]",
+      "content": "Basis Fields"
+    },
+    {
+      "type": "paragraph",
+      "id": 5,
+      "page number": 1,
+      "bounding box": [
+        144.0,
+        522.9494380000002,
+        454.8750300999999,
+        623.301753
+      ],
+      "font": "CMR10",
+      "font size": 10.909000000000002,
+      "text color": "[0.0]",
+      "content": "A vector ﬁeld may be written as a linear combination of basis vector ﬁelds. If n is the dimension, then any set of n linearly independent vector ﬁelds may be used as a basis. The coordinate basis X is an example of a basis.1 We will see later that not every basis is a coordinate basis: in order to be a coordinate basis, there must be a coordinate system such that each basis element is the directional derivative operator in a corresponding coordinate direction."
+    },
+    {
+      "type": "paragraph",
+      "id": 6,
+      "page number": 1,
+      "bounding box": [
+        144.00125710000003,
+        447.14911,
+        454.70921329999993,
+        519.7858280000002
+      ],
+      "font": "CMR10",
+      "font size": 10.048,
+      "text color": "[0.0]",
+      "content": "Let e be a tuple of basis vector ﬁelds, such as the coordinate basis X. The general vector ﬁeld v applied to an arbitrary manifold function f can be expressed as a linear combination  i ei(f)(m)b (m), i"
+    },
+    {
+      "type": "paragraph",
+      "id": 7,
+      "page number": 1,
+      "bounding box": [
+        144.00125710000003,
+        459.58996600000006,
+        269.08385110000006,
+        469.3862480000001
+      ],
+      "font": "CMSS10",
+      "font size": 10.909,
+      "text color": "[0.0]",
+      "content": "v(f)(m)=e(f)(m) b(m)="
+    },
+    {
+      "type": "paragraph",
+      "id": 8,
+      "page number": 1,
+      "bounding box": [
+        432.36128090000005,
+        459.58890699999995,
+        454.5501869,
+        469.341553
+      ],
+      "font": "CMR10",
+      "font size": 10.909,
+      "text color": "[0.0]",
+      "content": "(4.1)"
+    },
+    {
+      "type": "paragraph",
+      "id": 9,
+      "page number": 1,
+      "bounding box": [
+        144.00120199999998,
+        336.4693379999999,
+        454.90552019999996,
+        436.86546
+      ],
+      "font": "CMR10",
+      "font size": 10.909000000000002,
+      "text color": "[0.0]",
+      "content": "where b is a tuple-valued coeﬃcient function on the manifold. When expressed in a coordinate basis, the coeﬃcients that specify the direction of the vector are naturally expressed as functions bi of the coordinates of the manifold point. Here, the coeﬃcient function b is more naturally expressed as a tuple-valued function on the manifold. If b is the coeﬃcient function expressed as a function of coordinates, then b = b ◦ χ is the coeﬃcient function as a function on the manifold."
+    },
+    {
+      "type": "paragraph",
+      "id": 10,
+      "page number": 1,
+      "bounding box": [
+        143.64120499999999,
+        246.50911200000002,
+        455.0953368,
+        333.2620919999999
+      ],
+      "font": "CMR10",
+      "font size": 10.489142857142857,
+      "text color": "[0.0]",
+      "content": "The coordinate-basis forms have a simple deﬁnition in terms of the coordinate-basis vectors and the coordinates (equation 3.40). With this choice, the dual property, equation (3.41), holds without further fuss. More generally, we can deﬁne a basis of one-forms ˜e that is dual to e in that the property i i ˜e (ej)(m)=δj"
+    },
+    {
+      "type": "paragraph",
+      "id": 11,
+      "page number": 1,
+      "bounding box": [
+        144.00232119999998,
+        212.869306,
+        454.6011873999998,
+        258.501653
+      ],
+      "font": "CMR10",
+      "font size": 10.909,
+      "text color": "[0.0]",
+      "content": "(4.2) is satisﬁed, analogous to property (3.41). Figure 4.1 illustrates the duality of basis ﬁelds."
+    },
+    {
+      "type": "image",
+      "id": 12,
+      "page number": 1,
+      "bounding box": [
+        143.988,
+        201.588,
+        454.908,
+        201.708
+      ],
+      "source": "01030000000035_images/imageFile3.png"
+    },
+    {
+      "type": "paragraph",
+      "id": 13,
+      "page number": 1,
+      "bounding box": [
+        144.0,
+        174.5725886,
+        454.7654719999999,
+        192.548522
+      ],
+      "font": "CMR6",
+      "font size": 8.966,
+      "text color": "[0.0]",
+      "content": "1We cannot say if the basis vectors are orthogonal or normalized until we introduce a metric."
+    },
+    {
+      "type": "image",
+      "id": 14,
+      "page number": 1,
+      "bounding box": [
+        514.068,
+        748.908,
+        514.668,
+        768.948
+      ],
+      "source": "01030000000035_images/imageFile4.png"
+    },
+    {
+      "type": "image",
+      "id": 15,
+      "page number": 1,
+      "bounding box": [
+        519.348,
+        743.6279999999999,
+        539.3879999999999,
+        744.228
+      ],
+      "source": "01030000000035_images/imageFile5.png"
+    }
+  ]
+}

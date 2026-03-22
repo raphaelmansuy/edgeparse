@@ -1,0 +1,160 @@
+{
+  "file name": "lorem.pdf",
+  "number of pages": 1,
+  "author": "leebd-public",
+  "title": null,
+  "creation date": "D:20251010112501+09'00'",
+  "modification date": "D:20251010112501+09'00'",
+  "kids": [
+    {
+      "type": "paragraph",
+      "id": 1,
+      "page number": 1,
+      "bounding box": [
+        200.891125,
+        706.944863457,
+        299.687389354,
+        745.0948508729999
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 32.005023,
+      "text color": "[0.0]",
+      "content": "Lorem"
+    },
+    {
+      "type": "paragraph",
+      "id": 2,
+      "page number": 1,
+      "bounding box": [
+        307.633275,
+        706.944863457,
+        394.152057261,
+        745.0948508729999
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 32.005023,
+      "text color": "[0.0]",
+      "content": "Ipsum"
+    },
+    {
+      "type": "paragraph",
+      "id": 3,
+      "page number": 1,
+      "bounding box": [
+        85.033915,
+        567.9380583930001,
+        225.44859582750001,
+        659.750040777
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 9.949127000000002,
+      "text color": "[0.0]",
+      "content": "Lorem ipsum dolor sit amet, incididunt ut labore et dolore exercitation ullamco laboris dolor in reprehenderit in Excepteur sint occaecat anim id est laborum."
+    },
+    {
+      "type": "paragraph",
+      "id": 4,
+      "page number": 1,
+      "bounding box": [
+        202.570215,
+        583.880635393,
+        281.9370573279999,
+        659.750040777
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 9.949127,
+      "text color": "[0.0]",
+      "content": "consectetur magna nisi ut aliquip voluptate velit cupidatat non"
+    },
+    {
+      "type": "paragraph",
+      "id": 5,
+      "page number": 1,
+      "bounding box": [
+        263.37726,
+        583.880635393,
+        338.42551882850006,
+        659.750040777
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 9.949127,
+      "text color": "[0.0]",
+      "content": "adipiscing aliqua. Ut enim ex ea esse cillum proident, sunt"
+    },
+    {
+      "type": "paragraph",
+      "id": 6,
+      "page number": 1,
+      "bounding box": [
+        316.028725,
+        583.880635393,
+        363.3738218405,
+        659.750040777
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 9.949127,
+      "text color": "[0.0]",
+      "content": "elit, ad commodo dolore in"
+    },
+    {
+      "type": "paragraph",
+      "id": 7,
+      "page number": 1,
+      "bounding box": [
+        353.08864,
+        583.880635393,
+        417.94397099,
+        659.750040777
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 9.949127,
+      "text color": "[0.0]",
+      "content": "sed minim consequat. eu fugiat culpa"
+    },
+    {
+      "type": "paragraph",
+      "id": 8,
+      "page number": 1,
+      "bounding box": [
+        374.557005,
+        647.890681393,
+        388.5601478534999,
+        659.750040777
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 9.949127,
+      "text color": "[0.0]",
+      "content": "do"
+    },
+    {
+      "type": "paragraph",
+      "id": 9,
+      "page number": 1,
+      "bounding box": [
+        387.030245,
+        583.880635393,
+        504.7775226584999,
+        659.750040777
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 9.949127,
+      "text color": "[0.0]",
+      "content": "eiusmod tempor veniam, quis nostrud Duis aute irure nulla pariatur. officia deserunt mollit"
+    },
+    {
+      "type": "paragraph",
+      "id": 10,
+      "page number": 1,
+      "bounding box": [
+        382.83252,
+        583.880635393,
+        398.75391523699994,
+        595.739994777
+      ],
+      "font": "Pretendard-Regular",
+      "font size": 9.949127,
+      "text color": "[0.0]",
+      "content": "qui"
+    }
+  ]
+}

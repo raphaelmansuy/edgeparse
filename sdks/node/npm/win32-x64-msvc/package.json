@@ -1,0 +1,15 @@
+{
+  "name": "@edgeparse/pdf-win32-x64-msvc",
+  "version": "0.1.0",
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "main": "edgeparse-node.win32-x64-msvc.node",
+  "files": ["edgeparse-node.win32-x64-msvc.node"],
+  "description": "edgeparse native addon for win32-x64-msvc",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opendataloader-project/edgeparse.git",
+    "directory": "sdks/node/npm/win32-x64-msvc"
+  }
+}

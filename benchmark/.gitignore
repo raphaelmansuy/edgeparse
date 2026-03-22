@@ -1,0 +1,6 @@
+# Generated benchmark outputs
+reports/
+prediction/
+__pycache__/
+*.pyc
+.venv/

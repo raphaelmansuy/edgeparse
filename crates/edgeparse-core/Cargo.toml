@@ -1,0 +1,43 @@
+[package]
+name = "edgeparse-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "EdgeParse core library — PDF parsing and structured data extraction"
+readme = "README.md"
+keywords = ["pdf", "extraction", "markdown", "rag", "llm"]
+categories = ["text-processing", "parsing", "data-structures"]
+documentation = "https://docs.rs/edgeparse-core"
+
+[package.metadata.docs.rs]
+features = ["hybrid"]
+rustdoc-args = ["--cfg", "docsrs"]
+all-features = false
+
+[dependencies]
+lopdf = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+rayon = { workspace = true }
+image = { workspace = true }
+base64 = { workspace = true }
+regex = { workspace = true }
+unicode-normalization = { workspace = true }
+indexmap = { workspace = true }
+ordered-float = { workspace = true }
+ttf-parser = { workspace = true }
+euclid = { workspace = true }
+zip = { workspace = true }
+reqwest = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+[features]
+default = []
+hybrid = ["dep:reqwest", "dep:tokio"]
+
+[dev-dependencies]

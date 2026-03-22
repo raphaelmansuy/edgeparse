@@ -1,0 +1,77 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/edgeparse-core",
+    "crates/edgeparse-cli",
+    "crates/pdf-cos",
+    "crates/edgeparse-python",
+    "crates/edgeparse-node",
+]
+default-members = [
+    "crates/edgeparse-core",
+    "crates/edgeparse-cli",
+    "crates/pdf-cos",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/opendataloader-project/edgeparse"
+description = "EdgeParse — High-performance PDF-to-structured-data extraction engine"
+
+[workspace.dependencies]
+# PDF parsing (local fork of lopdf 0.39.0, renamed pdf-cos for clarity)
+# Using package alias so all existing `use lopdf::...` code works unchanged.
+lopdf = { package = "pdf-cos", path = "crates/pdf-cos", version = "0.39.0" }
+pdf-extract = "0.10.0"
+
+# CLI
+clap = { version = "4.6.0", features = ["derive"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# Async + HTTP (for hybrid mode)
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+
+# Parallelism
+rayon = "1.10"
+
+# Image processing
+image = "0.25"
+base64 = "0.22"
+
+# Text processing
+regex = "1.12"
+unicode-normalization = "0.1"
+
+# Collections
+indexmap = { version = "2", features = ["serde"] }
+ordered-float = { version = "4", features = ["serde"] }
+
+# Fonts
+ttf-parser = "0.25"
+
+# Math
+euclid = "0.22"
+
+# Archive
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
