@@ -64,8 +64,8 @@ ISOLATED_VENVS_DIR = BENCH_DIR / ".venvs"
 # (e.g. marker-pdf and mineru[all] each carry incompatible torch/torchvision).
 ISOLATED_VENVS_DIR = BENCH_DIR / ".venvs"
 
-# All known engines in preferred display order
-ALL_ENGINES = ["edgeparse", "opendataloader", "docling", "marker", "mineru", "pymupdf4llm", "markitdown", "edgequake"]
+# All known engines in preferred display order (EdgeQuake removed)
+ALL_ENGINES = ["edgeparse", "opendataloader", "docling", "pymupdf4llm", "markitdown"]
 
 # pip install commands for each engine
 INSTALL_COMMANDS = {

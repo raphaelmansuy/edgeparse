@@ -35,11 +35,10 @@ ENGINE_META: Dict[str, tuple] = {
     "edgeparse":        ("EdgeParse",        None,                "Rust PDF engine (this repo)"),
     "opendataloader": ("OpenDataLoader", "opendataloader-pdf","Java/Python PDF engine"),
     "docling":        ("Docling",        "docling",           "IBM Research document parser"),
-    "marker":         ("Marker",         "marker-pdf",        "ML-based PDF-to-Markdown"),
-    "mineru":         ("MinerU",         "mineru[all]",       "OpenDataLab PDF extractor"),
+    # "marker":         ("Marker",         "marker-pdf",        "ML-based PDF-to-Markdown"),
+    # "mineru":         ("MinerU",         "mineru[all]",       "OpenDataLab PDF extractor"),
     "pymupdf4llm":    ("PyMuPDF4LLM",   "pymupdf4llm",       "PyMuPDF for LLM/RAG"),
     "markitdown":     ("MarkItDown",     "markitdown[all]",   "Microsoft multi-format converter"),
-    "edgequake":      ("EdgeQuake",      None,                "VLM-based PDF parser (gpt-4.1-nano)"),
 }
 
 # ── Auto-register external engines ───────────────────────────────────────────
@@ -55,11 +54,11 @@ def _try_register(name: str, module_name: str, version_label: str = "installed")
 
 _try_register("opendataloader", "pdf_parser_opendataloader", "published")
 _try_register("docling",        "pdf_parser_docling",        "installed")
-_try_register("marker",         "pdf_parser_marker",         "installed")
-_try_register("mineru",         "pdf_parser_mineru",         "installed")
+
+
 _try_register("pymupdf4llm",    "pdf_parser_pymupdf4llm",   "installed")
 _try_register("markitdown",     "pdf_parser_markitdown",     "installed")
-_try_register("edgequake",      "pdf_parser_edgequake",      "installed")
+
 
 
 def available_engines() -> list:
