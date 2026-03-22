@@ -466,6 +466,7 @@ Technical documentation lives in [`docs/`](docs/):
 | [docs/03-data-model.md](docs/03-data-model.md) | Type hierarchy: `ContentElement`, `BoundingBox`, `PdfDocument` |
 | [docs/04-pdf-extraction.md](docs/04-pdf-extraction.md) | PDF loader, chunk parser, font/CMap decoding |
 | [docs/05-output-formats.md](docs/05-output-formats.md) | JSON schema, Markdown renderer, HTML/text/CSV output |
+| [docs/06-sdk-integration.md](docs/06-sdk-integration.md) | CLI flag reference, Python SDK API, Node.js SDK API, Batch API |
 
 ---
 
