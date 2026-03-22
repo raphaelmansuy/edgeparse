@@ -1,0 +1,51 @@
+name: Release — Rust (crates.io)
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify version consistency
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CARGO_VERSION=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name=="edgeparse-core") | .version')
+          if [[ "$TAG_VERSION" != "$CARGO_VERSION" ]]; then
+            echo "ERROR: tag $TAG_VERSION ≠ Cargo.toml $CARGO_VERSION"
+            exit 1
+          fi
+
+      - name: Generate CHANGELOG
+        uses: taiki-e/install-action@git-cliff
+      - run: git-cliff --tag "$GITHUB_REF_NAME" --latest -o RELEASE_NOTES.md
+
+      - name: Publish edgeparse-core
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p edgeparse-core
+
+      - name: Wait for crates.io index
+        run: sleep 30
+
+      - name: Publish edgeparse CLI
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p edgeparse-cli --no-verify
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

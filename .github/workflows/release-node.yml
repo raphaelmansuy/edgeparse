@@ -1,0 +1,131 @@
+name: Release — Node.js (npm)
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+jobs:
+  build-native:
+    name: Build .node — ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            node-platform: linux-x64-gnu
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            node-platform: linux-arm64-gnu
+            use-cross: true
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            node-platform: darwin-x64
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            node-platform: darwin-arm64
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            node-platform: win32-x64-msvc
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: '${{ matrix.target }}' }
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cross (for aarch64 Linux)
+        if: matrix.use-cross
+        run: cargo install cross --locked
+
+      - name: Build Rust binding
+        run: |
+          if [[ "${{ matrix.use-cross }}" == "true" ]]; then
+            cross build --release --target ${{ matrix.target }} -p edgeparse-node
+          else
+            cargo build --release --target ${{ matrix.target }} -p edgeparse-node
+          fi
+        shell: bash
+
+      - name: Rename .node artifact
+        shell: bash
+        run: |
+          TARGET="${{ matrix.target }}"
+          if [[ "$TARGET" == *"windows"* ]]; then
+            SRC="target/${TARGET}/release/edgeparse_node.dll"
+          elif [[ "$TARGET" == *"apple"* ]]; then
+            SRC="target/${TARGET}/release/libedgeparse_node.dylib"
+          else
+            SRC="target/${TARGET}/release/libedgeparse_node.so"
+          fi
+          DEST="sdks/node/npm/${{ matrix.node-platform }}/edgeparse-node.${{ matrix.node-platform }}.node"
+          mkdir -p "sdks/node/npm/${{ matrix.node-platform }}"
+          cp "$SRC" "$DEST"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: node-${{ matrix.node-platform }}
+          path: sdks/node/npm/${{ matrix.node-platform }}/
+
+  publish-npm:
+    name: Publish to npm
+    needs: build-native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: sdks/node/npm/
+
+      - name: Sync version
+        run: |
+          node -e "
+          const fs = require('fs');
+          const version = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+          const dirs = [
+            'sdks/node',
+            ...fs.readdirSync('sdks/node/npm').map(d => \`sdks/node/npm/\${d}\`)
+          ];
+          dirs.forEach(dir => {
+            const p = \`\${dir}/package.json\`;
+            if (fs.existsSync(p)) {
+              const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
+              Object.keys(pkg.optionalDependencies || {}).forEach(k => {
+                pkg.optionalDependencies[k] = version;
+              });
+              pkg.version = version;
+              fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + '\n');
+            }
+          });
+          console.log('Version synced to: ' + version);
+          "
+
+      - run: |
+          cd sdks/node
+          npm ci
+          npm run build:ts
+
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for dir in sdks/node/npm/*/; do
+            (cd "$dir" && npm publish --access public) || echo "::warning::Failed to publish $dir"
+          done
+
+      - name: Publish @edgeparse/pdf
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd sdks/node
+          npm publish --access public

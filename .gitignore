@@ -1,0 +1,46 @@
+# Rust build artefacts
+/target/
+**/target/
+
+# Cargo generated files (keep Cargo.lock for binaries)
+# Uncomment the next line if this were a library crate:
+# Cargo.lock
+
+# Python virtual environments
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.so
+
+# Node.js
+node_modules/
+sdks/node/dist/
+*.node
+
+# uv cache
+.uv/
+
+
+# Benchmark generated outputs (not committed — too large)
+benchmark/prediction/
+benchmark/.venv/
+benchmark/.venvs/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+
+# Compiled binaries in examples
+examples/output/
+
+# Log files
+*.log
+
+mission/
+logs/
