@@ -1,0 +1,1475 @@
+{
+  "file name": "01030000000170.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "paragraph",
+      "id": 1,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        719.4501,
+        114.069384,
+        733.853682
+      ],
+      "font": "CormorantGaramond-Bold",
+      "font size": 14.418,
+      "text color": "[0.0]",
+      "content": "cropping."
+    },
+    {
+      "type": "paragraph",
+      "id": 2,
+      "page number": 1,
+      "bounding box": [
+        132.4581,
+        678.9193,
+        200.99220000000003,
+        689.2873
+      ],
+      "font": "Lora-Bold",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "Contour Farming"
+    },
+    {
+      "type": "paragraph",
+      "id": 3,
+      "page number": 1,
+      "bounding box": [
+        213.7947,
+        674.4643000000001,
+        248.11440000000002,
+        693.7423
+      ],
+      "font": "Lora-Bold",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "Contour Farming"
+    },
+    {
+      "type": "paragraph",
+      "id": 4,
+      "page number": 1,
+      "bounding box": [
+        282.3006,
+        674.4643000000001,
+        338.1825,
+        693.7423
+      ],
+      "font": "Lora-Bold",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "Contour Strip Cropping"
+    },
+    {
+      "type": "paragraph",
+      "id": 5,
+      "page number": 1,
+      "bounding box": [
+        374.5178,
+        674.4643000000001,
+        430.39970000000005,
+        693.7423
+      ],
+      "font": "Lora-Bold",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "Contour Strip Cropping"
+    },
+    {
+      "type": "paragraph",
+      "id": 6,
+      "page number": 1,
+      "bounding box": [
+        466.7349,
+        674.4643000000001,
+        522.6168,
+        693.7423
+      ],
+      "font": "Lora-Bold",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "Contour Strip Cropping"
+    },
+    {
+      "type": "paragraph",
+      "id": 7,
+      "page number": 1,
+      "bounding box": [
+        60.3379,
+        649.3543000000001,
+        118.6417,
+        668.6323
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "Slope Gradient (%)"
+    },
+    {
+      "type": "paragraph",
+      "id": 8,
+      "page number": 1,
+      "bounding box": [
+        132.4581,
+        658.2643,
+        201.97230000000002,
+        668.6323
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "Max Slope Length"
+    },
+    {
+      "type": "paragraph",
+      "id": 9,
+      "page number": 1,
+      "bounding box": [
+        132.4581,
+        649.3543000000001,
+        145.28040000000001,
+        659.7223
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "(ft)"
+    },
+    {
+      "type": "paragraph",
+      "id": 10,
+      "page number": 1,
+      "bounding box": [
+        213.7947,
+        653.8093,
+        243.66750000000002,
+        664.1773
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "P Value"
+    },
+    {
+      "type": "paragraph",
+      "id": 11,
+      "page number": 1,
+      "bounding box": [
+        282.3006,
+        653.8093,
+        340.6854,
+        664.1773
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "Strip Width (ft)"
+    },
+    {
+      "type": "paragraph",
+      "id": 12,
+      "page number": 1,
+      "bounding box": [
+        374.5178,
+        653.8093,
+        434.69270000000006,
+        664.1773
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "P Value, RGMM"
+    },
+    {
+      "type": "paragraph",
+      "id": 13,
+      "page number": 1,
+      "bounding box": [
+        466.7349,
+        653.8093,
+        524.5608,
+        664.1773
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "P Value, RRGM"
+    },
+    {
+      "type": "table",
+      "id": 14,
+      "level": "7",
+      "page number": 1,
+      "bounding box": [
+        60.3379,
+        552.1543,
+        485.3892,
+        642.8743000000001
+      ],
+      "number of rows": 6,
+      "number of columns": 6,
+      "next table id": 0,
+      "rows": [
+        {
+          "type": "table row",
+          "row number": 1,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                625.0543,
+                105.22295,
+                642.8743000000001
+              ],
+              "row number": 1,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                105.22295,
+                625.0543,
+                181.41675,
+                642.8743000000001
+              ],
+              "row number": 1,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                181.41675,
+                625.0543,
+                254.85974999999996,
+                642.8743000000001
+              ],
+              "row number": 1,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                254.85974999999996,
+                625.0543,
+                335.71945,
+                642.8743000000001
+              ],
+              "row number": 1,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                335.71945,
+                625.0543,
+                429.90895,
+                642.8743000000001
+              ],
+              "row number": 1,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                429.90895,
+                625.0543,
+                485.3892,
+                642.8743000000001
+              ],
+              "row number": 1,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 2,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                608.8543000000001,
+                105.22295,
+                625.0543
+              ],
+              "row number": 2,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                105.22295,
+                608.8543000000001,
+                181.41675,
+                625.0543
+              ],
+              "row number": 2,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                181.41675,
+                608.8543000000001,
+                254.85974999999996,
+                625.0543
+              ],
+              "row number": 2,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                254.85974999999996,
+                608.8543000000001,
+                335.71945,
+                625.0543
+              ],
+              "row number": 2,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                335.71945,
+                608.8543000000001,
+                429.90895,
+                625.0543
+              ],
+              "row number": 2,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                429.90895,
+                608.8543000000001,
+                485.3892,
+                625.0543
+              ],
+              "row number": 2,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 3,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                592.6543,
+                105.22295,
+                608.8543000000001
+              ],
+              "row number": 3,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                105.22295,
+                592.6543,
+                181.41675,
+                608.8543000000001
+              ],
+              "row number": 3,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                181.41675,
+                592.6543,
+                254.85974999999996,
+                608.8543000000001
+              ],
+              "row number": 3,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                254.85974999999996,
+                592.6543,
+                335.71945,
+                608.8543000000001
+              ],
+              "row number": 3,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                335.71945,
+                592.6543,
+                429.90895,
+                608.8543000000001
+              ],
+              "row number": 3,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                429.90895,
+                592.6543,
+                485.3892,
+                608.8543000000001
+              ],
+              "row number": 3,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 4,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                576.4543000000001,
+                105.22295,
+                592.6543
+              ],
+              "row number": 4,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                105.22295,
+                576.4543000000001,
+                181.41675,
+                592.6543
+              ],
+              "row number": 4,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                181.41675,
+                576.4543000000001,
+                254.85974999999996,
+                592.6543
+              ],
+              "row number": 4,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                254.85974999999996,
+                576.4543000000001,
+                335.71945,
+                592.6543
+              ],
+              "row number": 4,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                335.71945,
+                576.4543000000001,
+                429.90895,
+                592.6543
+              ],
+              "row number": 4,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                429.90895,
+                576.4543000000001,
+                485.3892,
+                592.6543
+              ],
+              "row number": 4,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 5,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                560.2543000000001,
+                105.22295,
+                576.4543000000001
+              ],
+              "row number": 5,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                105.22295,
+                560.2543000000001,
+                181.41675,
+                576.4543000000001
+              ],
+              "row number": 5,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                181.41675,
+                560.2543000000001,
+                254.85974999999996,
+                576.4543000000001
+              ],
+              "row number": 5,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                254.85974999999996,
+                560.2543000000001,
+                335.71945,
+                576.4543000000001
+              ],
+              "row number": 5,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                335.71945,
+                560.2543000000001,
+                429.90895,
+                576.4543000000001
+              ],
+              "row number": 5,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                429.90895,
+                560.2543000000001,
+                485.3892,
+                576.4543000000001
+              ],
+              "row number": 5,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 6,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                552.1543,
+                105.22295,
+                560.2543000000001
+              ],
+              "row number": 6,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                105.22295,
+                552.1543,
+                181.41675,
+                560.2543000000001
+              ],
+              "row number": 6,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                181.41675,
+                552.1543,
+                254.85974999999996,
+                560.2543000000001
+              ],
+              "row number": 6,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                254.85974999999996,
+                552.1543,
+                335.71945,
+                560.2543000000001
+              ],
+              "row number": 6,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                335.71945,
+                552.1543,
+                429.90895,
+                560.2543000000001
+              ],
+              "row number": 6,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                429.90895,
+                552.1543,
+                485.3892,
+                560.2543000000001
+              ],
+              "row number": 6,
+              "column number": 6,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": 15,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        495.5783,
+        557.6743,
+        535.0983
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "Table adapted from Jones et al. (1988) with permission. †Strip cropping uses a four-year rotation of row crop followed by one year of a small grain and two years of meadow (forages) for RGMM, or uses two years of row crops followed by one year of small grain and one year of meadow for RRGM. Meadow includes alfalfa, clover, grass, etc."
+    },
+    {
+      "type": "image",
+      "id": 16,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        462.0883,
+        75.44290000000001,
+        480.8383
+      ],
+      "source": "01030000000170_images/imageFile1.png"
+    },
+    {
+      "type": "paragraph",
+      "id": 17,
+      "page number": 1,
+      "bounding box": [
+        84.4429,
+        472.5783,
+        457.9878999999999,
+        484.0983
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "How does the erosion rate under contour tillage compare to the tolerable erosion rate?"
+    },
+    {
+      "type": "image",
+      "id": 18,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        416.0883,
+        75.44290000000001,
+        434.8383
+      ],
+      "source": "01030000000170_images/imageFile2.png"
+    },
+    {
+      "type": "paragraph",
+      "id": 19,
+      "page number": 1,
+      "bounding box": [
+        84.4429,
+        426.5783,
+        555.2779,
+        438.0983
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "How does the erosion rate under contour tillage compare to the erosion rate under conservation tillage alone?"
+    },
+    {
+      "type": "paragraph",
+      "id": 20,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        338.5783,
+        557.6743,
+        392.0983
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "Next we will test the impact of installing terraces on the landscape. Using Table 16.5, determine the Pt factor. When terraces are installed, contour tillage is usually used as well. Also, note that installing a terrace results in a shorter length of the slope (because the terrace stops water from continuing to run down slope), so this calculation is performed for each terrace individually. Also note that the net P factor is determined by multiplying the"
+    },
+    {
+      "type": "paragraph",
+      "id": 21,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        324.5783,
+        303.4999,
+        336.0983
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "Pc and Pt values together, or writing the RUSLE as follows:"
+    },
+    {
+      "type": "paragraph",
+      "id": 22,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        234.6455,
+        537.9341568948,
+        266.350682
+      ],
+      "font": "CormorantGaramond-Bold",
+      "font size": 14.418,
+      "text color": "[0.0]",
+      "content": "Table 16.5. Conservation practice (P) values for terraces with underground outlets or waterways."
+    },
+    {
+      "type": "paragraph",
+      "id": 23,
+      "page number": 1,
+      "bounding box": [
+        60.3379,
+        198.5698,
+        360.06219999999996,
+        208.93779999999998
+      ],
+      "font": "Lora-Bold",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "Terrace Interval Underground Outlets Waterways with percent grade of:"
+    },
+    {
+      "type": "paragraph",
+      "id": 24,
+      "page number": 1,
+      "bounding box": [
+        60.3379,
+        182.3698,
+        73.1602,
+        192.7378
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "(ft)"
+    },
+    {
+      "type": "paragraph",
+      "id": 25,
+      "page number": 1,
+      "bounding box": [
+        357.9319,
+        166.16979999999998,
+        436.60720000000003,
+        192.7378
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.1,
+      "text color": "[0.0]",
+      "content": "0.4-0.7 0.8 Pt Values Pt Values"
+    },
+    {
+      "type": "table",
+      "id": 26,
+      "level": "3",
+      "page number": 1,
+      "bounding box": [
+        60.3379,
+        68.96979999999999,
+        411.8293,
+        159.6898
+      ],
+      "number of rows": 6,
+      "number of columns": 5,
+      "next table id": 0,
+      "rows": [
+        {
+          "type": "table row",
+          "row number": 1,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                141.8698,
+                104.05765,
+                159.6898
+              ],
+              "row number": 1,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                104.05765,
+                141.8698,
+                182.2105,
+                159.6898
+              ],
+              "row number": 1,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                182.2105,
+                141.8698,
+                296.056,
+                159.6898
+              ],
+              "row number": 1,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                296.056,
+                141.8698,
+                385.13980000000004,
+                159.6898
+              ],
+              "row number": 1,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                385.13980000000004,
+                141.8698,
+                411.8293,
+                159.6898
+              ],
+              "row number": 1,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 2,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                125.6698,
+                104.05765,
+                141.8698
+              ],
+              "row number": 2,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                104.05765,
+                125.6698,
+                182.2105,
+                141.8698
+              ],
+              "row number": 2,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                182.2105,
+                125.6698,
+                296.056,
+                141.8698
+              ],
+              "row number": 2,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                296.056,
+                125.6698,
+                385.13980000000004,
+                141.8698
+              ],
+              "row number": 2,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                385.13980000000004,
+                125.6698,
+                411.8293,
+                141.8698
+              ],
+              "row number": 2,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 3,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                109.46979999999999,
+                104.05765,
+                125.6698
+              ],
+              "row number": 3,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                104.05765,
+                109.46979999999999,
+                182.2105,
+                125.6698
+              ],
+              "row number": 3,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                182.2105,
+                109.46979999999999,
+                296.056,
+                125.6698
+              ],
+              "row number": 3,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                296.056,
+                109.46979999999999,
+                385.13980000000004,
+                125.6698
+              ],
+              "row number": 3,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                385.13980000000004,
+                109.46979999999999,
+                411.8293,
+                125.6698
+              ],
+              "row number": 3,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 4,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                93.2698,
+                104.05765,
+                109.46979999999999
+              ],
+              "row number": 4,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                104.05765,
+                93.2698,
+                182.2105,
+                109.46979999999999
+              ],
+              "row number": 4,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                182.2105,
+                93.2698,
+                296.056,
+                109.46979999999999
+              ],
+              "row number": 4,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                296.056,
+                93.2698,
+                385.13980000000004,
+                109.46979999999999
+              ],
+              "row number": 4,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                385.13980000000004,
+                93.2698,
+                411.8293,
+                109.46979999999999
+              ],
+              "row number": 4,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 5,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                77.0698,
+                104.05765,
+                93.2698
+              ],
+              "row number": 5,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                104.05765,
+                77.0698,
+                182.2105,
+                93.2698
+              ],
+              "row number": 5,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                182.2105,
+                77.0698,
+                296.056,
+                93.2698
+              ],
+              "row number": 5,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                296.056,
+                77.0698,
+                385.13980000000004,
+                93.2698
+              ],
+              "row number": 5,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                385.13980000000004,
+                77.0698,
+                411.8293,
+                93.2698
+              ],
+              "row number": 5,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 6,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                60.3379,
+                68.96979999999999,
+                104.05765,
+                77.0698
+              ],
+              "row number": 6,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                104.05765,
+                68.96979999999999,
+                182.2105,
+                77.0698
+              ],
+              "row number": 6,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                182.2105,
+                68.96979999999999,
+                296.056,
+                77.0698
+              ],
+              "row number": 6,
+              "column number": 3,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                296.056,
+                68.96979999999999,
+                385.13980000000004,
+                77.0698
+              ],
+              "row number": 6,
+              "column number": 4,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                385.13980000000004,
+                68.96979999999999,
+                411.8293,
+                77.0698
+              ],
+              "row number": 6,
+              "column number": 5,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": 27,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        37.6265,
+        190.70090000000002,
+        47.8665
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.0,
+      "text color": "[0.0]",
+      "content": "146 | Soil Erosion and Conservation"
+    }
+  ]
+}
