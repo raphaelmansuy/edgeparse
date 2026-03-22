@@ -1483,6 +1483,7 @@ fn is_list_section_heading(text: &str) -> bool {
         && trimmed.len() <= 80
         && trimmed.chars().any(char::is_alphabetic)
         && !trimmed.chars().next().is_some_and(|c| c.is_ascii_digit())
+        && !trimmed.starts_with(|c: char| "•‣◦●○◆◇▪▫–—-".contains(c))
 }
 
 fn should_merge_paragraph_text(prev: &str, next: &str) -> bool {

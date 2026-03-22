@@ -1,0 +1,279 @@
+{
+  "file name": "01030000000167.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "paragraph",
+      "id": 1,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        680.3041,
+        557.6741,
+        734.1886000000001
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "The acidic cations adsorbed on the negative exchange sites are called the reserve (also residual or potential) and saltreplaceable (also exchangeable) acidity. The reserve and salt-replaceable acidity controls the level of soluble or active acidity in the soil solution. Only the active acidity is measured in a routine pH determination. The reserve and saltreplaceable acidity is always many times higher than the active acidity."
+    },
+    {
+      "type": "paragraph",
+      "id": 2,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        629.3041,
+        557.6742753999999,
+        668.8240999999999
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "A soil is acid when hydrogen ions predominate in the soil. The degree of acidity is expressed in terms of pH, which is defined as the negative logarithm of the hydrogen ion activity. Therefore, the pH of a 0.01-molar hydrogen ion solution is"
+    },
+    {
+      "type": "paragraph",
+      "id": 3,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        507.24809999999997,
+        557.6740037000001,
+        574.7681
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "At pH 7, the concentration of H+ ions and OH- ions are equal, and the soil or solution is neutral. At pH values less than 7, the soil is acid; at values more than 7, the soil is alkaline. Most soils vary in pH from about 4 to 10. Soils in areas with high rainfall are generally acid with a pH less than 7. Soils developed in high-lime deposits often will be alkaline. Soils high in calcium seldom have pH values higher than 7.5, but the presence of large amounts of calcium carbonate may cause the pH to be as high as 8.5. Where the pH is higher than 8.5, an excess of sodium is highly probable."
+    },
+    {
+      "type": "paragraph",
+      "id": 4,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        470.24809999999997,
+        557.6741204,
+        495.76809999999995
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "The most desirable soil pH for most crops in Kansas is 6.8. However, crops like blueberries need a lower pH, and other crops, like alfalfa, need a higher pH. At soil pH less than 5.8, several problems may occur:"
+    },
+    {
+      "type": "list",
+      "id": 12,
+      "level": "1",
+      "page number": 1,
+      "bounding box": [
+        63.0839,
+        359.3909,
+        277.2109,
+        454.91089999999997
+      ],
+      "numbering style": "bullets",
+      "number of list items": 7,
+      "next list id": 0,
+      "previous list id": 0,
+      "list items": [
+        {
+          "type": "list item",
+          "id": 5,
+          "page number": 1,
+          "bounding box": [
+            63.0839,
+            443.3909,
+            153.1729,
+            454.91089999999997
+          ],
+          "font": "Lora-Regular",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "• Al and Mn toxicity",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 6,
+          "page number": 1,
+          "bounding box": [
+            63.0839,
+            429.3909,
+            231.4999,
+            440.91089999999997
+          ],
+          "font": "Lora-Regular",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "• Inhibited growth of N-fixing bacteria",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 7,
+          "page number": 1,
+          "bounding box": [
+            63.0839,
+            415.3909,
+            237.9979,
+            426.91089999999997
+          ],
+          "font": "Lora-Regular",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "• Possible deficiencies in Mg and/or Ca.",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 8,
+          "page number": 1,
+          "bounding box": [
+            63.0839,
+            401.3909,
+            230.77990000000003,
+            412.91089999999997
+          ],
+          "font": "Lora-Regular",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "• P deficiency (P reacts with Fe and Al)",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 9,
+          "page number": 1,
+          "bounding box": [
+            63.0839,
+            387.3909,
+            277.2109,
+            398.91089999999997
+          ],
+          "font": "Lora-Regular",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "• At more than pH 7.5, other problems may occur:",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 10,
+          "page number": 1,
+          "bounding box": [
+            63.0839,
+            373.3909,
+            205.82289999999998,
+            384.91089999999997
+          ],
+          "font": "Lora-Regular",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "• Deficiency of Fe, Mn, Cu, or Zn",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 11,
+          "page number": 1,
+          "bounding box": [
+            63.0839,
+            359.3909,
+            203.5279,
+            370.91089999999997
+          ],
+          "font": "Lora-Regular",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "• P deficiency (P reacts with Ca)",
+          "kids": []
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": 13,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        311.3982,
+        166.5063584938,
+        325.801782
+      ],
+      "heading level": 1,
+      "font": "CormorantGaramond-Regular",
+      "font size": 14.418,
+      "text color": "[0.0]",
+      "content": "Buffering Capacity"
+    },
+    {
+      "type": "paragraph",
+      "id": 14,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        192.5965,
+        557.6742999999999,
+        288.1165
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "Buffering capacity is a measure of the soil’s ability to resist a change in pH, directly related to the magnitude of the exchange capacity. Small fluctuations in acid or base content can occur without a noticeable pH change as cations are adsorbed or released from the exchange complex. Soils with the largest cation exchange capacity have the greatest buffering of a pH change. In other words, two soils may have the same pH (active acidity in soil solution), but the one with the largest cation exchange capacity will have the most acidity stored in reserve and therefore the highest buffering capacity or ability to resist a change in pH. For this reason, it takes less lime to increase the pH of a sandy soil (low CEC) by a given amount than it takes to increase the pH of a clay soil (higher CEC) the same amount."
+    },
+    {
+      "type": "heading",
+      "id": 15,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        144.6038,
+        188.16675915840003,
+        159.007382
+      ],
+      "heading level": 1,
+      "font": "CormorantGaramond-Regular",
+      "font size": 14.418,
+      "text color": "[0.0]",
+      "content": "Sources of Soil Acidity"
+    },
+    {
+      "type": "paragraph",
+      "id": 16,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        67.802,
+        557.6741,
+        121.322
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "Controlling soil pH is vital to optimal use and productivity of soils. Adding lime is the most effective and practical way to raise the pH of acid soils. Elemental sulfur, iron sulfate, or aluminum sulfate can be used to reduce soil pH. Because acidity is a concern in Kansas, we will focus on raising soil pH. Understanding the following equations should help you understand the sources of soil acidity and soil reactions to lime."
+    },
+    {
+      "type": "paragraph",
+      "id": 17,
+      "page number": 1,
+      "bounding box": [
+        56.6929,
+        37.6265,
+        201.3169,
+        47.8665
+      ],
+      "font": "Lora-Regular",
+      "font size": 8.0,
+      "text color": "[0.0]",
+      "content": "124 | Soil Acidity and Adjusting Soil pH"
+    }
+  ]
+}
