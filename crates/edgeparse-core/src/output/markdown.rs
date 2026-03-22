@@ -49,6 +49,15 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
                     continue;
                 }
 
+                // Demote headings that sit in the bottom margin of the page
+                // (running footers misclassified as headings by the pipeline).
+                if looks_like_bottom_margin_heading(doc, i) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
+                    i += 1;
+                    continue;
+                }
+
                 if let Some(next_text) = next_mergeable_paragraph_text(doc.kids.get(i + 1)) {
                     if should_demote_heading_to_paragraph(trimmed, &next_text) {
                         let mut merged = trimmed.to_string();
@@ -1590,6 +1599,36 @@ fn looks_like_margin_page_number(doc: &PdfDocument, element: &ContentElement, te
     }
 
     bbox.top_y >= page_top - 24.0 || bbox.bottom_y <= page_bottom + 24.0
+}
+
+/// Check whether a pipeline heading sits in the bottom margin of its page.
+/// Running footers (e.g. "Report Title 21") are sometimes classified as
+/// headings by the pipeline.  A heading at the page bottom is very unlikely
+/// to be a real section heading.
+fn looks_like_bottom_margin_heading(doc: &PdfDocument, idx: usize) -> bool {
+    let element = &doc.kids[idx];
+    let bbox = element.bbox();
+    if bbox.height() > 30.0 {
+        return false;
+    }
+
+    let Some(page) = element.page_number() else {
+        return false;
+    };
+
+    let mut page_bottom = f64::MAX;
+    for candidate in &doc.kids {
+        if candidate.page_number() == Some(page) {
+            page_bottom = page_bottom.min(candidate.bbox().bottom_y);
+        }
+    }
+
+    if !page_bottom.is_finite() {
+        return false;
+    }
+
+    // If this heading is at the very bottom of the page content, skip it.
+    bbox.bottom_y <= page_bottom + 24.0
 }
 
 fn should_skip_heading_text(text: &str) -> bool {
