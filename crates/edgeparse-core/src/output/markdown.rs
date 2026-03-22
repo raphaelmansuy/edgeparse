@@ -204,6 +204,11 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
         i += 1;
     }
 
+    // Post-processing: merge adjacent pipe tables that share the same
+    // column count.  The table detector sometimes emits highlighted or
+    // coloured rows as separate tables.
+    let output = merge_adjacent_pipe_tables(&output);
+
     Ok(output)
 }
 
@@ -1879,7 +1884,6 @@ fn cell_text_content(cell: &crate::models::table::TableBorderCell) -> String {
 /// are separated only by blank lines and have identical column counts,
 /// they are merged into a single table by appending the second table's
 /// rows (including its header-now-body row) to the first.
-#[allow(dead_code)]
 fn merge_adjacent_pipe_tables(markdown: &str) -> String {
     let lines: Vec<&str> = markdown.lines().collect();
     if lines.len() < 4 {
