@@ -4,25 +4,35 @@
 Runs EdgeParse against multiple third-party PDF-to-Markdown engines and produces
 terminal + HTML reports with side-by-side metrics, charts, and rankings.
 
-Supported engines: edgeparse, opendataloader, docling, marker, mineru,
-                   pymupdf4llm, markitdown
+Engine groups:
+  Non-OCR (fast, no ML models): edgeparse, opendataloader, pymupdf4llm,
+                                 markitdown, liteparse
+  OCR / ML (model-heavy):       edgeparse, docling, marker, mineru
 
 Usage:
-    # Compare EdgeParse with lightweight tools (fast):
-    uv run python compare_all.py --engines edgeparse,pymupdf4llm,markitdown
+    # Non-OCR comparison (fast, recommended first run):
+    uv run python compare_all.py --group non-ocr --install
 
-    # Compare all installed engines (skip missing):
-    uv run python compare_all.py --all
+    # OCR/ML comparison (slow — installs isolated venvs for marker & mineru):
+    uv run python compare_all.py --group ocr --install
 
-    # Reuse existing results:
-    uv run python compare_all.py --all --no-run
-
-    # Install missing engines before running:
+    # Custom engine subset:
     uv run python compare_all.py --engines edgeparse,docling,pymupdf4llm --install
 
+    # All engines (slow):
+    uv run python compare_all.py --all --install
+
+    # Reuse existing results (no re-run):
+    uv run python compare_all.py --group non-ocr --no-run
+
+    # List engine availability:
+    uv run python compare_all.py --list
+
 Via Makefile:
+    make bench-non-ocr
+    make bench-ocr
+    make bench-ocr OCR_ENGINES=docling
     make bench-compare-all
-    make bench-compare-all ENGINES=edgeparse,pymupdf4llm,markitdown
 """
 
 from __future__ import annotations
@@ -42,7 +52,10 @@ from typing import Dict, List, Optional, Sequence
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from engine_registry import ENGINES, ENGINE_META, available_engines, display_name
+from engine_registry import (
+    ENGINES, ENGINE_META, NON_OCR_ENGINES, OCR_ENGINES,
+    available_engines, display_name,
+)
 from report_terminal import print_comparison_report, print_single_report
 from report_html import generate_html_report
 
@@ -60,22 +73,24 @@ PREDICTION_DIR = BENCH_DIR / "prediction"
 # Dedicated per-engine venvs for packages that conflict with the base environment
 # (marker-pdf and mineru[all] each carry incompatible torch/torchvision).
 ISOLATED_VENVS_DIR = BENCH_DIR / ".venvs"
-# Dedicated per-engine venvs for packages that conflict with the base environment
-# (e.g. marker-pdf and mineru[all] each carry incompatible torch/torchvision).
-ISOLATED_VENVS_DIR = BENCH_DIR / ".venvs"
 
-# All known engines in preferred display order (EdgeQuake removed)
-ALL_ENGINES = ["edgeparse", "opendataloader", "docling", "pymupdf4llm", "markitdown", "liteparse"]
+# All known engines in preferred display order
+ALL_ENGINES = [
+    # Non-OCR (fast)
+    "edgeparse", "opendataloader", "pymupdf4llm", "markitdown", "liteparse",
+    # OCR / ML
+    "docling", "marker", "mineru",
+]
 
 # pip install commands for each engine
 INSTALL_COMMANDS = {
     "opendataloader": "opendataloader-pdf>=2.0.0",
+    "pymupdf4llm":    "pymupdf4llm",
+    "markitdown":     "markitdown[all]",
+    "liteparse":      "@llamaindex/liteparse",  # installed via run.py node adapter
     "docling":        "docling",
     "marker":         "marker-pdf",
     "mineru":         "mineru[all]",
-    "pymupdf4llm":    "pymupdf4llm",
-    "markitdown":     "markitdown[all]",
-    # edgequake-pdf2md is a Rust binary installed via cargo, not pip
 }
 
 
@@ -265,6 +280,7 @@ def run_comparison(
     skip_run: bool = False,
     install_missing: bool = False,
     html_output: Optional[Path] = None,
+    title: str = "EdgeParse Multi-Engine Benchmark",
 ) -> Dict[str, dict]:
     """Run benchmarks for all specified engines and produce reports.
 
@@ -273,7 +289,7 @@ def run_comparison(
     # ── Header ────────────────────────────────────────────────────────────────
     print()
     print(f"╔{'═' * 68}╗")
-    print(f"║  {BOLD}EdgeParse Multi-Engine Benchmark{RESET}{'':40}║")
+    print(f"║  {BOLD}{title}{RESET}{'':>{68 - 4 - len(title)}}║")
     print(f"║  {DIM}Methodology: opendataloader.org/docs/benchmark{RESET}{'':21}║")
     print(f"╚{'═' * 68}╝")
     print()
@@ -370,10 +386,8 @@ def run_comparison(
             latest.unlink()
         latest.symlink_to(html_output.name)
     except OSError:
-        # Fallback: just copy
-        import shutil
         shutil.copy2(str(html_output), str(latest))
-    print(f"  {DIM}Latest report: {latest}{RESET}")
+    print(f"  {DIM}Latest: {latest}{RESET}")
 
     # ── Save comparison JSON ─────────────────────────────────────────────────
     comparison_json = html_output.with_suffix(".json")
@@ -406,22 +420,29 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  uv run python compare_all.py --engines edgeparse,pymupdf4llm,markitdown
-  uv run python compare_all.py --all --install
+  uv run python compare_all.py --group non-ocr --install
+  uv run python compare_all.py --group ocr --install
+  uv run python compare_all.py --engines edgeparse,docling,pymupdf4llm --install
   uv run python compare_all.py --all --no-run
   uv run python compare_all.py --list
         """,
     )
     parser.add_argument(
+        "--group",
+        choices=["non-ocr", "ocr", "all"],
+        default=None,
+        help="Engine group to benchmark: non-ocr (fast), ocr (ML/model-heavy), all",
+    )
+    parser.add_argument(
         "--engines",
         type=str,
         default=None,
-        help="Comma-separated list of engines to compare (e.g. edgeparse,docling,pymupdf4llm)",
+        help="Comma-separated list of engines (overrides --group). E.g. edgeparse,docling,pymupdf4llm",
     )
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Run all available engines",
+        help="Run all known engines (non-OCR + OCR). Equivalent to --group all.",
     )
     parser.add_argument(
         "--no-run",
@@ -438,6 +459,12 @@ Examples:
         type=str,
         default=None,
         help="Output path for HTML report (default: benchmark/reports/benchmark-<timestamp>.html)",
+    )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="Custom title for the HTML report header",
     )
     parser.add_argument(
         "--list",
@@ -464,15 +491,28 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         print_engine_status()
         return
 
-    # Determine engines to run
+    # ── Determine engine list ──────────────────────────────────────────────────
+    # Priority: --engines > --group > --all > default (installed only)
     if args.engines:
         engines = [e.strip() for e in args.engines.split(",") if e.strip()]
-    elif args.all:
+        default_title = "EdgeParse Benchmark — Custom Selection"
+    elif args.all or args.group == "all":
         engines = ALL_ENGINES
+        default_title = "EdgeParse Multi-Engine Benchmark — All Engines"
+    elif args.group == "non-ocr":
+        engines = list(NON_OCR_ENGINES)
+        default_title = "EdgeParse Benchmark — Non-OCR Tools"
+    elif args.group == "ocr":
+        engines = list(OCR_ENGINES)
+        default_title = "EdgeParse Benchmark — OCR / ML Tools"
     else:
-        # Default: edgeparse + whatever else is installed
-        engines = ["edgeparse"] + [e for e in ALL_ENGINES[1:] if _check_engine_available(e)]
+        # Default: edgeparse + whatever else is installed (non-OCR only)
+        engines = ["edgeparse"] + [
+            e for e in NON_OCR_ENGINES[1:] if _check_engine_available(e)
+        ]
+        default_title = "EdgeParse Benchmark"
 
+    title = args.title or default_title
     html_path = Path(args.html) if args.html else None
 
     run_comparison(
@@ -480,6 +520,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         skip_run=args.no_run,
         install_missing=args.install,
         html_output=html_path,
+        title=title,
     )
 
 
