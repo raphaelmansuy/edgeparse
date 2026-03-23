@@ -30,6 +30,14 @@ jobs:
         uses: taiki-e/install-action@git-cliff
       - run: git-cliff --tag "$GITHUB_REF_NAME" --latest -o RELEASE_NOTES.md
 
+      - name: Publish pdf-cos (lopdf fork)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p pdf-cos
+
+      - name: Wait for crates.io index (pdf-cos)
+        run: sleep 30
+
       - name: Publish edgeparse-core
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

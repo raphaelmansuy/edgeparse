@@ -75,6 +75,7 @@ jobs:
     name: Publish to npm
     needs: build-native
     runs-on: ubuntu-latest
+    environment: npm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -100,6 +101,7 @@ jobs:
             const p = \`\${dir}/package.json\`;
             if (fs.existsSync(p)) {
               const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
+              // Update optionalDependencies versions
               Object.keys(pkg.optionalDependencies || {}).forEach(k => {
                 pkg.optionalDependencies[k] = version;
               });
@@ -123,7 +125,7 @@ jobs:
             (cd "$dir" && npm publish --access public) || echo "::warning::Failed to publish $dir"
           done
 
-      - name: Publish @edgeparse/pdf
+      - name: Publish edgeparse (main package)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |

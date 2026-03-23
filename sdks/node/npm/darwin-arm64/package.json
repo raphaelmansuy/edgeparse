@@ -9,7 +9,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/opendataloader-project/edgeparse.git",
+    "url": "https://github.com/raphaelmansuy/edgeparse.git",
     "directory": "sdks/node/npm/darwin-arm64"
   }
 }

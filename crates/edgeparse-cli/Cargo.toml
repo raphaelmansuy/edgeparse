@@ -9,7 +9,7 @@ description = "EdgeParse CLI — convert PDFs to Markdown, JSON, HTML"
 readme = "README.md"
 keywords = ["pdf", "cli", "markdown", "extraction"]
 categories = ["command-line-utilities", "text-processing"]
-documentation = "https://docs.rs/edgeparse"
+documentation = "https://docs.rs/edgeparse-cli"
 
 [[bin]]
 name = "edgeparse"

@@ -366,7 +366,7 @@ IMAGE_OUTPUTS  = ("off", "embedded", "external")
 
 ## 3. Node.js SDK
 
-**Package name:** `@edgeparse/pdf`  
+**Package name:** `edgeparse`  
 **Requires:** Node.js ≥ 18  
 **Source (TypeScript wrapper):** [`sdks/node/src/`](../sdks/node/src/)  
 **Source (Rust addon):** [`crates/edgeparse-node/src/lib.rs`](../crates/edgeparse-node/src/lib.rs)  
@@ -376,7 +376,7 @@ IMAGE_OUTPUTS  = ("off", "embedded", "external")
 
 ```
 sdks/node/
-├── package.json               # @edgeparse/pdf, optionalDependencies per platform
+├── package.json               # edgeparse, optionalDependencies per platform
 ├── tsconfig.json
 ├── src/
 │   ├── index.ts               # convert(), version() — public API
@@ -392,18 +392,18 @@ sdks/node/
     └── convert.test.ts        # vitest tests
 ```
 
-Platform packages (`@edgeparse/pdf-{platform}`) are loaded at runtime by
+Platform packages (`edgeparse-{platform}`) are loaded at runtime by
 `loadNative()` in `index.ts` using `process.platform`/`process.arch` as the
 lookup key.
 
 ### Installation
 
 ```bash
-npm install @edgeparse/pdf
+npm install edgeparse
 # or
-yarn add @edgeparse/pdf
+yarn add edgeparse
 # or
-pnpm add @edgeparse/pdf
+pnpm add edgeparse
 ```
 
 The correct platform native addon is automatically selected via
@@ -414,7 +414,7 @@ The correct platform native addon is automatically selected via
 Defined in [`sdks/node/src/index.ts`](../sdks/node/src/index.ts):
 
 ```ts
-import { convert } from '@edgeparse/pdf';
+import { convert } from 'edgeparse';
 
 function convert(inputPath: string, options?: ConvertOptions): string
 ```
@@ -463,7 +463,7 @@ n.convert(inputPath, options ? {
 ### `version()`
 
 ```ts
-import { version } from '@edgeparse/pdf';
+import { version } from 'edgeparse';
 
 function version(): string
 ```
@@ -473,7 +473,7 @@ Returns the edgeparse version string from the native addon.
 ### Example usage
 
 ```ts
-import { convert } from '@edgeparse/pdf';
+import { convert } from 'edgeparse';
 
 // Markdown (default format)
 const md = convert('report.pdf');
@@ -499,7 +499,7 @@ const secure = convert('secure.pdf', { password: 'hunter2' });
 **Entry point:** `edgeparse` binary (registered in `package.json` → `bin.edgeparse`)
 
 ```bash
-npx @edgeparse/pdf [options] <input.pdf>
+npx edgeparse [options] <input.pdf>
 # or after install:
 edgeparse [options] <input.pdf>
 ```

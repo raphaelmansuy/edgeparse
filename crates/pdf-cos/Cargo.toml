@@ -35,7 +35,7 @@ keywords = [
 ]
 categories = ["text-processing"]
 license = "MIT"
-repository = "https://github.com/edgeparse-project/edgeparse"
+repository = "https://github.com/raphaelmansuy/edgeparse"
 exclude = [".cargo_vcs_info.json", ".cargo-ok", "Cargo.toml.orig"]
 
 [badges.travis-ci]

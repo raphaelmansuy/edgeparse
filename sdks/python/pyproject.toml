@@ -25,9 +25,9 @@ keywords = ["pdf", "extraction", "markdown", "rag", "llm"]
 description = "High-performance PDF-to-structured-data extraction — Rust engine, Python interface"
 
 [project.urls]
-Homepage = "https://github.com/opendataloader-project/edgeparse"
-Repository = "https://github.com/opendataloader-project/edgeparse"
-Documentation = "https://opendataloader-project.github.io/edgeparse"
+Homepage = "https://github.com/raphaelmansuy/edgeparse"
+Repository = "https://github.com/raphaelmansuy/edgeparse"
+Documentation = "https://github.com/raphaelmansuy/edgeparse/tree/main/docs"
 
 [project.scripts]
 edgeparse = "edgeparse.cli:main"

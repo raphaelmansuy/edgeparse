@@ -45,4 +45,4 @@ edgeparse /path/to/dir/ --output-dir out/  # batch convert
 
 - [GitHub](https://github.com/raphaelmansuy/edgeparse)
 - [crates.io (Rust)](https://crates.io/crates/edgeparse-core)
-- [npm (@edgeparse/pdf)](https://www.npmjs.com/package/@edgeparse/pdf)
+- [npm (edgeparse)](https://www.npmjs.com/package/edgeparse)

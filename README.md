@@ -4,10 +4,13 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
+[![crates.io](https://img.shields.io/crates/v/edgeparse-cli.svg)](https://crates.io/crates/edgeparse-cli)
+[![PyPI](https://img.shields.io/pypi/v/edgeparse.svg)](https://pypi.org/project/edgeparse/)
+[![npm](https://img.shields.io/npm/v/edgeparse.svg)](https://www.npmjs.com/package/edgeparse)
 
 EdgeParse converts any digital PDF into Markdown, JSON (with bounding boxes), HTML, or plain text — deterministically, without a JVM, without a GPU, without OCR models, and with **best-in-class accuracy** among non-OCR tools on the 200-document benchmark suite included in this repository.
 
-Available as a **Rust library**, **CLI binary**, **Python package** (`edgeparse`), and **Node.js package** (`@edgeparse/pdf`).
+Available as a **Rust library**, **CLI binary**, **Python package** (`edgeparse`), and **Node.js package** (`edgeparse`).
 
 ---
 
@@ -110,7 +113,7 @@ md = edgeparse.convert(
 ### Node.js
 
 ```js
-import { convert } from '@edgeparse/pdf';
+import { convert } from 'edgeparse';
 
 // Convert to Markdown (returns a string)
 const md = convert('report.pdf', { format: 'markdown' });
@@ -131,7 +134,24 @@ const result = convert('report.pdf', {
 
 ## Installation
 
-### Rust CLI (from source)
+### CLI (from crates.io)
+
+```bash
+cargo install edgeparse-cli
+```
+
+### Rust library
+
+Add to `Cargo.toml`:
+
+```toml
+[dependencies]
+edgeparse-core = "0.1"
+```
+
+Docs: [docs.rs/edgeparse-core](https://docs.rs/edgeparse-core) · [docs.rs/edgeparse-cli](https://docs.rs/edgeparse-cli)
+
+### CLI (from source)
 
 Requires [Rust 1.85+](https://rustup.rs/).
 
@@ -159,7 +179,7 @@ maturin develop --release
 ### Node.js
 
 ```bash
-npm install @edgeparse/pdf
+npm install edgeparse
 ```
 
 Requires Node.js 18+. Pre-built native addons for macOS (arm64, x64), Linux (x64, arm64), and Windows (x64).
@@ -302,12 +322,12 @@ edgeparse *.pdf --format json --output-dir out/ --pages "1-3"
 
 ## Node.js SDK
 
-**Package:** `@edgeparse/pdf` · **Requires:** Node.js 18+ · **Source:** [`sdks/node/`](sdks/node/)
+**Package:** `edgeparse` · **Requires:** Node.js 18+ · **Source:** [`sdks/node/`](sdks/node/)
 
 ### `convert()`
 
 ```ts
-import { convert } from '@edgeparse/pdf';
+import { convert } from 'edgeparse';
 
 function convert(inputPath: string, options?: ConvertOptions): string
 ```
@@ -328,8 +348,8 @@ interface ConvertOptions {
 ### CLI (Node.js package)
 
 ```bash
-npx @edgeparse/pdf report.pdf -f markdown -o output.md
-npx @edgeparse/pdf report.pdf --format json --pages "1-5"
+npx edgeparse report.pdf -f markdown -o output.md
+npx edgeparse report.pdf --format json --pages "1-5"
 ```
 
 ---
@@ -501,6 +521,7 @@ Technical documentation lives in [`docs/`](docs/):
 | [docs/04-pdf-extraction.md](docs/04-pdf-extraction.md) | PDF loader, chunk parser, font/CMap decoding |
 | [docs/05-output-formats.md](docs/05-output-formats.md) | JSON schema, Markdown renderer, HTML/text/CSV output |
 | [docs/06-sdk-integration.md](docs/06-sdk-integration.md) | CLI flag reference, Python SDK API, Node.js SDK API, Batch API |
+| [docs/07-cicd-publishing.md](docs/07-cicd-publishing.md) | CI/CD publishing pipeline — how it works and how to configure it |
 
 ---
 
