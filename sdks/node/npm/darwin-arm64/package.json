@@ -1,5 +1,5 @@
 {
-  "name": "@edgeparse/pdf-darwin-arm64",
+  "name": "edgeparse-darwin-arm64",
   "version": "0.1.0",
   "os": ["darwin"],
   "cpu": ["arm64"],

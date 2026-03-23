@@ -1,5 +1,5 @@
 {
-  "name": "@edgeparse/pdf-linux-arm64-gnu",
+  "name": "edgeparse-linux-arm64-gnu",
   "version": "0.1.0",
   "os": ["linux"],
   "cpu": ["arm64"],

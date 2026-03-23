@@ -6,11 +6,11 @@ function loadNative(): {
   version: () => string;
 } {
   const platforms: Record<string, string> = {
-    'linux-x64':    '@edgeparse/pdf-linux-x64-gnu',
-    'linux-arm64':  '@edgeparse/pdf-linux-arm64-gnu',
-    'darwin-x64':   '@edgeparse/pdf-darwin-x64',
-    'darwin-arm64': '@edgeparse/pdf-darwin-arm64',
-    'win32-x64':    '@edgeparse/pdf-win32-x64-msvc',
+    'linux-x64':    'edgeparse-linux-x64-gnu',
+    'linux-arm64':  'edgeparse-linux-arm64-gnu',
+    'darwin-x64':   'edgeparse-darwin-x64',
+    'darwin-arm64': 'edgeparse-darwin-arm64',
+    'win32-x64':    'edgeparse-win32-x64-msvc',
   };
   const key = `${process.platform}-${process.arch}`;
   const pkg = platforms[key];
