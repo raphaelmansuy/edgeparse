@@ -16,7 +16,7 @@ name = "edgeparse"
 path = "src/main.rs"
 
 [dependencies]
-edgeparse-core = { path = "../edgeparse-core" }
+edgeparse-core = { path = "../edgeparse-core", version = "0.1.0" }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
