@@ -27,6 +27,7 @@ Available as a **Rust library**, **CLI binary**, **Python package** (`edgeparse`
   - [Why it matters](#why-it-matters)
   - [Results on 200-document benchmark suite](#results-on-200-document-benchmark-suite)
   - [Running the benchmark](#running-the-benchmark)
+- [Tutorials](#tutorials)
 - [Documentation](#documentation)
 - [Project Layout](#project-layout)
 - [Contributing](#contributing)
@@ -505,6 +506,20 @@ HTML reports are written to `benchmark/reports/`.
   "elapsed_per_doc": 2.0
 }
 ```
+
+---
+
+## Tutorials
+
+Step-by-step guides with working examples live in [`tutorials/`](tutorials/):
+
+| Tutorial | Description |
+|----------|-------------|
+| [tutorials/01-cli.md](tutorials/01-cli.md) | All CLI flags with working examples and output samples |
+| [tutorials/02-python-sdk.md](tutorials/02-python-sdk.md) | `pip install edgeparse` — full API, batch processing, JSON parsing |
+| [tutorials/03-nodejs-sdk.md](tutorials/03-nodejs-sdk.md) | `npm install edgeparse` — TypeScript, CJS, and worker threads |
+| [tutorials/04-rust-library.md](tutorials/04-rust-library.md) | `edgeparse-core` in your Rust project — config, models, Rayon |
+| [tutorials/05-output-formats.md](tutorials/05-output-formats.md) | JSON schema, bounding boxes, Markdown variants, HTML, plain text |
 
 ---
 
