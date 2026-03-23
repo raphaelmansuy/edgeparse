@@ -1,0 +1,61 @@
+---
+title: "Architecture Overview"
+description: "EdgeParse crate structure, pipeline stages, and design decisions."
+---
+
+## Crate Dependency Graph
+
+```
+edgeparse-cli
+  └── edgeparse-core
+        └── pdf-cos
+
+edgeparse-python
+  └── edgeparse-core (via PyO3)
+
+edgeparse-node
+  └── edgeparse-core (via napi-rs)
+```
+
+## Crates
+
+| Crate | Purpose |
+|-------|---------|
+| `pdf-cos` | Low-level COS object parser (xref, streams, filters) |
+| `edgeparse-core` | Document model, extraction pipeline, renderers |
+| `edgeparse-cli` | CLI binary |
+| `edgeparse-python` | Python bindings (PyO3 + maturin) |
+| `edgeparse-node` | Node.js bindings (napi-rs) |
+
+## Pipeline Stages
+
+EdgeParse processes a PDF through a 20-stage pipeline:
+
+1. **Byte loading** — read file or buffer
+2. **Header parse** — verify `%PDF-` magic
+3. **Xref parse** — locate cross-reference table
+4. **Trailer parse** — extract root, info, encrypt refs
+5. **Object resolve** — dereference indirect objects
+6. **Stream decode** — decompress FlateDecode, LZW, etc.
+7. **Page tree walk** — enumerate pages from `/Pages` tree
+8. **Content stream parse** — tokenize PDF operators (Tj, TJ, Tm, etc.)
+9. **Font map build** — extract /ToUnicode, /Encoding, built-in maps
+10. **Glyph decode** — map character codes → Unicode
+11. **Text run assembly** — group characters into runs by font/position
+12. **Line detection** — cluster runs into lines by baseline
+13. **Reading order** — sort lines into column-aware reading order
+14. **Paragraph merge** — join lines into paragraphs by indentation/spacing
+15. **Table detection** — identify grid structures via ruling lines
+16. **Heading detection** — classify headings by font-size heuristics
+17. **List detection** — recognize bullet/numbered lists
+18. **Image extraction** — decode inline/XObject images
+19. **Document model build** — assemble `Block` tree
+20. **Rendering** — output JSON, Markdown, HTML, or plain text
+
+## Design Principles
+
+- **Zero ML dependency** — all extraction is rule-based
+- **Zero copy where possible** — borrowed references into the PDF byte buffer
+- **No unsafe** — safe Rust only (except FFI boundaries)
+- **Streaming capable** — pages can be processed independently
+- **Deterministic** — same input always produces same output

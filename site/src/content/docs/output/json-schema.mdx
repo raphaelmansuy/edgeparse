@@ -1,0 +1,97 @@
+---
+title: "JSON Schema"
+description: "Complete reference for EdgeParse's structured JSON output format."
+---
+
+## Top-Level Structure
+
+The `--format json` output uses a flat `kids` array:
+
+```json
+{
+  "file name": "document.pdf",
+  "number of pages": 12,
+  "author": "string | null",
+  "title": "string | null",
+  "creation date": "string | null",
+  "modification date": "string | null",
+  "kids": [Element]
+}
+```
+
+## Element Object
+
+Each element in `kids` has a `type` field identifying its kind:
+
+| Field | Type | Description |
+|-------|------|------------|
+| `type` | `string` | `"heading"`, `"paragraph"`, `"table"`, `"list"`, `"image"`, `"caption"`, `"header"`, `"footer"` |
+| `id` | `int` | Globally unique sequential ID |
+| `page number` | `int` | 1-based page index |
+| `bounding box` | `[left, bottom, right, top]` | Coordinates in PDF points |
+| `content` | `string` | Extracted text |
+| `font` | `string` | Font name |
+| `font size` | `float` | Font size in points |
+
+## Heading-Specific Fields
+
+| Field | Type | Description |
+|-------|------|------------|
+| `level` | `string` | `"title"`, `"section"`, `"subsection"` |
+| `heading level` | `int` | Numeric heading level (1–6) |
+
+## Table-Specific Fields
+
+| Field | Type | Description |
+|-------|------|------------|
+| `rows` | `Row[]` | Array of row objects |
+
+### Row Object
+
+| Field | Type | Description |
+|-------|------|------------|
+| `row number` | `int` | 0-based row index |
+| `cells` | `Cell[]` | Array of cell objects |
+
+### Cell Object
+
+| Field | Type | Description |
+|-------|------|------------|
+| `col` | `int` | 0-based column index |
+| `content` | `string` | Cell text |
+| `is header` | `bool?` | Whether in a header row |
+| `row span` | `int?` | Rows spanned (default: 1) |
+| `col span` | `int?` | Columns spanned (default: 1) |
+
+## Full Example
+
+```json
+{
+  "file name": "report.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": "Quarterly Report",
+  "creation date": "2024-01-15",
+  "modification date": null,
+  "kids": [
+    {
+      "type": "heading",
+      "id": 1,
+      "level": "title",
+      "heading level": 1,
+      "page number": 1,
+      "bounding box": [72, 90, 540, 120],
+      "font": "Helvetica-Bold",
+      "font size": 24.0,
+      "content": "Quarterly Report"
+    },
+    {
+      "type": "paragraph",
+      "id": 2,
+      "page number": 1,
+      "bounding box": [72, 140, 540, 200],
+      "content": "Revenue grew 23% year-over-year."
+    }
+  ]
+}
+```

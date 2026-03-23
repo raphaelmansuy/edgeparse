@@ -1,0 +1,49 @@
+---
+title: "Heading Detection"
+description: "How EdgeParse identifies heading hierarchy from font analysis and structural cues."
+---
+
+## Approach
+
+EdgeParse determines heading levels by analyzing:
+
+1. **Font size** — larger text is more likely to be a heading
+2. **Font weight** — bold text signals heading intent
+3. **Spacing** — headings typically have more vertical space above
+4. **Position** — headings often start at the left margin
+5. **Tagged PDF structure** — H1–H6 tags when available
+
+## Heading Levels
+
+| Level | Typical Characteristics |
+|-------|------------------------|
+| `title` (H1) | Largest font size, first element |
+| `section` (H2) | Second-largest font, bold |
+| `subsection` (H3) | Third-largest font, bold |
+| `sub-subsection` (H4) | Bold, slightly larger than body |
+
+## MHS Score
+
+EdgeParse achieves a **MHS (Markdown Heading Similarity) score of 0.818**:
+
+| Tool | MHS Score |
+|------|-----------|
+| Docling | 0.824 |
+| **EdgeParse** | **0.818** |
+| Marker | 0.794 |
+| PyMuPDF4LLM | 0.774 |
+
+## Output
+
+```json
+{
+  "type": "heading",
+  "id": 1,
+  "level": "section",
+  "heading level": 2,
+  "page number": 1,
+  "content": "Financial Overview",
+  "font": "Helvetica-Bold",
+  "font size": 18.0
+}
+```

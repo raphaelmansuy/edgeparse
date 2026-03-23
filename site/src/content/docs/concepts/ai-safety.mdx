@@ -1,0 +1,51 @@
+---
+title: "AI Safety Filters"
+description: "Content safety filters: hidden text, off-page content, tiny text. Protect RAG from prompt injection."
+---
+
+## Why Safety Matters
+
+PDFs can contain hidden content that's invisible to humans but extracted by parsers. Malicious PDFs can use this to inject prompts into LLM pipelines.
+
+## Safety Filters
+
+EdgeParse includes built-in content safety filters:
+
+### Hidden Text Detection
+
+Text rendered with the same color as the background, or with render mode 3 (invisible), is flagged and optionally excluded.
+
+### Off-Page Content
+
+Content positioned outside the visible page area (negative coordinates, beyond page boundaries) is detected and filtered.
+
+### Tiny Text
+
+Text smaller than a configurable threshold (default: 3pt) is flagged. This catches hidden micro-text used for SEO manipulation or prompt injection.
+
+### OCG Layer Filtering
+
+Optional Content Groups (OCG) that are set to invisible by default are detected and handled appropriately.
+
+## Configuration
+
+```python
+import edgeparse
+
+# Safety filters are enabled by default
+markdown = edgeparse.convert("document.pdf", format="markdown")
+
+# All content including hidden text
+markdown = edgeparse.convert("document.pdf",
+    format="markdown",
+    include_hidden=True
+)
+```
+
+## RAG Security
+
+When building RAG pipelines, these filters help prevent:
+
+- **Prompt injection** — hidden instructions embedded in PDFs
+- **Data poisoning** — invisible content that skews embeddings
+- **Context pollution** — irrelevant hidden text diluting retrieval quality

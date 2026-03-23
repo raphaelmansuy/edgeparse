@@ -1,0 +1,49 @@
+---
+title: "Image Extraction"
+description: "Extract and handle images from PDF documents."
+---
+
+## Overview
+
+EdgeParse can detect and extract images embedded in PDF documents, reporting their bounding boxes and page locations.
+
+## Image Detection
+
+Images are identified in the JSON output:
+
+```json
+{
+  "type": "image",
+  "id": 5,
+  "page number": 1,
+  "bounding box": [72, 300, 540, 500]
+}
+```
+
+## CLI Usage
+
+```bash
+# Extract with image metadata
+edgeparse document.pdf -f json
+
+# Images are reported in the kids array with type "image"
+```
+
+## Python Usage
+
+```python
+import edgeparse
+import json
+
+json_str = edgeparse.convert("document.pdf", format="json")
+data = json.loads(json_str)
+
+for element in data["kids"]:
+    if element["type"] == "image":
+        print(f"Image on page {element['page number']}")
+        print(f"  Bounding box: {element['bounding box']}")
+```
+
+## Markdown Output
+
+In Markdown format, images are represented as placeholders with their page and position information.

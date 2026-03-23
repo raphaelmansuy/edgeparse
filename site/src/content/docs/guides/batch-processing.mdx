@@ -1,0 +1,55 @@
+---
+title: "Batch Processing"
+description: "Process multiple PDFs efficiently with EdgeParse."
+---
+
+## CLI Batch Processing
+
+```bash
+# Process all PDFs in a directory
+edgeparse ./documents/*.pdf -f markdown --output-dir ./results/
+
+# Process with specific format
+edgeparse ./invoices/*.pdf -f json --output-dir ./output/
+```
+
+## Python Batch Processing
+
+```python
+import edgeparse
+from pathlib import Path
+
+input_dir = Path("documents")
+output_dir = Path("results")
+output_dir.mkdir(exist_ok=True)
+
+for pdf_path in input_dir.glob("*.pdf"):
+    edgeparse.convert_file(str(pdf_path), str(output_dir), format="markdown")
+    print(f"Processed: {pdf_path.name}")
+```
+
+## Node.js Batch Processing
+
+```javascript
+import { convert } from "edgeparse";
+import { readdirSync, writeFileSync } from "fs";
+import { join, basename } from "path";
+
+const inputDir = "documents";
+const outputDir = "results";
+
+const files = readdirSync(inputDir).filter(f => f.endsWith(".pdf"));
+
+for (const file of files) {
+  const result = convert(join(inputDir, file), { format: "markdown" });
+  const outName = basename(file, ".pdf") + ".md";
+  writeFileSync(join(outputDir, outName), result);
+  console.log(`Processed: ${file}`);
+}
+```
+
+## Performance Tips
+
+- EdgeParse processes each page in parallel using Rayon
+- For large batches, the CLI handles parallelism automatically
+- Expect ~40 pages/second on modern hardware (single-threaded)

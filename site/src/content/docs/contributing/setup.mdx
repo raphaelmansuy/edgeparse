@@ -1,0 +1,63 @@
+---
+title: "Development Setup"
+description: "Set up a local development environment for EdgeParse."
+---
+
+## Prerequisites
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Rust | 1.75+ | Core library |
+| Python | 3.10+ | Python SDK |
+| Node.js | 22 LTS | Node.js SDK |
+| maturin | latest | Python ↔ Rust bridge |
+| pnpm | 10+ | Website / Node SDK |
+
+## Clone & Build
+
+```bash
+git clone https://github.com/raphaelmansuy/edgeparse.git
+cd edgeparse
+cargo build          # debug build
+cargo build --release # release build
+```
+
+## Run Tests
+
+```bash
+cargo test --workspace
+```
+
+## Python SDK (dev mode)
+
+```bash
+cd crates/edgeparse-python
+maturin develop --release
+python -c "import edgeparse; print(edgeparse.__version__)"
+```
+
+## Node.js SDK (dev mode)
+
+```bash
+cd crates/edgeparse-node
+pnpm install
+pnpm build
+node -e "const ep = require('./index.js'); console.log(ep)"
+```
+
+## Website (dev mode)
+
+```bash
+cd site
+pnpm install
+pnpm dev   # starts at http://localhost:4321/edgeparse/
+```
+
+## Useful Make Targets
+
+```bash
+make build    # release build
+make test     # run all tests
+make lint     # clippy + fmt check
+make bench    # run benchmarks
+```

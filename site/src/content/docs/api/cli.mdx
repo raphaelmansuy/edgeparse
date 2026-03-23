@@ -1,0 +1,58 @@
+---
+title: "CLI Reference"
+description: "Complete CLI flag reference for edgeparse-cli."
+---
+
+## Usage
+
+```bash
+edgeparse [OPTIONS] <FILE>...
+```
+
+## Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `<FILE>...` | One or more PDF files to process |
+
+## Options
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--format <FMT>` | `-f` | `markdown` | Output format: `json`, `markdown`, `html`, `text` |
+| `--output-dir <DIR>` | `-o` | stdout | Write output to directory |
+| `--pages <RANGE>` | | all | Page range, e.g. `1-5` |
+| `--hybrid <BACKEND>` | | none | Enable hybrid mode |
+| `--help` | `-h` | | Show help |
+| `--version` | `-V` | | Show version |
+
+## Examples
+
+```bash
+# Parse to JSON
+edgeparse report.pdf -f json
+
+# Parse to Markdown, save to file
+edgeparse report.pdf -f markdown -o output/
+
+# Process page range
+edgeparse report.pdf -f json --pages 1-10
+
+# Batch process
+edgeparse ./pdfs/*.pdf -f markdown -o results/
+
+# Hybrid mode
+edgeparse report.pdf -f json --hybrid docling-fast
+```
+
+## Installation
+
+```bash
+# From crates.io
+cargo install edgeparse-cli
+
+# From source
+git clone https://github.com/raphaelmansuy/edgeparse.git
+cd edgeparse
+cargo install --path crates/edgeparse-cli
+```

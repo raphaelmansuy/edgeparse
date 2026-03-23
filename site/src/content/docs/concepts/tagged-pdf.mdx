@@ -1,0 +1,33 @@
+---
+title: "Tagged PDF Support"
+description: "How EdgeParse uses PDF structure trees for improved extraction accuracy."
+---
+
+## What Are Tagged PDFs?
+
+Tagged PDFs include a structure tree that describes the logical organization of content — headings, paragraphs, lists, tables, and figures — with semantic tags similar to HTML.
+
+## How EdgeParse Uses Tags
+
+When a PDF contains structure tags, EdgeParse uses them to:
+
+1. **Validate heading levels** — confirm font-based heading detection with H1–H6 tags
+2. **Identify table structure** — use `<Table>`, `<TR>`, `<TD>`, `<TH>` tags
+3. **Detect lists** — recognize `<L>`, `<LI>`, `<LBody>` tag patterns
+4. **Mark figures** — identify `<Figure>` tags with alt text
+
+## Fallback Behavior
+
+Most PDFs in the wild are **not** tagged. EdgeParse's pipeline works equally well without tags, using font analysis, spatial layout, and alignment patterns as the primary extraction method.
+
+Tagged PDF data is used as supplementary information to improve accuracy when available.
+
+## Detection
+
+```python
+import edgeparse
+
+result = edgeparse.convert("document.pdf", format="json")
+# Tagged PDF information is automatically incorporated
+# into the extraction when available
+```

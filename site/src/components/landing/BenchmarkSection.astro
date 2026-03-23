@@ -1,0 +1,235 @@
+---
+interface Tool {
+  name: string;
+  nid: number;
+  teds: number;
+  mhs: number;
+  overall: number;
+  speed: string;
+  isHighlight: boolean;
+}
+
+interface Props {
+  title: string;
+  subtitle: string;
+  tools: Tool[];
+  note: string;
+}
+
+const { title, subtitle, tools, note } = Astro.props;
+const maxOverall = Math.max(...tools.map(t => t.overall));
+---
+
+<section class="benchmark-section" aria-labelledby="benchmark-heading">
+  <h2 id="benchmark-heading" class="section-title">{title}</h2>
+  <p class="section-subtitle">{subtitle}</p>
+
+  <div class="benchmark-chart">
+    {tools.map((tool, i) => {
+      const pct = (tool.overall / maxOverall * 100).toFixed(1);
+      return (
+        <div class:list={["benchmark-row", { highlight: tool.isHighlight }]} style={`--delay: ${i * 0.08}s`}>
+          <div class="tool-name">{tool.name}</div>
+          <div class="bar-container">
+            <div class="bar" style={`width: ${pct}%`}>
+              <span class="bar-label">{(tool.overall * 100).toFixed(1)}%</span>
+            </div>
+          </div>
+          <div class="speed">{tool.speed}</div>
+        </div>
+      );
+    })}
+  </div>
+
+  <div class="benchmark-table-wrap">
+    <table class="benchmark-table">
+      <thead>
+        <tr>
+          <th scope="col">Tool</th>
+          <th scope="col">NID</th>
+          <th scope="col">TEDS</th>
+          <th scope="col">MHS</th>
+          <th scope="col">Overall</th>
+          <th scope="col">Speed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {tools.map(tool => (
+          <tr class:list={{ highlight: tool.isHighlight }}>
+            <td class="tool-cell">{tool.name}</td>
+            <td>{tool.nid.toFixed(3)}</td>
+            <td>{tool.teds.toFixed(3)}</td>
+            <td>{tool.mhs.toFixed(3)}</td>
+            <td class="overall-cell">{tool.overall.toFixed(3)}</td>
+            <td class="speed-cell">{tool.speed}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="benchmark-note">{note}</p>
+</section>
+
+<style>
+  .benchmark-section {
+    padding: 5rem 1.5rem;
+    background: var(--ep-section-alt-bg, #F9FAFB);
+    text-align: center;
+  }
+
+  .section-title {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+    color: var(--ep-text-primary, #111827);
+    letter-spacing: -0.02em;
+  }
+
+  .section-subtitle {
+    font-size: clamp(1rem, 2.5vw, 1.125rem);
+    color: var(--ep-color-muted, #6B7280);
+    max-width: 560px;
+    margin: 0 auto 3rem;
+    line-height: 1.6;
+  }
+
+  .benchmark-chart {
+    max-width: 750px;
+    margin: 0 auto 3rem;
+    text-align: left;
+  }
+
+  .benchmark-row {
+    display: grid;
+    grid-template-columns: 130px 1fr 80px;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.625rem;
+    animation: slideInLeft 0.5s ease calc(var(--delay, 0s)) both;
+  }
+
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .tool-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: right;
+    color: var(--ep-text-primary, #1F2937);
+  }
+
+  .highlight .tool-name {
+    color: var(--sl-color-accent, #4F46E5);
+  }
+
+  .bar-container {
+    background: var(--ep-card-border, #E5E7EB);
+    border-radius: 0.375rem;
+    height: 32px;
+    overflow: hidden;
+  }
+
+  .bar {
+    height: 100%;
+    background: var(--ep-color-muted, #9CA3AF);
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 0.75rem;
+    transition: width 800ms ease-out;
+    min-width: 60px;
+  }
+
+  .highlight .bar {
+    background: linear-gradient(135deg, var(--sl-color-accent, #4F46E5), #818cf8);
+  }
+
+  .bar-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+
+  .speed {
+    font-size: 0.75rem;
+    font-family: var(--ep-font-mono, monospace);
+    color: var(--ep-color-muted, #6B7280);
+  }
+
+  .benchmark-table-wrap {
+    max-width: 850px;
+    margin: 0 auto;
+    overflow-x: auto;
+    border-radius: 1rem;
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    background: var(--ep-card-bg, white);
+  }
+
+  .benchmark-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .benchmark-table th,
+  .benchmark-table td {
+    padding: 0.75rem 1rem;
+    text-align: center;
+    border-bottom: 1px solid var(--ep-card-border, #E5E7EB);
+  }
+
+  .benchmark-table thead {
+    background: var(--ep-section-alt-bg, #F9FAFB);
+  }
+
+  .benchmark-table th {
+    font-weight: 700;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ep-color-muted, #6B7280);
+  }
+
+  .benchmark-table tbody tr {
+    transition: background 150ms ease;
+  }
+
+  .benchmark-table tbody tr:hover {
+    background: var(--sl-color-accent-low, #EEF2FF);
+  }
+
+  .benchmark-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .benchmark-table .highlight td {
+    font-weight: 700;
+    color: var(--sl-color-accent, #4F46E5);
+  }
+
+  .tool-cell { text-align: left; font-weight: 600; }
+  .overall-cell { font-weight: 800; }
+  .speed-cell { font-family: var(--ep-font-mono, monospace); font-size: 0.8125rem; }
+
+  .benchmark-note {
+    font-size: 0.75rem;
+    color: var(--ep-color-muted, #6B7280);
+    margin-top: 1.5rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 640px) {
+    .benchmark-section { padding: 3rem 1rem; }
+    .benchmark-row { grid-template-columns: 100px 1fr 60px; gap: 0.5rem; }
+    .tool-name { font-size: 0.75rem; }
+    .benchmark-table th, .benchmark-table td { padding: 0.5rem; font-size: 0.75rem; }
+  }
+</style>

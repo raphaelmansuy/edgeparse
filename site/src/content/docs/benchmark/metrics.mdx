@@ -1,0 +1,60 @@
+---
+title: "Metrics Explained"
+description: "NID, TEDS, and MHS — the three metrics used to evaluate PDF extraction quality."
+---
+
+## Overview
+
+EdgeParse benchmarks use three complementary metrics that each measure a different aspect of extraction quality.
+
+## NID — Normalized Information Distance
+
+**Measures:** Reading order and text completeness.
+
+NID compares the extracted plain text against a ground-truth reference using normalized compression distance. A score of **1.0** means the extracted text perfectly matches the reference.
+
+| Score | Meaning |
+|-------|---------|
+| 0.95+ | Excellent — near-perfect text extraction |
+| 0.90–0.95 | Good — minor differences |
+| 0.80–0.90 | Fair — some text missing or reordered |
+| < 0.80 | Poor — significant extraction errors |
+
+## TEDS — Tree Edit Distance Similarity
+
+**Measures:** Table structure accuracy.
+
+TEDS computes the tree edit distance between extracted HTML tables and ground-truth tables, normalized to a 0–1 similarity score. It penalizes missing rows, merged cells, and misaligned columns.
+
+| Score | Meaning |
+|-------|---------|
+| 0.90+ | Excellent — tables nearly identical |
+| 0.80–0.90 | Good — minor structural differences |
+| 0.60–0.80 | Fair — some rows/columns misaligned |
+| < 0.60 | Poor — significant structural errors |
+
+## MHS — Markdown Heading Similarity
+
+**Measures:** Document structure / heading detection accuracy.
+
+MHS compares the heading hierarchy (H1–H6) in the extracted output against the ground truth. It rewards correct heading levels and penalizes missing or incorrectly-leveled headings.
+
+| Score | Meaning |
+|-------|---------|
+| 0.90+ | Excellent — heading hierarchy correct |
+| 0.80–0.90 | Good — minor level mismatches |
+| 0.60–0.80 | Fair — some headings missing |
+| < 0.60 | Poor — heading detection unreliable |
+
+## Overall Score
+
+The **overall** score is the arithmetic mean of NID, TEDS, and MHS:
+
+```
+Overall = (NID + TEDS + MHS) / 3
+```
+
+Each metric is weighted equally because they measure orthogonal quality dimensions:
+- **NID** → "Did we extract the right text?"
+- **TEDS** → "Did we get the tables right?"
+- **MHS** → "Did we detect the document structure?"

@@ -1,0 +1,40 @@
+---
+title: "Reading Order"
+description: "How EdgeParse's XY-Cut++ algorithm correctly reads multi-column layouts without ML models."
+---
+
+## The Problem
+
+PDF documents don't store text in reading order. A two-column academic paper has text positioned absolutely on the page — the PDF viewer renders it visually, but the underlying data is a jumble of coordinates.
+
+## XY-Cut++ Algorithm
+
+EdgeParse uses an enhanced XY-Cut algorithm to determine reading order:
+
+1. **Recursive splitting** — divide the page into horizontal and vertical strips
+2. **Column detection** — identify column boundaries from whitespace gaps
+3. **Block ordering** — sort blocks within columns top-to-bottom, left-to-right
+4. **Cross-column flow** — handle elements that span multiple columns
+
+## How It Works
+
+```
+Page Layout          XY-Cut Analysis       Reading Order
+┌────┬────┐         ┌────┬────┐          1. Title (span)
+│ Title    │         │ █████████│          2. Col 1, Para 1
+├────┼────┤  ──▶    ├──▶─┼──▶─┤   ──▶   3. Col 1, Para 2
+│Par1│Par3│         │ 1  │ 3  │          4. Col 2, Para 3
+│Par2│Par4│         │ 2  │ 4  │          5. Col 2, Para 4
+└────┴────┘         └────┴────┘          6. Footer (span)
+```
+
+## Benchmark
+
+EdgeParse achieves a **NID score of 0.911** on 200 diverse documents — the highest reading order accuracy among benchmarked tools.
+
+| Tool | NID Score |
+|------|-----------|
+| **EdgeParse** | **0.911** |
+| OpenDataLoader | 0.912 |
+| Docling | 0.899 |
+| PyMuPDF4LLM | 0.888 |

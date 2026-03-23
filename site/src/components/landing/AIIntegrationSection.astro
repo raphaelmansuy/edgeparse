@@ -1,0 +1,395 @@
+---
+interface Props {
+  title?: string;
+  subtitle?: string;
+}
+
+const {
+  title = 'One Engine, Every AI Workflow',
+  subtitle = 'EdgeParse sits at the foundation of your AI stack — turning messy PDFs into clean, structured data that LLMs, agents, and RAG pipelines actually understand.',
+} = Astro.props;
+---
+
+<section class="ai-section" aria-labelledby="ai-heading">
+  <div class="ai-container">
+    <div class="ai-header">
+      <span class="ai-eyebrow">AI Integration</span>
+      <h2 id="ai-heading" class="ai-title">{title}</h2>
+      <p class="ai-subtitle">{subtitle}</p>
+    </div>
+
+    <!-- Pipeline flow -->
+    <div class="pipeline-flow" aria-label="Pipeline: PDF to EdgeParse to AI workflows">
+      <div class="pipeline-source">
+        <div class="pipeline-icon-large">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>
+          </svg>
+        </div>
+        <span class="pipeline-label">Any PDF</span>
+      </div>
+
+      <div class="pipeline-arrow" aria-hidden="true">
+        <svg width="40" height="20" viewBox="0 0 40 20" fill="none">
+          <line x1="0" y1="10" x2="32" y2="10" stroke="var(--sl-color-accent, #4F46E5)" stroke-width="2" stroke-dasharray="4 3" class="arrow-dash"/>
+          <path d="M30 4l8 6-8 6" stroke="var(--sl-color-accent, #4F46E5)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <div class="pipeline-engine">
+        <div class="engine-glow" aria-hidden="true"></div>
+        <div class="engine-box">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/>
+          </svg>
+          <span class="engine-name">EdgeParse</span>
+        </div>
+      </div>
+
+      <div class="pipeline-arrow" aria-hidden="true">
+        <svg width="40" height="20" viewBox="0 0 40 20" fill="none">
+          <line x1="0" y1="10" x2="32" y2="10" stroke="var(--sl-color-accent, #4F46E5)" stroke-width="2" stroke-dasharray="4 3" class="arrow-dash"/>
+          <path d="M30 4l8 6-8 6" stroke="var(--sl-color-accent, #4F46E5)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <div class="pipeline-output">
+        <div class="pipeline-icon-large">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"/>
+          </svg>
+        </div>
+        <span class="pipeline-label">Structured Data</span>
+      </div>
+    </div>
+
+    <!-- Three destination cards -->
+    <div class="ai-cards">
+      <div class="ai-card">
+        <div class="ai-card-icon rag-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"/>
+          </svg>
+        </div>
+        <h3 class="ai-card-title">RAG Pipelines</h3>
+        <p class="ai-card-desc">Feed your vector database clean, hierarchically-chunked data with bounding boxes for source citation. No more garbled embeddings from raw PDF text.</p>
+        <div class="ai-card-code">
+          <code><span class="code-comment"># Chunk-ready output for your RAG pipeline</span><br/>
+<span class="code-key">chunks</span> = edgeparse.convert(<span class="code-str">"report.pdf"</span>, format=<span class="code-str">"json"</span>)<br/>
+<span class="code-key">embeddings</span> = embed(chunks)  <span class="code-comment"># Clean structured data</span></code>
+        </div>
+        <div class="ai-card-features">
+          <span class="ai-feature-tag">Embeddings</span>
+          <span class="ai-feature-tag">Citations</span>
+          <span class="ai-feature-tag">LangChain</span>
+          <span class="ai-feature-tag">LlamaIndex</span>
+        </div>
+      </div>
+
+      <div class="ai-card ai-card-featured">
+        <div class="ai-card-badge">Most Popular</div>
+        <div class="ai-card-icon agent-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/>
+          </svg>
+        </div>
+        <h3 class="ai-card-title">AI Agents</h3>
+        <p class="ai-card-desc">Give your AI agents the ability to read, understand, and reason over any PDF document. Structured extraction means reliable tool use — no hallucinations.</p>
+        <div class="ai-card-code">
+          <code><span class="code-comment"># Agent tool: extract PDF intelligence</span><br/>
+@tool(<span class="code-str">"read_pdf"</span>)<br/>
+<span class="code-key">def</span> read_pdf(path: str) -> dict:<br/>
+&nbsp;&nbsp;<span class="code-key">return</span> edgeparse.convert(path, format=<span class="code-str">"json"</span>)</code>
+        </div>
+        <div class="ai-card-features">
+          <span class="ai-feature-tag">Tool Use</span>
+          <span class="ai-feature-tag">CrewAI</span>
+          <span class="ai-feature-tag">AutoGen</span>
+          <span class="ai-feature-tag">OpenAI</span>
+        </div>
+      </div>
+
+      <div class="ai-card">
+        <div class="ai-card-icon skill-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875S10.5 3.089 10.5 4.125c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.4 48.4 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z"/>
+          </svg>
+        </div>
+        <h3 class="ai-card-title">Copilot Skills</h3>
+        <p class="ai-card-desc">Build custom Copilot Skills and MCP servers that give AI assistants deep PDF understanding. Extract tables, headings, and metadata on demand.</p>
+        <div class="ai-card-code">
+          <code><span class="code-comment"># MCP server tool definition</span><br/>
+@server.tool(<span class="code-str">"extract_pdf"</span>)<br/>
+<span class="code-key">async def</span> extract(uri: str) -> str:<br/>
+&nbsp;&nbsp;<span class="code-key">return</span> edgeparse.convert(uri, format=<span class="code-str">"md"</span>)</code>
+        </div>
+        <div class="ai-card-features">
+          <span class="ai-feature-tag">MCP</span>
+          <span class="ai-feature-tag">Copilot</span>
+          <span class="ai-feature-tag">ChatGPT</span>
+          <span class="ai-feature-tag">Claude</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .ai-section {
+    padding: 6rem 1.5rem;
+    background: var(--ep-section-alt-bg, #F9FAFB);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ai-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .ai-header {
+    text-align: center;
+    margin-bottom: 3.5rem;
+  }
+
+  .ai-eyebrow {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sl-color-accent, #4F46E5);
+    margin-bottom: 0.75rem;
+    padding: 0.3rem 0.75rem;
+    background: rgba(79, 70, 229, 0.08);
+    border-radius: 999px;
+  }
+
+  .ai-title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 800;
+    color: var(--ep-text-primary, #111827);
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.02em;
+  }
+
+  .ai-subtitle {
+    font-size: 1.1rem;
+    color: var(--ep-text-secondary, #6B7280);
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Pipeline flow */
+  .pipeline-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    margin-bottom: 3.5rem;
+    flex-wrap: wrap;
+  }
+
+  .pipeline-source,
+  .pipeline-output {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .pipeline-icon-large {
+    width: 72px;
+    height: 72px;
+    border-radius: 1rem;
+    background: var(--ep-card-bg, white);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ep-text-secondary, #6B7280);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .pipeline-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ep-color-muted, #9CA3AF);
+  }
+
+  .pipeline-arrow {
+    display: flex;
+    align-items: center;
+  }
+
+  .arrow-dash {
+    animation: dashMove 1.5s linear infinite;
+  }
+
+  @keyframes dashMove {
+    to { stroke-dashoffset: -14; }
+  }
+
+  .pipeline-engine {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .engine-glow {
+    position: absolute;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(79, 70, 229, 0.12), transparent 70%);
+    pointer-events: none;
+  }
+
+  .engine-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 1rem;
+    background: var(--sl-color-accent, #4F46E5);
+    color: white;
+    font-weight: 700;
+    font-size: 1rem;
+    box-shadow: 0 4px 20px rgba(79, 70, 229, 0.35);
+  }
+
+  .engine-name {
+    letter-spacing: -0.01em;
+  }
+
+  /* AI Cards */
+  .ai-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .ai-card {
+    background: var(--ep-card-bg, white);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem 1.5rem;
+    position: relative;
+    transition: all 250ms ease;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ai-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+    border-color: var(--sl-color-accent, #4F46E5);
+  }
+
+  .ai-card-featured {
+    border-color: var(--sl-color-accent, #4F46E5);
+    box-shadow: 0 4px 20px rgba(79, 70, 229, 0.12);
+  }
+
+  .ai-card-badge {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.2rem 0.75rem;
+    border-radius: 999px;
+    background: var(--sl-color-accent, #4F46E5);
+    color: white;
+  }
+
+  .ai-card-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+  }
+
+  .rag-icon {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .agent-icon {
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--sl-color-accent, #4F46E5);
+  }
+
+  .skill-icon {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+  }
+
+  .ai-card-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--ep-text-primary, #1F2937);
+    margin-bottom: 0.5rem;
+  }
+
+  .ai-card-desc {
+    font-size: 0.88rem;
+    color: var(--ep-text-secondary, #6B7280);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+
+  .ai-card-code {
+    background: var(--ep-code-bg, #F3F4F6);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-family: var(--ep-font-mono, monospace);
+    font-size: 0.72rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    flex: 1;
+  }
+
+  .code-comment { color: var(--ep-color-muted, #9CA3AF); }
+  .code-key { color: var(--sl-color-accent, #4F46E5); }
+  .code-str { color: #10b981; }
+
+  .ai-card-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .ai-feature-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: var(--ep-surface-bg, #F3F4F6);
+    color: var(--ep-text-secondary, #6B7280);
+    letter-spacing: 0.02em;
+  }
+
+  @media (max-width: 900px) {
+    .ai-cards { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+    .pipeline-arrow { display: none; }
+    .pipeline-flow { flex-direction: column; gap: 0.75rem; }
+  }
+
+  @media (max-width: 640px) {
+    .ai-section { padding: 3rem 1rem; }
+  }
+</style>

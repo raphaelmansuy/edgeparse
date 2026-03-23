@@ -1,0 +1,51 @@
+---
+title: "Python API"
+description: "Complete Python API reference for EdgeParse."
+---
+
+## Module: `edgeparse`
+
+### `convert(path, format, **kwargs)`
+
+Convert a PDF file to the specified format and return the result as a string.
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | `str` | required | Path to the PDF file |
+| `format` | `str` | `"markdown"` | Output format: `"markdown"`, `"json"`, `"html"`, `"text"` |
+| `pages` | `str` | `None` | Page range, e.g. `"1-5"` |
+| `table_method` | `str` | `None` | Table detection method |
+
+**Returns:** `str` — the converted content.
+
+```python
+import edgeparse
+
+markdown = edgeparse.convert("document.pdf", format="markdown")
+json_str = edgeparse.convert("document.pdf", format="json")
+html = edgeparse.convert("document.pdf", format="html")
+text = edgeparse.convert("document.pdf", format="text")
+```
+
+### `convert_file(path, output_dir, format, **kwargs)`
+
+Convert a PDF file and save the result to a file.
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | `str` | required | Path to the PDF file |
+| `output_dir` | `str` | required | Directory to save output |
+| `format` | `str` | `"markdown"` | Output format |
+
+**Returns:** `str` — path to the saved file.
+
+```python
+import edgeparse
+
+out = edgeparse.convert_file("document.pdf", "output/", format="json")
+print(f"Saved to: {out}")
+```

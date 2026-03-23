@@ -1,0 +1,756 @@
+---
+interface Props {
+  title?: string;
+  subtitle?: string;
+}
+
+const { title = 'Structured Output with Bounding Boxes', subtitle = 'Every element extracted with pixel-precise coordinates, type classification, and reading order.' } = Astro.props;
+
+const defaultJson = `{
+  "type": "heading",
+  "level": 1,
+  "content": "Multi-Modal Attention...",
+  "bounding_box": [52, 28, 520, 58],
+  "font": "NimbusSans-Bold",
+  "font_size": 16.5,
+  "page": 1
+}`;
+---
+
+<section class="bbox-section" aria-label="Bounding box visualization">
+  <div class="bbox-container">
+    <div class="bbox-header">
+      <h2 class="bbox-title">{title}</h2>
+      <p class="bbox-subtitle">{subtitle}</p>
+    </div>
+
+    <div class="bbox-demo-grid">
+      <!-- PDF Page with bounding boxes -->
+      <div class="pdf-viewer" role="img" aria-label="Simulated PDF page with bounding box annotations">
+        <div class="pdf-chrome">
+          <div class="pdf-dots">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+          </div>
+          <span class="pdf-filename">research-paper.pdf</span>
+        </div>
+        <div class="pdf-page" id="bbox-pdf-page">
+          <!-- Heading bbox -->
+          <div class="bbox bbox-heading" data-type="heading" data-id="1">
+            <span class="bbox-label">H1</span>
+            <div class="bbox-text-sim heading-text">Multi-Modal Attention Networks for Document Understanding</div>
+          </div>
+
+          <!-- Authors bbox -->
+          <div class="bbox bbox-paragraph" data-type="paragraph" data-id="2">
+            <span class="bbox-label">P</span>
+            <div class="bbox-text-sim author-text">J. Smith, A. Chen, M. Rodriguez — Stanford University</div>
+          </div>
+
+          <!-- Abstract heading -->
+          <div class="bbox bbox-heading bbox-h2" data-type="heading" data-id="3">
+            <span class="bbox-label">H2</span>
+            <div class="bbox-text-sim subheading-text">Abstract</div>
+          </div>
+
+          <!-- Abstract paragraph -->
+          <div class="bbox bbox-paragraph bbox-abstract" data-type="paragraph" data-id="4">
+            <span class="bbox-label">P</span>
+            <div class="bbox-text-sim body-text">We present a novel architecture for extracting structured data from complex PDF documents using multi-modal attention mechanisms. Our approach achieves state-of-the-art results on standard benchmarks while maintaining real-time processing speed.</div>
+          </div>
+
+          <!-- Two-column layout -->
+          <div class="pdf-columns">
+            <div class="pdf-col">
+              <!-- Section heading -->
+              <div class="bbox bbox-heading bbox-h2" data-type="heading" data-id="5">
+                <span class="bbox-label">H2</span>
+                <div class="bbox-text-sim subheading-text">1. Introduction</div>
+              </div>
+              <!-- Paragraph -->
+              <div class="bbox bbox-paragraph" data-type="paragraph" data-id="6">
+                <span class="bbox-label">P</span>
+                <div class="bbox-text-sim body-text small-text">Document understanding remains a critical challenge in information extraction pipelines. Traditional approaches rely on rule-based heuristics that fail to generalize across layouts.</div>
+              </div>
+              <!-- Table -->
+              <div class="bbox bbox-table" data-type="table" data-id="7">
+                <span class="bbox-label">T</span>
+                <div class="bbox-table-sim">
+                  <div class="table-row table-header">
+                    <span>Method</span><span>F1</span><span>Speed</span>
+                  </div>
+                  <div class="table-row">
+                    <span>Ours</span><span class="highlight-val">0.94</span><span>42ms</span>
+                  </div>
+                  <div class="table-row">
+                    <span>Baseline</span><span>0.81</span><span>186ms</span>
+                  </div>
+                  <div class="table-row">
+                    <span>Prior</span><span>0.87</span><span>312ms</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="pdf-col">
+              <!-- Image bbox -->
+              <div class="bbox bbox-image" data-type="image" data-id="8">
+                <span class="bbox-label">IMG</span>
+                <div class="bbox-image-sim">
+                  <svg viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="10" y="55" width="15" height="20" fill="#818cf8" opacity="0.7" rx="2"/>
+                    <rect x="30" y="35" width="15" height="40" fill="#6366f1" opacity="0.7" rx="2"/>
+                    <rect x="50" y="25" width="15" height="50" fill="#4f46e5" opacity="0.8" rx="2"/>
+                    <rect x="70" y="15" width="15" height="60" fill="#4338ca" opacity="0.9" rx="2"/>
+                    <rect x="90" y="10" width="15" height="65" fill="#3730a3" rx="2"/>
+                    <line x1="5" y1="75" x2="115" y2="75" stroke="#94a3b8" stroke-width="0.5"/>
+                    <line x1="10" y1="5" x2="10" y2="75" stroke="#94a3b8" stroke-width="0.5"/>
+                  </svg>
+                  <span class="img-caption">Fig. 1: Performance comparison</span>
+                </div>
+              </div>
+              <!-- List bbox -->
+              <div class="bbox bbox-list" data-type="list" data-id="9">
+                <span class="bbox-label">L</span>
+                <div class="bbox-text-sim body-text small-text">
+                  <div class="list-item">• Zero external dependencies</div>
+                  <div class="list-item">• Cross-platform support</div>
+                  <div class="list-item">• Streaming API available</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legend & JSON output -->
+      <div class="bbox-sidebar">
+        <div class="bbox-legend">
+          <h3 class="legend-title">Element Types</h3>
+          <div class="legend-items">
+            <button class="legend-item active" data-filter="all">
+              <span class="legend-swatch legend-all"></span>
+              All Elements
+            </button>
+            <button class="legend-item" data-filter="heading">
+              <span class="legend-swatch legend-heading"></span>
+              Headings
+            </button>
+            <button class="legend-item" data-filter="paragraph">
+              <span class="legend-swatch legend-paragraph"></span>
+              Paragraphs
+            </button>
+            <button class="legend-item" data-filter="table">
+              <span class="legend-swatch legend-table"></span>
+              Tables
+            </button>
+            <button class="legend-item" data-filter="image">
+              <span class="legend-swatch legend-image"></span>
+              Images
+            </button>
+            <button class="legend-item" data-filter="list">
+              <span class="legend-swatch legend-list"></span>
+              Lists
+            </button>
+          </div>
+        </div>
+
+        <div class="bbox-json-preview">
+          <div class="json-header">
+            <span class="json-dot"></span>
+            EdgeParse Output
+          </div>
+          <pre class="json-code" id="bbox-json-output"><code set:text={defaultJson} /></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Interactive bounding box demo
+  const page = document.getElementById('bbox-pdf-page');
+  const jsonOutput = document.getElementById('bbox-json-output');
+  const legendItems = document.querySelectorAll('.legend-item');
+
+  if (page && jsonOutput) {
+    const bboxes = page.querySelectorAll('.bbox');
+
+    // Hover to show JSON for specific element
+    const jsonSnippets: Record<string, string> = {
+      '1': `{
+  "type": "heading",
+  "level": 1,
+  "content": "Multi-Modal Attention...",
+  "bounding_box": [52, 28, 520, 58],
+  "font": "NimbusSans-Bold",
+  "font_size": 16.5,
+  "page": 1
+}`,
+      '2': `{
+  "type": "paragraph",
+  "content": "J. Smith, A. Chen...",
+  "bounding_box": [52, 65, 520, 82],
+  "font": "NimbusSans-Regular",
+  "font_size": 10.0,
+  "page": 1
+}`,
+      '3': `{
+  "type": "heading",
+  "level": 2,
+  "content": "Abstract",
+  "bounding_box": [52, 95, 130, 112],
+  "font": "NimbusSans-Bold",
+  "font_size": 12.0,
+  "page": 1
+}`,
+      '4': `{
+  "type": "paragraph",
+  "content": "We present a novel...",
+  "bounding_box": [52, 118, 520, 175],
+  "font": "NimbusSans-Regular",
+  "font_size": 10.0,
+  "page": 1
+}`,
+      '7': `{
+  "type": "table",
+  "rows": 4,
+  "columns": 3,
+  "bounding_box": [52, 280, 260, 380],
+  "cells": [
+    {"row": 0, "col": 0, "text": "Method"},
+    {"row": 1, "col": 1, "text": "0.94"}
+  ],
+  "page": 1
+}`,
+      '8': `{
+  "type": "image",
+  "bounding_box": [280, 200, 520, 330],
+  "width": 240,
+  "height": 130,
+  "alt": "Fig. 1: Performance",
+  "page": 1
+}`,
+      '9': `{
+  "type": "list",
+  "items": 3,
+  "bounding_box": [280, 345, 520, 410],
+  "style": "unordered",
+  "content": [
+    "Zero external dependencies",
+    "Cross-platform support"
+  ],
+  "page": 1
+}`,
+    };
+
+    bboxes.forEach(bbox => {
+      bbox.addEventListener('mouseenter', () => {
+        const id = (bbox as HTMLElement).dataset.id || '1';
+        const code = jsonOutput.querySelector('code');
+        if (code && jsonSnippets[id]) {
+          code.textContent = jsonSnippets[id];
+        }
+        bbox.classList.add('bbox-active');
+      });
+      bbox.addEventListener('mouseleave', () => {
+        bbox.classList.remove('bbox-active');
+      });
+    });
+
+    // Filter by element type
+    legendItems.forEach(item => {
+      item.addEventListener('click', () => {
+        legendItems.forEach(li => li.classList.remove('active'));
+        item.classList.add('active');
+        const filter = (item as HTMLElement).dataset.filter || 'all';
+
+        bboxes.forEach(bbox => {
+          const type = (bbox as HTMLElement).dataset.type;
+          if (filter === 'all' || type === filter) {
+            (bbox as HTMLElement).style.opacity = '1';
+            (bbox as HTMLElement).style.pointerEvents = 'auto';
+          } else {
+            (bbox as HTMLElement).style.opacity = '0.15';
+            (bbox as HTMLElement).style.pointerEvents = 'none';
+          }
+        });
+      });
+    });
+  }
+</script>
+
+<style>
+  .bbox-section {
+    padding: 5rem 1.5rem;
+    background: var(--ep-surface-bg, #F9FAFB);
+  }
+
+  .bbox-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .bbox-header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .bbox-title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 800;
+    color: var(--ep-text-primary, #111827);
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.02em;
+  }
+
+  .bbox-subtitle {
+    font-size: 1.1rem;
+    color: var(--ep-text-secondary, #6B7280);
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .bbox-demo-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  /* --- PDF Viewer --- */
+  .pdf-viewer {
+    background: var(--ep-card-bg, white);
+    border-radius: 1rem;
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  }
+
+  .pdf-chrome {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--ep-code-bg, #F3F4F6);
+    border-bottom: 1px solid var(--ep-card-border, #E5E7EB);
+  }
+
+  .pdf-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .dot-red { background: #ef4444; }
+  .dot-yellow { background: #f59e0b; }
+  .dot-green { background: #22c55e; }
+
+  .pdf-filename {
+    font-size: 0.8rem;
+    color: var(--ep-color-muted, #6B7280);
+    font-family: var(--ep-font-mono, monospace);
+  }
+
+  .pdf-page {
+    padding: 2rem 2.5rem;
+    min-height: 480px;
+    background: white;
+    position: relative;
+  }
+
+  :root[data-theme='dark'] .pdf-page,
+  .dark .pdf-page {
+    background: #1a1a2e;
+  }
+
+  /* --- Bounding Boxes --- */
+  .bbox {
+    position: relative;
+    margin-bottom: 0.75rem;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    transition: all 250ms ease;
+    cursor: pointer;
+  }
+
+  .bbox-label {
+    position: absolute;
+    top: -8px;
+    left: 6px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.03em;
+    opacity: 0;
+    transition: opacity 200ms ease;
+    z-index: 2;
+  }
+
+  .bbox:hover .bbox-label,
+  .bbox.bbox-active .bbox-label {
+    opacity: 1;
+  }
+
+  .bbox-heading {
+    border: 2px solid transparent;
+    border-left: 3px solid #6366f1;
+    background: rgba(99, 102, 241, 0.04);
+  }
+
+  .bbox-heading .bbox-label {
+    background: #6366f1;
+    color: white;
+  }
+
+  .bbox-heading:hover,
+  .bbox-heading.bbox-active {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.1);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  }
+
+  .bbox-paragraph {
+    border: 2px solid transparent;
+    border-left: 3px solid #10b981;
+    background: rgba(16, 185, 129, 0.04);
+  }
+
+  .bbox-paragraph .bbox-label {
+    background: #10b981;
+    color: white;
+  }
+
+  .bbox-paragraph:hover,
+  .bbox-paragraph.bbox-active {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+  }
+
+  .bbox-table {
+    border: 2px solid transparent;
+    border-left: 3px solid #f59e0b;
+    background: rgba(245, 158, 11, 0.04);
+  }
+
+  .bbox-table .bbox-label {
+    background: #f59e0b;
+    color: white;
+  }
+
+  .bbox-table:hover,
+  .bbox-table.bbox-active {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+  }
+
+  .bbox-image {
+    border: 2px solid transparent;
+    border-left: 3px solid #ef4444;
+    background: rgba(239, 68, 68, 0.04);
+  }
+
+  .bbox-image .bbox-label {
+    background: #ef4444;
+    color: white;
+  }
+
+  .bbox-image:hover,
+  .bbox-image.bbox-active {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+  }
+
+  .bbox-list {
+    border: 2px solid transparent;
+    border-left: 3px solid #8b5cf6;
+    background: rgba(139, 92, 246, 0.04);
+  }
+
+  .bbox-list .bbox-label {
+    background: #8b5cf6;
+    color: white;
+  }
+
+  .bbox-list:hover,
+  .bbox-list.bbox-active {
+    border-color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.1);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+  }
+
+  /* --- Text simulation --- */
+  .bbox-text-sim {
+    color: var(--ep-text-primary, #1F2937);
+    line-height: 1.5;
+  }
+
+  .heading-text {
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .author-text {
+    font-size: 0.8rem;
+    color: var(--ep-text-secondary, #6B7280);
+    font-style: italic;
+  }
+
+  .subheading-text {
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .body-text {
+    font-size: 0.78rem;
+    color: var(--ep-text-secondary, #4B5563);
+    line-height: 1.6;
+  }
+
+  .small-text {
+    font-size: 0.72rem;
+  }
+
+  .list-item {
+    padding: 1px 0;
+  }
+
+  /* --- PDF columns --- */
+  .pdf-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .pdf-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* --- Table simulation --- */
+  .bbox-table-sim {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .table-row {
+    display: grid;
+    grid-template-columns: 1fr 0.6fr 0.6fr;
+    gap: 4px;
+    font-size: 0.7rem;
+    padding: 3px 6px;
+    border-radius: 2px;
+  }
+
+  .table-header {
+    font-weight: 700;
+    background: rgba(245, 158, 11, 0.08);
+    color: var(--ep-text-primary, #374151);
+  }
+
+  .table-row:not(.table-header) {
+    color: var(--ep-text-secondary, #6B7280);
+  }
+
+  .highlight-val {
+    color: #059669;
+    font-weight: 700;
+  }
+
+  /* --- Image simulation --- */
+  .bbox-image-sim {
+    text-align: center;
+  }
+
+  .bbox-image-sim svg {
+    width: 100%;
+    max-width: 180px;
+    height: auto;
+  }
+
+  .img-caption {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--ep-color-muted, #9CA3AF);
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  /* --- Sidebar --- */
+  .bbox-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    position: sticky;
+    top: 2rem;
+  }
+
+  .bbox-legend {
+    background: var(--ep-card-bg, white);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+  }
+
+  .legend-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ep-text-primary, #374151);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+    color: var(--ep-text-secondary, #6B7280);
+    transition: all 150ms ease;
+    text-align: left;
+    width: 100%;
+  }
+
+  .legend-item:hover {
+    background: var(--ep-surface-bg, #F9FAFB);
+  }
+
+  .legend-item.active {
+    background: var(--ep-surface-bg, #F3F4F6);
+    border-color: var(--ep-card-border, #E5E7EB);
+    color: var(--ep-text-primary, #374151);
+    font-weight: 600;
+  }
+
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .legend-all { background: linear-gradient(135deg, #6366f1, #10b981, #f59e0b); }
+  .legend-heading { background: #6366f1; }
+  .legend-paragraph { background: #10b981; }
+  .legend-table { background: #f59e0b; }
+  .legend-image { background: #ef4444; }
+  .legend-list { background: #8b5cf6; }
+
+  /* --- JSON Preview --- */
+  .bbox-json-preview {
+    background: var(--ep-card-bg, white);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .json-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1rem;
+    background: var(--ep-code-bg, #F3F4F6);
+    border-bottom: 1px solid var(--ep-card-border, #E5E7EB);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ep-text-secondary, #6B7280);
+  }
+
+  .json-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+  }
+
+  .json-code {
+    padding: 1rem;
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    font-family: var(--ep-font-mono, monospace);
+    color: var(--ep-text-primary, #374151);
+    background: transparent;
+    overflow-x: auto;
+    min-height: 160px;
+    transition: all 200ms ease;
+  }
+
+  .json-code code {
+    font-family: inherit;
+    white-space: pre;
+  }
+
+  /* --- Responsive --- */
+  @media (max-width: 900px) {
+    .bbox-demo-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .bbox-sidebar {
+      position: static;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+
+    .bbox-legend,
+    .bbox-json-preview {
+      flex: 1;
+      min-width: 260px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .bbox-section { padding: 3rem 1rem; }
+    .pdf-page { padding: 1rem; }
+    .pdf-columns { grid-template-columns: 1fr; }
+    .bbox-sidebar { flex-direction: column; }
+  }
+
+  /* --- Animation on scroll --- */
+  .bbox {
+    animation: bboxFadeIn 0.6s ease both;
+  }
+
+  .bbox:nth-child(1) { animation-delay: 0.1s; }
+  .bbox:nth-child(2) { animation-delay: 0.2s; }
+  .bbox:nth-child(3) { animation-delay: 0.3s; }
+  .bbox:nth-child(4) { animation-delay: 0.4s; }
+
+  @keyframes bboxFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>

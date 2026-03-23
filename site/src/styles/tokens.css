@@ -1,0 +1,82 @@
+/* EdgeParse Design Tokens — Light & Dark modes, WCAG 2.1 AA compliant
+ * Starlight semantic model: "white" = text foreground, "black" = page background.
+ * Gray scale runs from near-text (gray-1) to near-background (gray-6/7). */
+
+/* ── Light Mode ───────────────────────────────────────────── */
+:root,
+:root[data-theme='light'] {
+  /* Indigo accent */
+  --sl-color-accent-low: #EEF2FF;   /* indigo-50  — tinted backgrounds */
+  --sl-color-accent: #4F46E5;       /* indigo-600 — links, buttons */
+  --sl-color-accent-high: #3730A3;  /* indigo-800 — high-emphasis accent text */
+
+  /* Semantic gray scale (text → background) */
+  --sl-color-white: #111827;         /* neutral-900 — headings / primary text */
+  --sl-color-gray-1: #1F2937;        /* neutral-800 */
+  --sl-color-gray-2: #374151;        /* neutral-700 — secondary text, borders */
+  --sl-color-gray-3: #6B7280;        /* neutral-500 — muted text, 5.22:1 on #FFF */
+  --sl-color-gray-4: #9CA3AF;        /* neutral-400 — placeholders */
+  --sl-color-gray-5: #D1D5DB;        /* neutral-300 — dividers, subtle borders */
+  --sl-color-gray-6: #F3F4F6;        /* neutral-100 — section backgrounds */
+  --sl-color-gray-7: #F9FAFB;        /* neutral-50  — card / code backgrounds */
+  --sl-color-black: #FFFFFF;         /* white       — page background */
+
+  /* Custom tokens */
+  --ep-color-rust: #EA580C;
+  --ep-color-python: #2563EB;
+  --ep-color-nodejs: #15803D;
+  --ep-color-benchmark-win: #4F46E5;
+  --ep-color-muted: #6B7280;
+
+  /* Landing page */
+  --ep-hero-gradient: linear-gradient(135deg, #FAFBFF 0%, #EEF2FF 50%, #FAFBFF 100%);
+  --ep-card-bg: #FFFFFF;
+  --ep-card-border: #E5E7EB;
+  --ep-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --ep-card-shadow-hover: 0 8px 25px rgba(79, 70, 229, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --ep-section-alt-bg: #F9FAFB;
+  --ep-code-bg: #F3F4F6;
+  --ep-text-primary: #111827;
+  --ep-text-secondary: #4B5563;
+
+  /* Font families */
+  --ep-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --ep-font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* ── Dark Mode ────────────────────────────────────────────── */
+:root[data-theme='dark'] {
+  /* Indigo accent (brighter for dark bg) */
+  --sl-color-accent-low: #1e1b4b;   /* indigo-950 — tinted backgrounds */
+  --sl-color-accent: #818cf8;        /* indigo-400 — links, buttons */
+  --sl-color-accent-high: #c7d2fe;   /* indigo-200 — high-emphasis accent text */
+
+  /* Semantic gray scale (text → background) */
+  --sl-color-white: #f9fafb;         /* neutral-50  — headings / primary text */
+  --sl-color-gray-1: #f3f4f6;        /* neutral-100 */
+  --sl-color-gray-2: #e5e7eb;        /* neutral-200 — secondary text, borders */
+  --sl-color-gray-3: #9ca3af;        /* neutral-400 — muted text */
+  --sl-color-gray-4: #6b7280;        /* neutral-500 — placeholders */
+  --sl-color-gray-5: #374151;        /* neutral-700 — dividers, subtle borders */
+  --sl-color-gray-6: #1f2937;        /* neutral-800 — section backgrounds */
+  --sl-color-gray-7: #111827;        /* neutral-900 — card / code backgrounds */
+  --sl-color-black: #0f172a;         /* slate-900   — page background */
+
+  /* Custom tokens */
+  --ep-color-rust: #fb923c;
+  --ep-color-python: #60a5fa;
+  --ep-color-nodejs: #4ade80;
+  --ep-color-benchmark-win: #818cf8;
+  --ep-color-muted: #9ca3af;
+
+  /* Landing page */
+  --ep-hero-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  --ep-card-bg: #1f2937;
+  --ep-card-border: #374151;
+  --ep-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --ep-card-shadow-hover: 0 8px 25px rgba(129, 140, 248, 0.15), 0 2px 8px rgba(0, 0, 0, 0.2);
+  --ep-section-alt-bg: #111827;
+  --ep-code-bg: #1e293b;
+  --ep-text-primary: #f9fafb;
+  --ep-text-secondary: #d1d5db;
+}

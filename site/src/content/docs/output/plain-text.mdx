@@ -1,0 +1,43 @@
+---
+title: "Plain Text Output"
+description: "EdgeParse plain text output in reading order."
+---
+
+## Overview
+
+The `--format text` output produces clean plain text following the document's reading order, with no formatting markup.
+
+## Usage
+
+```python
+import edgeparse
+
+text = edgeparse.convert("document.pdf", format="text")
+```
+
+```bash
+edgeparse document.pdf -f text
+```
+
+## Features
+
+- **Reading order** — text follows natural reading sequence
+- **Tables** — tab-separated columns
+- **Headings** — preserved as standalone lines
+- **Minimal noise** — no formatting artifacts
+
+## Example Output
+
+```text
+Annual Report 2024
+
+Revenue grew 23% year-over-year, driven by expansion in the enterprise segment.
+
+Financial Summary
+
+Quarter	Revenue ($M)	YoY Growth
+Q1 2024	142.3	+18%
+Q2 2024	156.7	+22%
+Q3 2024	168.9	+25%
+Q4 2024	179.2	+27%
+```

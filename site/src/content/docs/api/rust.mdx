@@ -1,0 +1,56 @@
+---
+title: "Rust API"
+description: "Complete Rust API reference for edgeparse-core."
+---
+
+## Crate: `edgeparse-core`
+
+### `convert(path, config) -> Result<Document>`
+
+Parse a PDF file and return a structured `Document`.
+
+```rust
+use std::path::Path;
+use edgeparse_core::api::config::ProcessingConfig;
+use edgeparse_core::convert;
+
+let config = ProcessingConfig::default();
+let doc = convert(Path::new("document.pdf"), &config)?;
+
+println!("Pages: {}", doc.number_of_pages);
+println!("Elements: {}", doc.kids.len());
+```
+
+### `Document` struct
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `file_name` | `String` | Source file name |
+| `number_of_pages` | `usize` | Total pages |
+| `author` | `Option<String>` | PDF author metadata |
+| `title` | `Option<String>` | PDF title metadata |
+| `kids` | `Vec<ContentElement>` | Extracted elements in reading order |
+
+### Output Renderers
+
+```rust
+use edgeparse_core::output;
+
+// Markdown
+let md = output::markdown::to_markdown(&doc)?;
+
+// HTML
+let html = output::html::to_html(&doc)?;
+
+// JSON (legacy-compatible)
+let json = output::legacy_json::to_legacy_json_string(&doc, "document")?;
+```
+
+## Crate: `pdf-cos`
+
+Low-level PDF COS object parser. Used internally by `edgeparse-core`.
+
+```toml
+[dependencies]
+edgeparse-core = "0.1"
+```

@@ -1,0 +1,56 @@
+---
+title: "ProcessingConfig"
+description: "Configuration options for EdgeParse's processing pipeline."
+---
+
+## Overview
+
+`ProcessingConfig` controls how EdgeParse processes PDFs. All fields have sensible defaults.
+
+## Rust
+
+```rust
+use edgeparse_core::api::config::ProcessingConfig;
+
+let config = ProcessingConfig {
+    // All fields use defaults
+    ..ProcessingConfig::default()
+};
+```
+
+## Python
+
+Configuration options are passed as keyword arguments:
+
+```python
+import edgeparse
+
+result = edgeparse.convert("document.pdf",
+    format="json",
+    pages="1-5",
+    table_method="cluster",
+)
+```
+
+## Node.js
+
+Configuration options are passed in an options object:
+
+```javascript
+import { convert } from "edgeparse";
+
+const result = convert("document.pdf", {
+  format: "json",
+  pages: "1-5",
+  tableMethod: "cluster",
+});
+```
+
+## Available Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `format` | string | `"markdown"` | Output format |
+| `pages` | string | all pages | Page range |
+| `table_method` | string | `"auto"` | Table detection: `"border"`, `"cluster"`, `"auto"` |
+| `hybrid` | string | none | Hybrid backend |

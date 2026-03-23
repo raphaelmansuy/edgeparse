@@ -1,0 +1,54 @@
+---
+title: "Quick Start: Node.js"
+description: "Use EdgeParse with Node.js via native NAPI-RS bindings."
+---
+
+## Installation
+
+```bash
+npm install edgeparse
+```
+
+**Requirements:** Node.js 18+ · No additional system dependencies.
+
+## Parse a PDF
+
+```javascript
+import { convert } from "edgeparse";
+
+// Get Markdown string
+const markdown = convert("document.pdf", { format: "markdown" });
+console.log(markdown);
+
+// Get structured JSON string
+const json = convert("document.pdf", { format: "json" });
+
+// Get HTML string
+const html = convert("document.pdf", { format: "html" });
+```
+
+## With Options
+
+```javascript
+import { convert } from "edgeparse";
+
+const result = convert("document.pdf", {
+  format: "markdown",
+  pages: "1-5",
+  tableMethod: "cluster",
+});
+```
+
+## Output Formats
+
+| Format | Description |
+|--------|-------------|
+| `"markdown"` | Clean Markdown with table support |
+| `"json"` | Structured JSON with full metadata |
+| `"html"` | Semantic HTML |
+| `"text"` | Plain text (reading order) |
+
+## Next Steps
+
+- [JSON Schema Reference](/output/json-schema/)
+- [Benchmark Results](/benchmark/results/)

@@ -18,6 +18,7 @@ Available as a **Rust library**, **CLI binary**, **Python package** (`edgeparse`
 
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [Agent Skill](#agent-skill)
 - [Installation](#installation)
 - [CLI Reference](#cli-reference)
 - [Python SDK](#python-sdk)
@@ -130,6 +131,38 @@ const result = convert('report.pdf', {
   tableMethod: 'cluster',
 });
 ```
+
+---
+
+## Agent Skill
+
+EdgeParse ships as a **Claude agent skill** — a structured description that teaches Claude (and any compatible AI agent) how to extract PDF content on behalf of users.
+
+```bash
+# Add the EdgeParse skill to your agent environment
+npx skills add raphaelmansuy/edgeparse --skill edgeparse
+
+# Install the Python package  
+pip install edgeparse
+```
+
+The `npx skills add` command registers the skill in `skills-lock.json`:
+
+```json
+{
+  "version": 1,
+  "skills": {
+    "edgeparse": {
+      "source": "raphaelmansuy/edgeparse",
+      "sourceType": "github"
+    }
+  }
+}
+```
+
+Once installed, the agent reads `skills/edgeparse/SKILL.md` and knows when to call `edgeparse.convert()`, which format to use for different tasks, and how to handle edge cases like encrypted PDFs, borderless tables, and multi-column layouts.
+
+See [docs/08-agent-skill.md](docs/08-agent-skill.md) for the full skill documentation and integration patterns (LangChain, LlamaIndex, MCP, CrewAI).
 
 ---
 
@@ -537,6 +570,7 @@ Technical documentation lives in [`docs/`](docs/):
 | [docs/05-output-formats.md](docs/05-output-formats.md) | JSON schema, Markdown renderer, HTML/text/CSV output |
 | [docs/06-sdk-integration.md](docs/06-sdk-integration.md) | CLI flag reference, Python SDK API, Node.js SDK API, Batch API |
 | [docs/07-cicd-publishing.md](docs/07-cicd-publishing.md) | CI/CD publishing pipeline — how it works and how to configure it |
+| [docs/08-agent-skill.md](docs/08-agent-skill.md) | EdgeParse agent skill — `npx skills add`, SKILL.md structure, SDK patterns |
 
 ---
 
