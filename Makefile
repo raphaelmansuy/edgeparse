@@ -198,8 +198,8 @@ bench-download-mineru: bench-setup ## Create MinerU isolated venv + download pip
 	@$(BENCH_DIR)/.venvs/mineru/bin/mineru-models-download \
 		--source huggingface --model_type pipeline
 
-bench-compare-all: build bench-setup ## Compare EdgeParse against ALL engines: opendataloader, docling, marker, mineru, pymupdf4llm, markitdown, edgequake
-	$(call log,Running full multi-engine comparison — all 8 engines ...)
+bench-compare-all: build bench-setup ## Compare EdgeParse against ALL engines: opendataloader, docling, marker, mineru, pymupdf4llm, markitdown, edgequake, liteparse
+	$(call log,Running full multi-engine comparison — all 9 engines ...)
 	@cd $(BENCH_DIR) && uv run python compare_all.py --all --install
 
 bench-compare-fast: build bench-setup ## Quick comparison: EdgeParse + pymupdf4llm + markitdown  (installs missing engines)

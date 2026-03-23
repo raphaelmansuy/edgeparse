@@ -42,6 +42,11 @@ impl TextLine {
     /// Whitespace-only chunks are skipped (matching the reference processTextLines
     /// which skips `isWhiteSpaceChunk()` chunks); word spaces are re-detected
     /// from bounding-box gaps via `needs_space()`.
+    ///
+    /// For letter-spaced text (≥70% of chunks are single-character), an adaptive
+    /// gap threshold based on the median inter-chunk gap is used instead of the
+    /// fixed `fontSize * 0.17` rule. This correctly collapses text like
+    /// `"H O W  C A N"` into `"HOW CAN"`.
     pub fn value(&self) -> String {
         // Filter to non-whitespace, non-empty chunks (reference behaviour).
         let real_chunks: Vec<&TextChunk> = self
@@ -50,12 +55,96 @@ impl TextLine {
             .filter(|c| !c.value.is_empty() && !c.is_white_space_chunk())
             .collect();
 
+        Self::concatenate_chunk_refs(&real_chunks)
+    }
+
+    /// Concatenate a slice of owned TextChunks using gap-based word boundary
+    /// detection.  Handles letter-spaced text with adaptive threshold.
+    ///
+    /// For multi-line content (e.g. table cells), chunks on different visual
+    /// lines are separated by spaces — detected via Y-position change.
+    pub fn concatenate_chunks(chunks: &[TextChunk]) -> String {
+        let filtered: Vec<&TextChunk> = chunks
+            .iter()
+            .filter(|c| !c.value.is_empty() && !c.is_white_space_chunk())
+            .collect();
+
+        if filtered.len() < 2 {
+            return Self::concatenate_chunk_refs(&filtered);
+        }
+
+        // Split into same-line groups based on Y position, then concatenate
+        // each group with gap-based logic and join groups with spaces.
+        let mut groups: Vec<Vec<&TextChunk>> = Vec::new();
+        let mut current_group: Vec<&TextChunk> = vec![filtered[0]];
+
+        for i in 1..filtered.len() {
+            let prev = filtered[i - 1];
+            let curr = filtered[i];
+            let y_diff = (curr.bbox.top_y - prev.bbox.top_y).abs();
+            let font_size = prev.font_size.max(curr.font_size).max(1.0);
+            // If Y changes by more than half the font size, it's a new visual line.
+            if y_diff > font_size * 0.5 {
+                groups.push(std::mem::take(&mut current_group));
+                current_group = vec![curr];
+            } else {
+                current_group.push(curr);
+            }
+        }
+        groups.push(current_group);
+
+        if groups.len() == 1 {
+            return Self::concatenate_chunk_refs(&groups[0]);
+        }
+
+        // Concatenate each group separately and join with spaces.
+        groups
+            .iter()
+            .map(|g| Self::concatenate_chunk_refs(g))
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Core gap-based concatenation logic for a pre-ordered slice of chunk refs.
+    fn concatenate_chunk_refs(real_chunks: &[&TextChunk]) -> String {
         if real_chunks.is_empty() {
             return String::new();
         }
         if real_chunks.len() == 1 {
-            return real_chunks[0].value.clone();
+            return Self::collapse_letter_spaced(&real_chunks[0].value);
         }
+
+        // Detect letter-spaced lines: ≥70% of chunks are single characters
+        // and there are at least 5 chunks.
+        let adaptive_threshold = if real_chunks.len() >= 5 {
+            let single_char_count = real_chunks
+                .iter()
+                .filter(|c| c.value.chars().count() == 1)
+                .count();
+            if single_char_count * 10 >= real_chunks.len() * 7 {
+                // Compute median positive gap to determine the typical letter-spacing.
+                let mut gaps: Vec<f64> = Vec::new();
+                for i in 1..real_chunks.len() {
+                    let gap = real_chunks[i].bbox.left_x - real_chunks[i - 1].bbox.right_x;
+                    if gap > 0.0 {
+                        gaps.push(gap);
+                    }
+                }
+                if gaps.len() >= 3 {
+                    gaps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                    let median = gaps[gaps.len() / 2];
+                    Some(median * 1.8)
+                } else {
+                    // Too few gaps to compute median; fall back to collapsing all
+                    Some(f64::MAX)
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         let mut result = String::with_capacity(
             real_chunks.iter().map(|c| c.value.len()).sum::<usize>()
@@ -67,7 +156,14 @@ impl TextLine {
             let prev = real_chunks[i - 1];
             let curr = real_chunks[i];
 
-            if Self::needs_space(prev, curr) {
+            if let Some(threshold) = adaptive_threshold {
+                // For letter-spaced lines, only insert a space when the gap
+                // is significantly larger than the typical letter spacing.
+                let gap = curr.bbox.left_x - prev.bbox.right_x;
+                if gap > threshold {
+                    result.push(' ');
+                }
+            } else if Self::needs_space(prev, curr) {
                 result.push(' ');
             }
             result.push_str(&curr.value);
@@ -103,6 +199,59 @@ impl TextLine {
         let threshold = font_size * 0.17;
 
         gap > threshold
+    }
+
+    /// Collapse letter-spaced text within a single string.
+    ///
+    /// Detects strings where ≥60% of space-separated tokens are single
+    /// alphabetic characters (min 4). Consecutive single-char tokens are
+    /// joined; double spaces and multi-char tokens act as word boundaries.
+    fn collapse_letter_spaced(text: &str) -> String {
+        let tokens: Vec<&str> = text.split(' ').collect();
+        if tokens.len() < 5 {
+            return text.to_string();
+        }
+
+        let non_empty: Vec<&str> = tokens.iter().copied().filter(|t| !t.is_empty()).collect();
+        if non_empty.len() < 4 {
+            return text.to_string();
+        }
+
+        let single_alpha = non_empty
+            .iter()
+            .filter(|t| {
+                let mut chars = t.chars();
+                matches!(chars.next(), Some(c) if c.is_alphabetic()) && chars.next().is_none()
+            })
+            .count();
+
+        if single_alpha < 4 || single_alpha * 10 < non_empty.len() * 6 {
+            return text.to_string();
+        }
+
+        let mut result = String::new();
+        for token in &tokens {
+            if token.is_empty() {
+                // Double space → word boundary.
+                if !result.is_empty() && !result.ends_with(' ') {
+                    result.push(' ');
+                }
+                continue;
+            }
+            let is_single_alpha = {
+                let mut chars = token.chars();
+                matches!(chars.next(), Some(c) if c.is_alphabetic()) && chars.next().is_none()
+            };
+            if is_single_alpha {
+                result.push_str(token);
+            } else {
+                if !result.is_empty() && !result.ends_with(' ') {
+                    result.push(' ');
+                }
+                result.push_str(token);
+            }
+        }
+        result.trim().to_string()
     }
 
     /// Number of text chunks in this line.

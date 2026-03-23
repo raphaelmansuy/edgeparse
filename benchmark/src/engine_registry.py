@@ -39,6 +39,7 @@ ENGINE_META: Dict[str, tuple] = {
     # "mineru":         ("MinerU",         "mineru[all]",       "OpenDataLab PDF extractor"),
     "pymupdf4llm":    ("PyMuPDF4LLM",   "pymupdf4llm",       "PyMuPDF for LLM/RAG"),
     "markitdown":     ("MarkItDown",     "markitdown[all]",   "Microsoft multi-format converter"),
+    "liteparse":     ("LiteParse",      "@llamaindex/liteparse", "LlamaIndex local PDF parser"),
 }
 
 # ── Auto-register external engines ───────────────────────────────────────────
@@ -58,6 +59,7 @@ _try_register("docling",        "pdf_parser_docling",        "installed")
 
 _try_register("pymupdf4llm",    "pdf_parser_pymupdf4llm",   "installed")
 _try_register("markitdown",     "pdf_parser_markitdown",     "installed")
+_try_register("liteparse",     "pdf_parser_liteparse",     "installed")
 
 
 

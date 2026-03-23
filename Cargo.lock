@@ -615,6 +615,7 @@ dependencies = [
  "edgeparse-core",
  "env_logger",
  "log",
+ "rayon",
  "serde",
  "serde_json",
 ]

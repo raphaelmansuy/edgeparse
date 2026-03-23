@@ -92,7 +92,7 @@ const UPPERCASE_PENALTY: f64 = 0.2;
 const FAR_NEIGHBOR_BOOST: f64 = 0.2;
 
 /// Lines-number penalty factor: final_prob *= max(0, 1 - FACTOR * (lines-1)^2).
-const LINES_PENALTY_FACTOR: f64 = 0.0291;
+const LINES_PENALTY_FACTOR: f64 = 0.05;
 
 /// Minimum one-sided neighbor support required before a numbered section heading
 /// can survive an asymmetric reading-order comparison (for example, when the
@@ -205,11 +205,56 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
             continue;
         }
 
+        // Skip text with fewer than 2 alphabetic characters — isolated math
+        // symbols ("O", "M =") or formula fragments are not section headings.
+        // Pure-digit text (chapter numbers like "4") is exempt: it has 0 alpha
+        // chars but is handled by the existing numeric filter below.
+        let trimmed_text = p.base.value().trim().to_string();
+        let alpha_count = trimmed_text.chars().filter(|c| c.is_alphabetic()).count();
+        if alpha_count == 1 {
+            continue;
+        }
+
         // Skip overly long paragraphs — genuine headings are short (section
         // titles).  Run-in bold text ("**Ablation.** We present results...")
         // and body paragraphs with distinctive font properties are always long.
         // 150 chars ≈ 2 full lines at typical heading font sizes.
         if text_len > MAX_HEADING_TEXT_LENGTH {
+            continue;
+        }
+
+        // Skip text ending with a comma — commas indicate continuation
+        // (author lists, enumerated items) and never occur at the end of
+        // section headings.  This is a structural text property, not a
+        // content heuristic.
+        if trimmed_text.ends_with(',') {
+            continue;
+        }
+
+        // Skip text ending with a hyphen — indicates a word broken at a
+        // column/page boundary (e.g. "When ap-"). Section headings are
+        // complete phrases and never end with a hyphenated word break.
+        if trimmed_text.ends_with('-')
+            && trimmed_text.len() > 3
+            && trimmed_text.as_bytes()[trimmed_text.len() - 2].is_ascii_alphabetic()
+        {
+            continue;
+        }
+
+        // Skip body text containing internal sentence breaks.
+        // A period followed by a space and uppercase letter (". [A-Z]")
+        // indicates a sentence boundary within the text.  Section headings
+        // are single phrases/titles and never contain sentence breaks.
+        // Guards: skip periods preceded by digits (section numbers like "4.3"),
+        // single uppercase letters (abbreviations like "U.S."), and periods
+        // too close to the start (short prefixes like "Dr. Smith").
+        if contains_internal_sentence_break(&trimmed_text) {
+            continue;
+        }
+
+        // Skip standalone dates — "June 2023", "Jan 2024" etc. are
+        // publication metadata, never section headings.
+        if is_standalone_date(&trimmed_text) {
             continue;
         }
 
@@ -244,6 +289,13 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
             continue;
         }
 
+        // Skip fully parenthesized text — "(Niederle and Vesterlund 2007)" is a
+        // citation or parenthetical note, not a section heading. No real heading
+        // is enclosed in parentheses.
+        if trimmed_text.starts_with('(') && trimmed_text.ends_with(')') {
+            continue;
+        }
+
         // Skip text that starts with a lowercase letter — real headings start
         // capitalized ("References"), with a number ("4. Entropy"), or with an
         // uppercase prefix ("B.6 Data Contamination").  Body text fragments that
@@ -260,6 +312,18 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
         // captions, not section headings.  They often have distinct font
         // properties (bold, italic) that the scoring would otherwise promote.
         if is_caption_prefix(p.base.value().trim()) {
+            continue;
+        }
+
+        // Skip text containing email addresses — "EMAIL FOO@BAR.COM" or
+        // "Contact: user@domain.org" are contact info, never section headings.
+        if contains_email_address(&trimmed_text) {
+            continue;
+        }
+
+        // Skip text starting with arrow/bullet symbols — ⮚, ▶, ►, ➤, ☛, →
+        // These are list-item or callout markers from infographics, not headings.
+        if starts_with_bullet_or_arrow(&trimmed_text) && !is_above_body {
             continue;
         }
 
@@ -369,7 +433,7 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
             .map(|(_, positions)| positions.len())
             .sum();
 
-        if body_bold_count > non_body_count * 3 {
+        if body_bold_count > non_body_count * 2 {
             let styles_to_remove: Vec<TextStyle> = heading_styles
                 .keys()
                 .filter(|s| {
@@ -859,6 +923,57 @@ fn is_primarily_numeric(text: &str) -> bool {
     alpha_count * 100 / total < 30
 }
 
+/// Check if text contains an internal sentence break — a period followed by
+/// a space and an uppercase letter (e.g. "results. When") that is not part
+/// of a number pattern or single-letter abbreviation.
+fn contains_internal_sentence_break(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.len() < 4 {
+        return false;
+    }
+    for i in 1..bytes.len().saturating_sub(2) {
+        if bytes[i] != b'.' {
+            continue;
+        }
+        if i + 2 >= bytes.len() || bytes[i + 1] != b' ' || !bytes[i + 2].is_ascii_uppercase() {
+            continue;
+        }
+        // Skip periods preceded by a digit (section numbers: "4.3 Results")
+        if bytes[i - 1].is_ascii_digit() {
+            continue;
+        }
+        // Skip periods preceded by a single uppercase letter (abbreviations: "U.S.")
+        if i >= 2 && bytes[i - 1].is_ascii_uppercase() && (i < 3 || !bytes[i - 2].is_ascii_alphanumeric()) {
+            continue;
+        }
+        // Skip periods too close to the start (short prefixes: "Dr. Smith", "Mr. Jones")
+        if i < 12 {
+            continue;
+        }
+        return true;
+    }
+    false
+}
+
+/// Standalone date check — "June 2023", "Jan 2024", etc.
+/// Publication metadata is never a section heading.
+fn is_standalone_date(text: &str) -> bool {
+    const MONTHS: &[&str] = &[
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december",
+        "jan", "feb", "mar", "apr", "jun", "jul", "aug",
+        "sep", "oct", "nov", "dec",
+    ];
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.len() != 2 {
+        return false;
+    }
+    let word0_lower = words[0].to_lowercase();
+    let is_month = MONTHS.iter().any(|m| *m == word0_lower.as_str());
+    let is_year = words[1].len() == 4 && words[1].chars().all(|c| c.is_ascii_digit());
+    is_month && is_year
+}
+
 /// Check if a paragraph is a standalone page number positioned at the extreme
 /// top or bottom margin of its page.  Such elements look like headings (isolated,
 /// sometimes bold) but are not section headings.
@@ -933,6 +1048,32 @@ fn is_caption_prefix(text: &str) -> bool {
         return first_non_space.is_some_and(|c| c.is_ascii_digit());
     }
     false
+}
+
+/// Check if text contains an email address pattern (something@domain.tld).
+fn contains_email_address(text: &str) -> bool {
+    if let Some(at_pos) = text.find('@') {
+        // Check for at least one char before @ and a dot after @
+        let before = &text[..at_pos];
+        let after = &text[at_pos + 1..];
+        let has_prefix = before
+            .chars()
+            .last()
+            .is_some_and(|c| c.is_alphanumeric() || c == '.' || c == '_');
+        let has_domain = after.contains('.');
+        return has_prefix && has_domain;
+    }
+    false
+}
+
+/// Check if text starts with an arrow or bullet symbol that indicates a list
+/// item or callout marker rather than a section heading.
+fn starts_with_bullet_or_arrow(text: &str) -> bool {
+    let first = text.chars().next();
+    matches!(
+        first,
+        Some('⮚' | '▶' | '►' | '➤' | '☛' | '→' | '➜' | '➔' | '⯈' | '◆' | '◉' | '▸' | '‣')
+    )
 }
 
 /// Detect numbered section headings such as "1 Introduction",

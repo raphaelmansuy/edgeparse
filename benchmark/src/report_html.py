@@ -162,6 +162,7 @@ def _get_display_name(engine: str) -> str:
         "mineru": "MinerU",
         "pymupdf4llm": "PyMuPDF4LLM",
         "markitdown": "MarkItDown",
+        "liteparse": "LiteParse",
     }
     return names.get(engine, engine)
 

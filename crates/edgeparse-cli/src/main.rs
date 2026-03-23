@@ -2,9 +2,11 @@
 
 use std::path::PathBuf;
 use std::process;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use clap::Parser;
 use edgeparse_core::api::config::OutputFormat;
+use rayon::prelude::*;
 
 /// EdgeParse: High-performance PDF-to-structured-data extraction
 #[derive(Parser, Debug)]
@@ -122,9 +124,9 @@ fn main() {
     // Build processing config
     let config = build_config(&cli);
 
-    // Process each input file
-    let mut has_errors = false;
-    for input_path in &cli.input {
+    // Process each input file in parallel
+    let has_errors = AtomicBool::new(false);
+    cli.input.par_iter().for_each(|input_path| {
         match edgeparse_core::convert(input_path, &config) {
             Ok(doc) => {
                 log::info!(
@@ -134,17 +136,17 @@ fn main() {
                 );
                 if let Err(e) = write_outputs(input_path, &doc, &config) {
                     eprintln!("Error writing output for {}: {}", input_path.display(), e);
-                    has_errors = true;
+                    has_errors.store(true, Ordering::Relaxed);
                 }
             }
             Err(e) => {
                 eprintln!("Error processing {}: {}", input_path.display(), e);
-                has_errors = true;
+                has_errors.store(true, Ordering::Relaxed);
             }
         }
-    }
+    });
 
-    if has_errors {
+    if has_errors.load(Ordering::Relaxed) {
         process::exit(1);
     }
 }

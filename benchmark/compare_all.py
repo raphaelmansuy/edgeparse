@@ -65,7 +65,7 @@ ISOLATED_VENVS_DIR = BENCH_DIR / ".venvs"
 ISOLATED_VENVS_DIR = BENCH_DIR / ".venvs"
 
 # All known engines in preferred display order (EdgeQuake removed)
-ALL_ENGINES = ["edgeparse", "opendataloader", "docling", "pymupdf4llm", "markitdown"]
+ALL_ENGINES = ["edgeparse", "opendataloader", "docling", "pymupdf4llm", "markitdown", "liteparse"]
 
 # pip install commands for each engine
 INSTALL_COMMANDS = {
