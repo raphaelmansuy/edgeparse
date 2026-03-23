@@ -18,6 +18,8 @@
         bench bench-setup bench-check bench-doc \
         bench-engines bench-non-ocr bench-ocr bench-compare-all bench-report \
         run demo \
+        publish-rust publish-rust-dry publish-python publish-python-dry \
+        publish-node publish-node-dry publish-all \
         clean clean-bench clean-all
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -202,6 +204,60 @@ bench-report: bench-setup ## Regenerate HTML report from existing results  (no r
 	$(call log,Generating HTML report from existing results ...)
 	@cd $(BENCH_DIR) && uv run python compare_all.py --group all --no-run
 	$(call ok,Report saved to $(BENCH_DIR)/reports/benchmark-latest.html)
+
+# ══════════════════════════════════════════════════════════════════════════════
+## Publish
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Rust / crates.io ──────────────────────────────────────────────────────────
+publish-rust-dry: ## Dry-run: verify edgeparse-core + edgeparse-cli can be published
+	$(call log,cargo publish --dry-run  [edgeparse-core])
+	@cargo publish -p edgeparse-core --dry-run
+	$(call log,cargo publish --dry-run  [edgeparse-cli])
+	@cargo publish -p edgeparse-cli --dry-run
+	$(call ok,Rust dry-run passed — ready for crates.io)
+
+publish-rust: ## Publish edgeparse-core then edgeparse-cli to crates.io
+	$(call log,Publishing edgeparse-core to crates.io ...)
+	@cargo publish -p edgeparse-core
+	$(call log,Waiting 30 s for crates.io index to propagate ...)
+	@sleep 30
+	$(call log,Publishing edgeparse-cli to crates.io ...)
+	@cargo publish -p edgeparse-cli
+	$(call ok,Rust crates published)
+
+# ── Python / PyPI ─────────────────────────────────────────────────────────────
+publish-python-dry: ## Dry-run: build Python wheel and validate with twine
+	$(call log,maturin build  [sdks/python/])
+	@cd sdks/python && maturin build --release --out dist/
+	$(call log,twine check)
+	@twine check sdks/python/dist/*.whl
+	$(call ok,Python dry-run passed — wheel is valid)
+
+publish-python: ## Build Python manylinux wheel and upload to PyPI
+	$(call log,maturin publish  [sdks/python/])
+	@cd sdks/python && maturin publish
+	$(call ok,Python SDK published to PyPI)
+
+# ── Node.js / npm ─────────────────────────────────────────────────────────────
+publish-node-dry: ## Dry-run: build TypeScript and show what would be published
+	$(call log,npm pack --dry-run  [sdks/node/])
+	@cd sdks/node && npm install --ignore-scripts
+	@cd sdks/node && npm run build:ts
+	@cd sdks/node && npm pack --dry-run
+	$(call ok,Node.js dry-run passed — package looks good)
+
+publish-node: ## Build and publish @edgeparse/pdf to npm
+	$(call log,Building Node.js SDK ...)
+	@cd sdks/node && npm install --ignore-scripts
+	@cd sdks/node && npm run build:ts
+	$(call log,npm publish  [@edgeparse/pdf])
+	@cd sdks/node && npm publish --access public
+	$(call ok,Node.js SDK published to npm)
+
+# ── Combined ──────────────────────────────────────────────────────────────────
+publish-all: publish-rust publish-python publish-node ## Publish Rust + Python + Node.js SDKs in sequence
+	$(call ok,All SDKs published)
 
 # ══════════════════════════════════════════════════════════════════════════════
 ## Clean
