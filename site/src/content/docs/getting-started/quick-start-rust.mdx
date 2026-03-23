@@ -1,0 +1,62 @@
+---
+title: "Quick Start: Rust"
+description: "Use EdgeParse as a Rust library (edgeparse-core crate)."
+---
+
+## Add Dependency
+
+```toml
+[dependencies]
+edgeparse-core = "0.1"
+```
+
+## Parse a PDF
+
+```rust
+use std::path::Path;
+use edgeparse_core::api::config::ProcessingConfig;
+use edgeparse_core::{convert, output};
+
+fn main() -> anyhow::Result<()> {
+    let config = ProcessingConfig::default();
+    let doc = convert(Path::new("document.pdf"), &config)?;
+
+    println!("Pages: {}", doc.number_of_pages);
+    println!("Elements: {}", doc.kids.len());
+
+    // Render to Markdown string
+    let md = output::markdown::to_markdown(&doc)?;
+    println!("{md}");
+
+    Ok(())
+}
+```
+
+## Output Renderers
+
+```rust
+use std::path::Path;
+use edgeparse_core::api::config::ProcessingConfig;
+use edgeparse_core::{convert, output};
+
+fn main() -> anyhow::Result<()> {
+    let config = ProcessingConfig::default();
+    let doc = convert(Path::new("document.pdf"), &config)?;
+
+    // Markdown
+    let md = output::markdown::to_markdown(&doc)?;
+
+    // HTML
+    let html = output::html::to_html(&doc)?;
+
+    // JSON
+    let json = output::legacy_json::to_legacy_json_string(&doc, "document")?;
+
+    Ok(())
+}
+```
+
+## Next Steps
+
+- [Architecture](/contributing/architecture/)
+- [JSON Schema Reference](/output/json-schema/)

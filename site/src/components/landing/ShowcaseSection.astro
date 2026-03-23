@@ -1,0 +1,259 @@
+---
+interface ShowcaseItem {
+  icon: string;
+  title: string;
+  description: string;
+  tags: string[];
+  href?: string;
+}
+
+interface Props {
+  title?: string;
+  subtitle?: string;
+  items: ShowcaseItem[];
+}
+
+const {
+  title = 'Built for Real-World Use Cases',
+  subtitle = 'See how teams use EdgeParse to power production document pipelines.',
+  items
+} = Astro.props;
+
+const iconPaths: Record<string, string> = {
+  rag: 'M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5',
+  legal: 'M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0 0 12 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52 2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 0 1-2.031.352 5.988 5.988 0 0 1-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971Zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0 2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 0 1-2.031.352 5.989 5.989 0 0 1-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971Z',
+  finance: 'M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z',
+  academic: 'M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5',
+  healthcare: 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z',
+  etl: 'M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5',
+};
+---
+
+<section class="showcase-section" aria-label="Use cases and showcases">
+  <div class="showcase-container">
+    <div class="showcase-header">
+      <span class="showcase-eyebrow">Use Cases</span>
+      <h2 class="showcase-title">{title}</h2>
+      <p class="showcase-subtitle">{subtitle}</p>
+    </div>
+
+    <div class="showcase-grid">
+      {items.map((item, i) => (
+        <div class="showcase-card" style={`animation-delay: ${i * 0.1}s`}>
+          <div class="showcase-icon-wrap">
+            <svg class="showcase-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d={iconPaths[item.icon] || iconPaths.rag} />
+            </svg>
+          </div>
+          <h3 class="showcase-card-title">{item.title}</h3>
+          <p class="showcase-card-desc">{item.description}</p>
+          <div class="showcase-tags">
+            {item.tags.map(tag => (
+              <span class="showcase-tag">{tag}</span>
+            ))}
+          </div>
+          {item.href && (
+            <a href={item.href} class="showcase-link">
+              Learn more
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .showcase-section {
+    padding: 5rem 1.5rem;
+    background: var(--ep-hero-gradient);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .showcase-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--sl-color-accent, #4F46E5) 1px, transparent 1px),
+      linear-gradient(90deg, var(--sl-color-accent, #4F46E5) 1px, transparent 1px);
+    background-size: 80px 80px;
+    opacity: 0.015;
+    pointer-events: none;
+  }
+
+  .showcase-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .showcase-header {
+    text-align: center;
+    margin-bottom: 3.5rem;
+  }
+
+  .showcase-eyebrow {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sl-color-accent, #4F46E5);
+    margin-bottom: 0.75rem;
+    padding: 0.3rem 0.75rem;
+    background: rgba(79, 70, 229, 0.08);
+    border-radius: 999px;
+  }
+
+  .showcase-title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 800;
+    color: var(--ep-text-primary, #111827);
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.02em;
+  }
+
+  .showcase-subtitle {
+    font-size: 1.1rem;
+    color: var(--ep-text-secondary, #6B7280);
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .showcase-card {
+    background: var(--ep-card-bg, white);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    position: relative;
+    transition: all 250ms ease;
+    animation: showcaseFadeIn 0.6s ease both;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .showcase-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--sl-color-accent, #4F46E5), #818cf8);
+    opacity: 0;
+    transition: opacity 250ms ease;
+  }
+
+  .showcase-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+    border-color: var(--sl-color-accent, #4F46E5);
+  }
+
+  .showcase-card:hover::before {
+    opacity: 1;
+  }
+
+  .showcase-icon-wrap {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: rgba(79, 70, 229, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    transition: all 250ms ease;
+  }
+
+  .showcase-card:hover .showcase-icon-wrap {
+    background: rgba(79, 70, 229, 0.15);
+    transform: scale(1.05);
+  }
+
+  .showcase-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--sl-color-accent, #4F46E5);
+  }
+
+  .showcase-card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--ep-text-primary, #1F2937);
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+  }
+
+  .showcase-card-desc {
+    font-size: 0.88rem;
+    color: var(--ep-text-secondary, #6B7280);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+    flex: 1;
+  }
+
+  .showcase-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .showcase-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: var(--ep-surface-bg, #F3F4F6);
+    color: var(--ep-text-secondary, #6B7280);
+    letter-spacing: 0.02em;
+  }
+
+  .showcase-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--sl-color-accent, #4F46E5);
+    text-decoration: none;
+    transition: gap 200ms ease;
+    margin-top: auto;
+  }
+
+  .showcase-link:hover {
+    gap: 0.6rem;
+  }
+
+  @keyframes showcaseFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .showcase-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 640px) {
+    .showcase-section { padding: 3rem 1rem; }
+    .showcase-grid { grid-template-columns: 1fr; }
+  }
+</style>

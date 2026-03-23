@@ -1,0 +1,138 @@
+---
+interface Stage {
+  name: string;
+  description: string;
+  crate: string;
+}
+
+interface Props {
+  title: string;
+  subtitle: string;
+  stages: Stage[];
+}
+
+const { title, subtitle, stages } = Astro.props;
+---
+
+<section class="arch-section" aria-labelledby="arch-heading">
+  <h2 id="arch-heading" class="section-title">{title}</h2>
+  <p class="section-subtitle">{subtitle}</p>
+
+  <div class="pipeline">
+    {stages.map((stage, i) => (
+      <div class="pipeline-stage" style={`--delay: ${i * 0.12}s`}>
+        <div class="stage-line" aria-hidden="true">
+          <div class="stage-number">{i + 1}</div>
+          {i < stages.length - 1 && <div class="stage-connector"></div>}
+        </div>
+        <div class="stage-content">
+          <h3 class="stage-name">{stage.name}</h3>
+          <p class="stage-desc">{stage.description}</p>
+          <span class="stage-crate">{stage.crate}</span>
+        </div>
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  .arch-section {
+    padding: 5rem 1.5rem;
+    background: var(--ep-section-alt-bg, #F9FAFB);
+    text-align: center;
+  }
+
+  .section-title {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+    color: var(--ep-text-primary, #111827);
+    letter-spacing: -0.02em;
+  }
+
+  .section-subtitle {
+    font-size: clamp(1rem, 2.5vw, 1.125rem);
+    color: var(--ep-color-muted, #6B7280);
+    max-width: 560px;
+    margin: 0 auto 3rem;
+    line-height: 1.6;
+  }
+
+  .pipeline {
+    max-width: 560px;
+    margin: 0 auto;
+    text-align: left;
+  }
+
+  .pipeline-stage {
+    display: flex;
+    gap: 1.25rem;
+    animation: fadeInUp 0.4s ease both;
+    animation-delay: var(--delay, 0s);
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .stage-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .stage-number {
+    width: 36px;
+    height: 36px;
+    background: var(--sl-color-accent, #4F46E5);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .stage-connector {
+    width: 2px;
+    flex: 1;
+    background: var(--ep-card-border, #E5E7EB);
+    min-height: 2rem;
+  }
+
+  .stage-content {
+    padding-bottom: 2rem;
+  }
+
+  .stage-name {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    color: var(--ep-text-primary, #111827);
+  }
+
+  .stage-desc {
+    font-size: 0.875rem;
+    color: var(--ep-color-muted, #6B7280);
+    margin-bottom: 0.375rem;
+    line-height: 1.6;
+  }
+
+  .stage-crate {
+    font-size: 0.75rem;
+    font-family: var(--ep-font-mono, monospace);
+    color: var(--ep-color-rust, #EA580C);
+    background: rgba(234, 88, 12, 0.08);
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+  }
+
+  @media (max-width: 540px) {
+    .arch-section { padding: 3rem 1rem; }
+    .stage-content { padding-bottom: 1.25rem; }
+  }
+</style>

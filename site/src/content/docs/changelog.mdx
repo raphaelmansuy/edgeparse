@@ -1,0 +1,55 @@
+---
+title: Changelog
+description: All notable changes to EdgeParse — versions, new features, bug fixes, and breaking changes.
+---
+
+All notable changes to EdgeParse are documented here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
+this project adheres to [Semantic Versioning](https://semver.org/).
+
+---
+
+## [0.1.1] — 2026-03-23
+
+### Fixed
+- Zero Clippy warnings across all crates
+- Corrected `.gitignore` to exclude build artifacts cleanly
+
+### Added
+- Comprehensive Rust doc comments on public API surface
+- Step-by-step tutorials for CLI, Python SDK, Node.js SDK, Rust library, and output formats
+- CI/CD publishing guide
+
+### Changed
+- Bumped version to `0.1.1` in all crates and SDK manifests
+
+---
+
+## [0.1.0] — 2026-03-22
+
+### Added
+- **Core extraction engine** (`edgeparse-core`): Rust-native PDF-to-structured-data pipeline — no ML, no Java, no GPU
+- **Python SDK** (`edgeparse`): PyO3-based bindings, available on [PyPI](https://pypi.org/project/edgeparse/)
+- **Node.js SDK** (`edgeparse`): NAPI-RS bindings, available on [npm](https://www.npmjs.com/package/edgeparse)
+- **CLI binary** (`edgeparse-cli`): Zero-dependency binary for all major platforms
+- **Rust library** (`edgeparse-core`): First-class crate published to [crates.io](https://crates.io/crates/edgeparse-core)
+- Reading-order reconstruction for multi-column and sidebar layouts
+- Ruling-line and borderless table detection with cell-span merging
+- Heading and paragraph classification
+- AI safety filters (PII scrubbing, content flags)
+- Tagged PDF support (PDF/UA accessibility structure)
+- Output formats: JSON (full schema), Markdown, HTML, plain text
+- Benchmark suite comparing EdgeParse against Docling, Marker, pymupdf4llm, MinerU, MarkItDown, and LiteParse
+- Docker image for containerised deployment
+- GitHub Actions CI workflows for Rust, Python, Node.js, and Docker releases
+- Renamed Node.js package from `@edgeparse/pdf` → `edgeparse`
+
+---
+
+## Links
+
+- [GitHub Releases](https://github.com/raphaelmansuy/edgeparse/releases)
+- [crates.io](https://crates.io/crates/edgeparse-core)
+- [PyPI](https://pypi.org/project/edgeparse/)
+- [npm](https://www.npmjs.com/package/edgeparse)

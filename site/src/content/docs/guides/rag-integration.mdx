@@ -1,0 +1,67 @@
+---
+title: "RAG Integration"
+description: "Use EdgeParse with LangChain and LlamaIndex for RAG pipelines."
+---
+
+## Why EdgeParse for RAG?
+
+EdgeParse produces structured output with reading order, heading hierarchy, and table structure — all critical for high-quality retrieval-augmented generation.
+
+## LangChain Integration
+
+```python
+import edgeparse
+from langchain.text_splitter import MarkdownHeaderTextSplitter
+
+# Extract structured Markdown
+markdown = edgeparse.convert("document.pdf", format="markdown")
+
+# Split by heading hierarchy
+splitter = MarkdownHeaderTextSplitter(
+    headers_to_split_on=[
+        ("#", "H1"),
+        ("##", "H2"),
+        ("###", "H3"),
+    ]
+)
+
+chunks = splitter.split_text(markdown)
+
+for chunk in chunks:
+    print(chunk.metadata)
+    print(chunk.page_content[:100])
+    print("---")
+```
+
+## LlamaIndex Integration
+
+```python
+import edgeparse
+from llama_index.core import Document
+
+# Extract as JSON for maximum metadata
+json_str = edgeparse.convert("document.pdf", format="json")
+import json
+data = json.loads(json_str)
+
+# Create documents with rich metadata
+documents = []
+for element in data["kids"]:
+    if element["type"] in ("paragraph", "heading"):
+        doc = Document(
+            text=element["content"],
+            metadata={
+                "page": element["page number"],
+                "type": element["type"],
+                "source": data["file name"],
+            }
+        )
+        documents.append(doc)
+```
+
+## Best Practices
+
+1. **Use Markdown format** for heading-based chunking
+2. **Use JSON format** when you need bounding boxes or element metadata
+3. **Enable safety filters** to prevent prompt injection from malicious PDFs
+4. **Preserve table structure** — structured tables improve retrieval quality

@@ -1,0 +1,46 @@
+---
+title: "Markdown Output"
+description: "EdgeParse Markdown output format with table support and heading hierarchy."
+---
+
+## Overview
+
+The `--format markdown` output produces clean Markdown with proper heading hierarchy, table formatting, and list structures.
+
+## Usage
+
+```python
+import edgeparse
+
+markdown = edgeparse.convert("document.pdf", format="markdown")
+print(markdown)
+```
+
+```bash
+edgeparse document.pdf -f markdown
+```
+
+## Features
+
+- **Heading hierarchy** — H1–H6 levels mapped from font analysis
+- **Tables** — GitHub-Flavored Markdown table syntax
+- **Lists** — Bullet and numbered lists preserved
+- **Bold/italic** — Font weight and style detection
+- **Page breaks** — Optional page break markers
+
+## Example Output
+
+```markdown
+# Annual Report 2024
+
+Revenue grew 23% year-over-year, driven by expansion in the enterprise segment.
+
+## Financial Summary
+
+| Quarter | Revenue ($M) | YoY Growth |
+|---------|-------------|------------|
+| Q1 2024 | 142.3       | +18%       |
+| Q2 2024 | 156.7       | +22%       |
+| Q3 2024 | 168.9       | +25%       |
+| Q4 2024 | 179.2       | +27%       |
+```

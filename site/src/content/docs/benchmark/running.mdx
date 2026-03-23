@@ -1,0 +1,66 @@
+---
+title: "Running Benchmarks"
+description: "Reproduce EdgeParse benchmarks locally with the Python harness."
+---
+
+## Prerequisites
+
+- Python 3.10+
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- EdgeParse CLI installed
+
+## Quick Start
+
+```bash
+cd benchmark
+uv sync          # install dependencies
+uv run python run.py --tool edgeparse
+```
+
+## Running a Single Tool
+
+```bash
+uv run python run.py --tool edgeparse
+```
+
+Available tools: `edgeparse`, `docling`, `marker`, `edgequake`, `opendataloader`, `pymupdf4llm`, `markitdown`.
+
+## Running All Tools
+
+```bash
+uv run python compare_all.py
+```
+
+This compares all tools against the ground-truth reference set and generates an HTML report in `reports/`.
+
+## Custom PDFs
+
+Place your PDF files in `benchmark/pdfs/` and matching ground-truth Markdown in `benchmark/ground-truth/markdown/`.
+
+```bash
+# Run with custom corpus
+uv run python run.py --tool edgeparse --pdf-dir ./my-pdfs
+```
+
+## Viewing Reports
+
+Reports are generated as HTML files:
+
+```bash
+open reports/benchmark-latest.html
+```
+
+## Thresholds
+
+The `thresholds.json` file defines minimum acceptable scores:
+
+```json
+{
+  "nid": 0.85,
+  "teds": 0.70,
+  "mhs": 0.75,
+  "overall": 0.80
+}
+```
+
+CI will fail if EdgeParse scores drop below these thresholds.

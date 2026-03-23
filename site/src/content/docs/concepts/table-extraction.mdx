@@ -1,0 +1,57 @@
+---
+title: "Table Extraction"
+description: "How EdgeParse detects table borders, clusters borderless tables, and assigns content to cells."
+---
+
+## Approach
+
+EdgeParse uses two complementary methods for table detection:
+
+### 1. Border-Based Detection
+
+When PDFs contain ruling lines (`re`, `l`, `m` operators), EdgeParse identifies grid patterns and maps text runs into cells.
+
+### 2. Cluster-Based Detection
+
+For borderless tables, EdgeParse analyzes text alignment patterns to infer column boundaries and row groupings.
+
+## Cell Merging
+
+After initial detection, EdgeParse identifies spanning cells by analyzing:
+
+- Cells with content that overlaps multiple grid positions
+- Header rows with merged cells
+- Row/column span attributes from tagged PDF structure
+
+## TEDS Score
+
+EdgeParse achieves a **TEDS score of 0.783** — the highest among rule-based tools:
+
+| Tool | TEDS Score | Type |
+|------|-----------|------|
+| Docling | 0.887 | ML-based |
+| Marker | 0.825 | ML-based |
+| **EdgeParse** | **0.783** | Rule-based |
+| EdgeQuake | 0.795 | ML-enhanced |
+| PyMuPDF4LLM | 0.540 | Rule-based |
+
+## Output Format
+
+Tables in JSON output include full cell structure:
+
+```json
+{
+  "type": "table",
+  "id": 3,
+  "page number": 1,
+  "rows": [
+    {
+      "row number": 0,
+      "cells": [
+        {"col": 0, "content": "Quarter", "is header": true},
+        {"col": 1, "content": "Revenue", "is header": true}
+      ]
+    }
+  ]
+}
+```

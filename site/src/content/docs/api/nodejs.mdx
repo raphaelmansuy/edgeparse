@@ -1,0 +1,40 @@
+---
+title: "Node.js API"
+description: "Complete Node.js API reference for EdgeParse."
+---
+
+## Module: `edgeparse`
+
+### `convert(path, options?)`
+
+Convert a PDF file to the specified format.
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | `string` | required | Path to the PDF file |
+| `options.format` | `string` | `"markdown"` | Output format |
+| `options.pages` | `string` | `undefined` | Page range, e.g. `"1-5"` |
+| `options.tableMethod` | `string` | `undefined` | Table detection method |
+
+**Returns:** `string` — the converted content.
+
+```javascript
+import { convert } from "edgeparse";
+
+const markdown = convert("document.pdf", { format: "markdown" });
+const json = convert("document.pdf", { format: "json" });
+const html = convert("document.pdf", { format: "html" });
+const text = convert("document.pdf", { format: "text" });
+```
+
+### Options Object
+
+```typescript
+interface ConvertOptions {
+  format?: "markdown" | "json" | "html" | "text";
+  pages?: string;
+  tableMethod?: "border" | "cluster";
+}
+```

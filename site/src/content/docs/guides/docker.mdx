@@ -1,0 +1,44 @@
+---
+title: "Docker Deployment"
+description: "Run EdgeParse in Docker containers for production deployments."
+---
+
+## Quick Start
+
+```bash
+# Pull the image
+docker pull ghcr.io/raphaelmansuy/edgeparse:latest
+
+# Process a PDF
+docker run --rm -v $(pwd):/data ghcr.io/raphaelmansuy/edgeparse:latest \
+  edgeparse /data/document.pdf -f markdown
+```
+
+## Dockerfile
+
+```dockerfile
+FROM rust:1.83-slim AS builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release --bin edgeparse-cli
+
+FROM debian:bookworm-slim
+COPY --from=builder /app/target/release/edgeparse-cli /usr/local/bin/edgeparse
+ENTRYPOINT ["edgeparse"]
+```
+
+## Docker Compose
+
+```yaml
+services:
+  edgeparse:
+    image: ghcr.io/raphaelmansuy/edgeparse:latest
+    volumes:
+      - ./input:/data/input
+      - ./output:/data/output
+    command: /data/input/document.pdf -f json --output-dir /data/output
+```
+
+## Image Size
+
+The production image is approximately **15 MB** — no Python runtime, no Java, no ML models.

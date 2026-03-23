@@ -1,0 +1,45 @@
+---
+title: "Hybrid Mode"
+description: "Combine EdgeParse with ML-based backends for maximum accuracy."
+---
+
+## What Is Hybrid Mode?
+
+Hybrid mode lets EdgeParse use an ML-based backend (like Docling) for specific tasks while keeping its fast rule-based pipeline for everything else.
+
+## Usage
+
+```bash
+# CLI
+edgeparse document.pdf -f json --hybrid docling-fast
+```
+
+```python
+import edgeparse
+
+result = edgeparse.convert("document.pdf",
+    format="json",
+    hybrid="docling-fast"
+)
+```
+
+## When to Use Hybrid Mode
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Speed-critical production | Standard mode (0.026s/doc) |
+| Maximum table accuracy | Hybrid mode with docling-fast |
+| No GPU available | Standard mode |
+| Complex academic papers | Hybrid mode |
+
+## Supported Backends
+
+| Backend | Description |
+|---------|-------------|
+| `docling-fast` | Uses Docling's layout model for table detection |
+
+## Trade-offs
+
+- **Speed**: Hybrid mode is slower (~1s/doc vs 0.026s/doc)
+- **Accuracy**: Higher TEDS score for complex tables
+- **Dependencies**: Requires the backend to be installed

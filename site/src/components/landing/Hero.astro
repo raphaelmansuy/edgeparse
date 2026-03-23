@@ -1,0 +1,749 @@
+---
+// Hero override for Starlight — cinematic landing hero
+const base = import.meta.env.BASE_URL;
+const installCmd = 'pip install edgeparse';
+---
+
+<section class="hero" aria-label="EdgeParse introduction">
+  <div class="hero-bg-effects" aria-hidden="true">
+    <canvas id="hero-three-canvas"></canvas>
+    <div class="hero-grid"></div>
+    <div class="hero-glow hero-glow-1"></div>
+    <div class="hero-glow hero-glow-2"></div>
+  </div>
+
+  <div class="hero-content">
+    <div class="hero-eyebrow">
+      <span class="eyebrow-badge">Open Source</span>
+      <span class="eyebrow-text">The PDF extraction engine for the AI era</span>
+      <svg class="eyebrow-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+
+    <h1 class="hero-title">
+      <span class="hero-line-1">The PDF Engine</span>
+      <span class="hero-line-2">for <span class="hero-rotating-wrapper"><span id="hero-rotating" class="hero-rotating">RAG Pipelines</span></span></span>
+    </h1>
+
+    <p class="hero-subtitle">
+      Feed your LLMs clean structured data. EdgeParse extracts headings, tables, lists, and reading order from any PDF — in milliseconds, with zero ML dependencies. Built in Rust.
+    </p>
+
+    <div class="hero-actions">
+      <a href={`${base}getting-started/quick-start-python/`} class="btn-primary">
+        Get Started
+        <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <a href="https://github.com/raphaelmansuy/edgeparse" target="_blank" rel="noopener noreferrer" class="btn-secondary">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Star on GitHub
+      </a>
+    </div>
+
+    <div class="install-bar" role="group" aria-label="Install command">
+      <span class="install-prompt" aria-hidden="true">$</span>
+      <code>{installCmd}</code>
+      <button class="copy-btn" aria-label="Copy install command" data-copy={installCmd}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </div>
+
+    <div class="hero-metrics" aria-label="Key metrics">
+      <div class="metric">
+        <span class="metric-value" data-count="40">0</span><span class="metric-suffix">+</span>
+        <span class="metric-label">pages/sec</span>
+      </div>
+      <div class="metric-sep" aria-hidden="true"></div>
+      <div class="metric">
+        <span class="metric-value" data-count="88">0</span><span class="metric-suffix">%</span>
+        <span class="metric-label">accuracy</span>
+      </div>
+      <div class="metric-sep" aria-hidden="true"></div>
+      <div class="metric">
+        <span class="metric-value" data-count="0">0</span>
+        <span class="metric-label">ML dependencies</span>
+      </div>
+      <div class="metric-sep" aria-hidden="true"></div>
+      <div class="metric">
+        <span class="metric-value" data-count="3">0</span>
+        <span class="metric-label">SDK languages</span>
+      </div>
+    </div>
+
+    <div class="hero-trust">
+      <span class="trust-label">Works with</span>
+      <div class="trust-logos">
+        <span class="trust-item">Python</span>
+        <span class="trust-dot"></span>
+        <span class="trust-item">Node.js</span>
+        <span class="trust-dot"></span>
+        <span class="trust-item">Rust</span>
+        <span class="trust-dot"></span>
+        <span class="trust-item">CLI</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Copy button handler
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = (btn as HTMLElement).dataset.copy || '';
+      await navigator.clipboard.writeText(text);
+      btn.classList.add('copied');
+      setTimeout(() => btn.classList.remove('copied'), 2000);
+    });
+  });
+
+  // Rotating text animation
+  const rotatingEl = document.getElementById('hero-rotating');
+  if (rotatingEl) {
+    const phrases = ['RAG Pipelines', 'AI Agents', 'Copilot Skills', 'Data Extraction', 'Document Intelligence'];
+    let idx = 0;
+    setInterval(() => {
+      idx = (idx + 1) % phrases.length;
+      rotatingEl.classList.add('hero-rotating-out');
+      setTimeout(() => {
+        rotatingEl.textContent = phrases[idx];
+        rotatingEl.classList.remove('hero-rotating-out');
+        rotatingEl.classList.add('hero-rotating-in');
+        setTimeout(() => rotatingEl.classList.remove('hero-rotating-in'), 400);
+      }, 300);
+    }, 2800);
+  }
+
+  // Animated counters
+  const metricEls = document.querySelectorAll('.metric-value[data-count]');
+  const animateCounter = (el: Element) => {
+    const target = parseInt((el as HTMLElement).dataset.count || '0', 10);
+    if (target === 0) { el.textContent = '0'; return; }
+    let current = 0;
+    const step = Math.max(1, Math.floor(target / 30));
+    const timer = setInterval(() => {
+      current += step;
+      if (current >= target) {
+        current = target;
+        clearInterval(timer);
+      }
+      el.textContent = String(current);
+    }, 40);
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        animateCounter(e.target);
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.5 });
+  metricEls.forEach(el => observer.observe(el));
+
+  // Three.js hero animation
+  import * as THREE from 'three';
+
+  const canvas = document.getElementById('hero-three-canvas') as HTMLCanvasElement;
+  if (canvas) {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 100);
+    camera.position.z = 12;
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: true,
+      powerPreference: 'low-power',
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+
+    const isDark = () => document.documentElement.dataset.theme === 'dark' ||
+      document.documentElement.classList.contains('dark');
+
+    const accentColor = new THREE.Color(isDark() ? '#818cf8' : '#4F46E5');
+
+    // --- Floating document planes ---
+    const docGroup = new THREE.Group();
+    scene.add(docGroup);
+
+    interface DocPlane {
+      mesh: THREE.Mesh;
+      edges: THREE.LineSegments;
+      lines: THREE.Group;
+      basePos: THREE.Vector3;
+      phase: number;
+      speed: number;
+    }
+
+    const docPlanes: DocPlane[] = [];
+    const docPositions = [
+      { x: -5.5, y: 2.2, z: -2, rx: 0.15, ry: -0.3 },
+      { x: 5.2, y: 1.5, z: -3, rx: -0.1, ry: 0.25 },
+      { x: -3.5, y: -2.0, z: -1.5, rx: 0.2, ry: 0.15 },
+      { x: 4.5, y: -1.8, z: -2.5, rx: -0.15, ry: -0.2 },
+      { x: 0, y: 3.5, z: -4, rx: 0.1, ry: 0.1 },
+      { x: -6.5, y: 0, z: -3.5, rx: -0.08, ry: 0.3 },
+      { x: 6.5, y: -0.5, z: -4, rx: 0.12, ry: -0.15 },
+    ];
+
+    for (const pos of docPositions) {
+      const w = 1.4 + Math.random() * 0.6;
+      const h = w * 1.414;
+      const geo = new THREE.PlaneGeometry(w, h);
+      const mat = new THREE.MeshBasicMaterial({
+        color: isDark() ? 0x1e1e2e : 0xffffff,
+        transparent: true,
+        opacity: isDark() ? 0.06 : 0.04,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(pos.x, pos.y, pos.z);
+      mesh.rotation.set(pos.rx, pos.ry, 0);
+
+      const edgeGeo = new THREE.EdgesGeometry(geo);
+      const edgeMat = new THREE.LineBasicMaterial({
+        color: accentColor, transparent: true, opacity: isDark() ? 0.2 : 0.1,
+      });
+      const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+      edges.position.copy(mesh.position);
+      edges.rotation.copy(mesh.rotation);
+
+      const lineGroup = new THREE.Group();
+      const lineCount = 4 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < lineCount; i++) {
+        const lw = (0.3 + Math.random() * 0.6) * w;
+        const lineGeo = new THREE.PlaneGeometry(lw, 0.03);
+        const lineMat = new THREE.MeshBasicMaterial({
+          color: accentColor, transparent: true, opacity: isDark() ? 0.12 : 0.06,
+        });
+        const line = new THREE.Mesh(lineGeo, lineMat);
+        const startY = h * 0.35;
+        const spacing = h * 0.7 / (lineCount + 1);
+        line.position.set((lw - w) * 0.5 + w * 0.1, startY - spacing * (i + 1), 0.01);
+        lineGroup.add(line);
+      }
+      lineGroup.position.copy(mesh.position);
+      lineGroup.rotation.copy(mesh.rotation);
+
+      docGroup.add(mesh);
+      docGroup.add(edges);
+      docGroup.add(lineGroup);
+
+      docPlanes.push({
+        mesh, edges, lines: lineGroup,
+        basePos: new THREE.Vector3(pos.x, pos.y, pos.z),
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.3 + Math.random() * 0.4,
+      });
+    }
+
+    // --- Particle system ---
+    const particleCount = 200;
+    const particleGeo = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const velocities = new Float32Array(particleCount * 3);
+    const opacities = new Float32Array(particleCount);
+    const sizes = new Float32Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      positions[i3] = (Math.random() - 0.5) * 20;
+      positions[i3 + 1] = (Math.random() - 0.5) * 14;
+      positions[i3 + 2] = (Math.random() - 0.5) * 10 - 2;
+      velocities[i3] = (Math.random() - 0.5) * 0.008;
+      velocities[i3 + 1] = (Math.random() - 0.5) * 0.008 + 0.004;
+      velocities[i3 + 2] = (Math.random() - 0.5) * 0.004;
+      opacities[i] = Math.random();
+      sizes[i] = 1.5 + Math.random() * 2;
+    }
+
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particleGeo.setAttribute('aOpacity', new THREE.BufferAttribute(opacities, 1));
+    particleGeo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+    const particleMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      uniforms: { uColor: { value: accentColor }, uTime: { value: 0 } },
+      vertexShader: `
+        attribute float aOpacity;
+        attribute float aSize;
+        varying float vOpacity;
+        uniform float uTime;
+        void main() {
+          vOpacity = aOpacity * (0.5 + 0.5 * sin(uTime * 2.0 + position.x));
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = aSize * (8.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        varying float vOpacity;
+        void main() {
+          float d = length(gl_PointCoord - vec2(0.5));
+          if (d > 0.5) discard;
+          float alpha = smoothstep(0.5, 0.1, d) * vOpacity * 0.35;
+          gl_FragColor = vec4(uColor, alpha);
+        }
+      `,
+    });
+
+    const particles = new THREE.Points(particleGeo, particleMat);
+    scene.add(particles);
+
+    // --- Mouse interaction ---
+    let mouseX = 0;
+    let mouseY = 0;
+    const heroSection = canvas.closest('.hero');
+    if (heroSection) {
+      heroSection.addEventListener('mousemove', (e: Event) => {
+        const me = e as MouseEvent;
+        const rect = (heroSection as HTMLElement).getBoundingClientRect();
+        mouseX = ((me.clientX - rect.left) / rect.width - 0.5) * 2;
+        mouseY = -((me.clientY - rect.top) / rect.height - 0.5) * 2;
+      });
+    }
+
+    let time = 0;
+    let animationId: number;
+
+    function animate() {
+      animationId = requestAnimationFrame(animate);
+      time += 0.016;
+
+      if (prefersReducedMotion) {
+        renderer.render(scene, camera);
+        return;
+      }
+
+      camera.position.x += (mouseX * 1.0 - camera.position.x) * 0.015;
+      camera.position.y += (mouseY * 0.6 - camera.position.y) * 0.015;
+      camera.lookAt(0, 0, -2);
+
+      for (const doc of docPlanes) {
+        const fy = Math.sin(time * doc.speed + doc.phase) * 0.25;
+        const fx = Math.cos(time * doc.speed * 0.7 + doc.phase) * 0.12;
+        const newPos = new THREE.Vector3(doc.basePos.x + fx, doc.basePos.y + fy, doc.basePos.z);
+        doc.mesh.position.copy(newPos);
+        doc.edges.position.copy(newPos);
+        doc.lines.position.copy(newPos);
+      }
+
+      const posAttr = particleGeo.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3;
+        positions[i3] += velocities[i3];
+        positions[i3 + 1] += velocities[i3 + 1];
+        positions[i3 + 2] += velocities[i3 + 2];
+        if (positions[i3] > 10) positions[i3] = -10;
+        if (positions[i3] < -10) positions[i3] = 10;
+        if (positions[i3 + 1] > 7) positions[i3 + 1] = -7;
+        if (positions[i3 + 1] < -7) positions[i3 + 1] = 7;
+      }
+      posAttr.needsUpdate = true;
+      particleMat.uniforms.uTime.value = time;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    const onResize = () => {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h, false);
+    };
+    window.addEventListener('resize', onResize);
+
+    document.addEventListener('astro:before-swap', () => {
+      cancelAnimationFrame(animationId);
+      renderer.dispose();
+      window.removeEventListener('resize', onResize);
+    });
+  }
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    text-align: center;
+    padding: 7rem 1.5rem 5rem;
+    background: var(--ep-hero-gradient);
+    overflow: hidden;
+    min-height: 90vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .hero-bg-effects {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  #hero-three-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--sl-color-accent, #4F46E5) 1px, transparent 1px),
+      linear-gradient(90deg, var(--sl-color-accent, #4F46E5) 1px, transparent 1px);
+    background-size: 80px 80px;
+    opacity: 0.025;
+    mask-image: radial-gradient(ellipse at center, black 0%, transparent 65%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 0%, transparent 65%);
+  }
+
+  .hero-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.15;
+  }
+
+  .hero-glow-1 {
+    width: 600px;
+    height: 600px;
+    background: var(--sl-color-accent, #4F46E5);
+    top: -200px;
+    right: -100px;
+  }
+
+  .hero-glow-2 {
+    width: 500px;
+    height: 500px;
+    background: #a78bfa;
+    bottom: -200px;
+    left: -100px;
+  }
+
+  .hero-content {
+    position: relative;
+    max-width: 900px;
+    margin: 0 auto;
+    z-index: 1;
+  }
+
+  /* Eyebrow */
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    padding: 0.4rem 0.4rem 0.4rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: heroFadeIn 0.6s ease both;
+    font-size: 0.85rem;
+    color: var(--ep-text-secondary, #4B5563);
+  }
+
+  :root[data-theme='dark'] .hero-eyebrow {
+    background: rgba(30, 27, 75, 0.5);
+  }
+
+  .eyebrow-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--sl-color-accent, #4F46E5);
+    color: white;
+  }
+
+  .eyebrow-text {
+    font-weight: 500;
+  }
+
+  .eyebrow-arrow {
+    opacity: 0.5;
+    flex-shrink: 0;
+  }
+
+  /* Title */
+  .hero-title {
+    font-size: clamp(2.75rem, 6.5vw, 4.5rem);
+    font-weight: 800;
+    line-height: 1.08;
+    margin-bottom: 1.5rem;
+    color: var(--ep-text-primary, #111827);
+    letter-spacing: -0.03em;
+    animation: heroFadeIn 0.6s ease 0.1s both;
+  }
+
+  .hero-line-1,
+  .hero-line-2 {
+    display: block;
+  }
+
+  .hero-rotating-wrapper {
+    display: inline-block;
+    position: relative;
+  }
+
+  .hero-rotating {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--sl-color-accent, #4F46E5), #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .hero-rotating-out {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  .hero-rotating-in {
+    animation: rotateIn 0.4s ease;
+  }
+
+  @keyframes rotateIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Subtitle */
+  .hero-subtitle {
+    font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+    color: var(--ep-text-secondary, #4B5563);
+    max-width: 660px;
+    margin: 0 auto 2.5rem;
+    line-height: 1.7;
+    animation: heroFadeIn 0.6s ease 0.2s both;
+  }
+
+  /* Actions */
+  .hero-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    animation: heroFadeIn 0.6s ease 0.3s both;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem 2rem;
+    background: var(--sl-color-accent, #4F46E5);
+    color: white;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: all 200ms ease;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+  }
+
+  .btn-primary:hover {
+    background: var(--sl-color-accent-high, #3730A3);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
+  }
+
+  .btn-arrow {
+    transition: transform 200ms ease;
+  }
+
+  .btn-primary:hover .btn-arrow {
+    transform: translateX(3px);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem 2rem;
+    border: 1.5px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 0.75rem;
+    color: var(--ep-text-primary, #1F2937);
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 200ms ease;
+  }
+
+  :root[data-theme='dark'] .btn-secondary {
+    background: rgba(30, 27, 75, 0.4);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--sl-color-accent, #4F46E5);
+    color: var(--sl-color-accent, #4F46E5);
+    transform: translateY(-2px);
+  }
+
+  /* Install bar */
+  .install-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--ep-code-bg, #F3F4F6);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 2.5rem;
+    animation: heroFadeIn 0.6s ease 0.4s both;
+  }
+
+  .install-prompt {
+    color: var(--sl-color-accent, #4F46E5);
+    font-family: var(--ep-font-mono);
+    font-weight: 700;
+    user-select: none;
+  }
+
+  .install-bar code {
+    font-family: var(--ep-font-mono, monospace);
+    font-size: 0.875rem;
+    color: var(--ep-text-primary, #1F2937);
+  }
+
+  .copy-btn {
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    color: var(--ep-color-muted, #6B7280);
+    border-radius: 0.25rem;
+    transition: color 150ms ease;
+    display: flex;
+  }
+
+  .copy-btn:hover { color: var(--sl-color-accent, #4F46E5); }
+  .copy-btn.copied { color: #10b981; }
+
+  /* Metrics */
+  .hero-metrics {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+    animation: heroFadeIn 0.6s ease 0.5s both;
+  }
+
+  .metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
+  .metric-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--sl-color-accent, #4F46E5);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .metric-suffix {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--sl-color-accent, #4F46E5);
+    line-height: 1;
+  }
+
+  .metric-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ep-color-muted, #6B7280);
+    font-weight: 600;
+  }
+
+  .metric-sep {
+    width: 1px;
+    height: 2.5rem;
+    background: var(--ep-card-border, #E5E7EB);
+  }
+
+  /* Trust strip */
+  .hero-trust {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    animation: heroFadeIn 0.6s ease 0.6s both;
+  }
+
+  .trust-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ep-color-muted, #9CA3AF);
+    font-weight: 600;
+  }
+
+  .trust-logos {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .trust-item {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ep-text-secondary, #6B7280);
+  }
+
+  .trust-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--ep-color-muted, #9CA3AF);
+  }
+
+  @keyframes heroFadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 640px) {
+    .hero { padding: 4rem 1rem 3rem; min-height: auto; }
+    .hero-actions { flex-direction: column; align-items: center; }
+    .btn-primary, .btn-secondary { width: 100%; max-width: 300px; justify-content: center; }
+    .hero-metrics { gap: 1rem; }
+    .metric-sep { display: none; }
+    .install-bar { width: calc(100% - 2rem); justify-content: center; }
+    .hero-trust { flex-wrap: wrap; }
+    .hero-glow-1, .hero-glow-2 { display: none; }
+  }
+
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .hero { padding: 5rem 2rem 4rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #hero-three-canvas { display: none; }
+    .hero-glow-1, .hero-glow-2 { animation: none; }
+  }
+</style>

@@ -1,0 +1,54 @@
+---
+title: "Quick Start: CLI"
+description: "Extract PDFs from the command line with edgeparse-cli."
+---
+
+## Installation
+
+```bash
+cargo install edgeparse-cli
+```
+
+Or download a pre-built binary from [GitHub Releases](https://github.com/raphaelmansuy/edgeparse/releases).
+
+## Basic Usage
+
+```bash
+# Parse to JSON (output to stdout)
+edgeparse document.pdf --format json
+
+# Parse to Markdown (output to stdout)
+edgeparse document.pdf -f markdown
+
+# Save to output directory
+edgeparse document.pdf -f markdown --output-dir results/
+
+# Parse multiple files
+edgeparse ./pdfs/*.pdf -f markdown --output-dir ./results/
+
+# Enable hybrid mode
+edgeparse document.pdf -f json --hybrid docling-fast
+```
+
+## All Formats
+
+| Flag | Output |
+|------|--------|
+| `--format json` / `-f json` | Structured JSON with full metadata |
+| `--format markdown` / `-f markdown` | Clean Markdown with tables |
+| `--format html` / `-f html` | Semantic HTML |
+| `--format text` / `-f text` | Plain text (reading order) |
+
+## Key Flags
+
+| Flag | Description |
+|------|-------------|
+| `--output-dir <DIR>` / `-o` | Write output files to directory |
+| `--format <FMT>` / `-f` | Output format |
+| `--hybrid <BACKEND>` | Enable hybrid mode (`docling-fast`) |
+| `--pages <RANGE>` | Page range, e.g. `1-5` |
+
+## Next Steps
+
+- [Output Format Details](/output/json-schema/)
+- [Rust Library Usage](/getting-started/quick-start-rust/)

@@ -1,0 +1,52 @@
+---
+title: "Quick Start: Python"
+description: "Install EdgeParse and extract your first PDF in under a minute."
+---
+
+## Installation
+
+```bash
+pip install edgeparse
+```
+
+**Requirements:** Python 3.9+ · No additional system dependencies.
+
+## Parse a PDF
+
+```python
+import edgeparse
+
+# Get Markdown string
+markdown = edgeparse.convert("document.pdf", format="markdown")
+print(markdown)
+
+# Get structured JSON string
+json_str = edgeparse.convert("document.pdf", format="json")
+
+# Get HTML string
+html = edgeparse.convert("document.pdf", format="html")
+```
+
+## Write to File
+
+```python
+import edgeparse
+
+# Save to output directory (returns path of saved file)
+out_path = edgeparse.convert_file("document.pdf", "output/", format="json")
+print(f"Saved to: {out_path}")
+```
+
+## Output Formats
+
+| Format | Description |
+|--------|-------------|
+| `"markdown"` | Clean Markdown with table support |
+| `"json"` | Structured JSON with full metadata |
+| `"html"` | Semantic HTML |
+| `"text"` | Plain text (reading order) |
+
+## Next Steps
+
+- [JSON Schema Reference](/output/json-schema/) — understand every field
+- [Benchmark Results](/benchmark/results/) — accuracy &amp; speed data

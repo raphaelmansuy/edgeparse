@@ -1,0 +1,194 @@
+---
+interface Props {
+  title: string;
+  subtitle: string;
+  features: Array<{ icon: string; title: string; description: string; link?: string }>;
+}
+
+const { title, subtitle, features } = Astro.props;
+const base = import.meta.env.BASE_URL;
+
+const svgPaths: Record<string, string> = {
+  'zap': 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z',
+  'table': 'M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M10.875 12c-.621 0-1.125.504-1.125 1.125M12 12c.621 0 1.125.504 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 0v1.5c0 .621-.504 1.125-1.125 1.125m0 0h-7.5',
+  'layers': 'M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0L12 17.25 6.429 14.25m11.142 0 4.179 2.25L12 21.75l-9.75-5.25 4.179-2.25',
+  'box': 'M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9',
+  'cpu': 'M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 0 0 2.25-2.25V6.75a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Zm.75-12h9v9h-9v-9Z',
+  'globe': 'M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418',
+  'target': 'M7.5 3.75H6A2.25 2.25 0 0 0 3.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0 1 20.25 6v1.5m0 9V18A2.25 2.25 0 0 1 18 20.25h-1.5m-9 0H6A2.25 2.25 0 0 1 3.75 18v-1.5M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+  'shield': 'M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z',
+};
+---
+
+<section class="feature-section" aria-labelledby="feature-heading">
+  <div class="feature-container">
+    <div class="feature-header">
+      <span class="feature-eyebrow">Features</span>
+      <h2 id="feature-heading" class="section-title">{title}</h2>
+      <p class="section-subtitle">{subtitle}</p>
+    </div>
+    <div class="feature-grid">
+      {features.map((f, i) => (
+        <div class="feature-card" style={`--delay: ${i * 0.05}s`}>
+          <div class="feature-icon-wrap">
+            <svg class="feature-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d={svgPaths[f.icon] || svgPaths['zap']} />
+            </svg>
+          </div>
+          <h3 class="feature-title">{f.title}</h3>
+          <p class="feature-desc">{f.description}</p>
+          {f.link && <a href={`${base}${f.link.replace(/^\/docs\//, '')}`} class="feature-link">Learn more <span aria-hidden="true">→</span></a>}
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .feature-section {
+    padding: 6rem 1.5rem;
+    background: var(--ep-section-alt-bg, #F9FAFB);
+    text-align: center;
+  }
+
+  .feature-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .feature-header {
+    margin-bottom: 3.5rem;
+  }
+
+  .feature-eyebrow {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sl-color-accent, #4F46E5);
+    margin-bottom: 0.75rem;
+    padding: 0.3rem 0.75rem;
+    background: rgba(79, 70, 229, 0.08);
+    border-radius: 999px;
+  }
+
+  .section-title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+    color: var(--ep-text-primary, #111827);
+    letter-spacing: -0.02em;
+  }
+
+  .section-subtitle {
+    font-size: 1.1rem;
+    color: var(--ep-text-secondary, #6B7280);
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+
+  .feature-card {
+    background: var(--ep-card-bg, #FFFFFF);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    text-align: left;
+    transition: all 250ms ease;
+    animation: fadeInUp 0.5s ease calc(var(--delay, 0s)) both;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--sl-color-accent, #4F46E5), #818cf8);
+    opacity: 0;
+    transition: opacity 250ms ease;
+  }
+
+  .feature-card:hover {
+    border-color: var(--sl-color-accent, #4F46E5);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+    transform: translateY(-4px);
+  }
+
+  .feature-card:hover::before {
+    opacity: 1;
+  }
+
+  .feature-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 0.625rem;
+    background: var(--sl-color-accent-low, #EEF2FF);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    color: var(--sl-color-accent, #4F46E5);
+    transition: all 250ms ease;
+  }
+
+  .feature-card:hover .feature-icon-wrap {
+    background: rgba(79, 70, 229, 0.15);
+    transform: scale(1.05);
+  }
+
+  .feature-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--ep-text-primary, #111827);
+  }
+
+  .feature-desc {
+    font-size: 0.85rem;
+    color: var(--ep-text-secondary, #6B7280);
+    line-height: 1.7;
+    margin-bottom: 0.75rem;
+  }
+
+  .feature-link {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--sl-color-accent, #4F46E5);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: gap 200ms ease;
+  }
+
+  .feature-link:hover {
+    gap: 0.5rem;
+    text-decoration: none;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 900px) {
+    .feature-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 640px) {
+    .feature-section { padding: 3rem 1rem; }
+    .feature-grid { grid-template-columns: 1fr; }
+    .feature-card { padding: 1.5rem; }
+  }
+</style>

@@ -1,0 +1,50 @@
+---
+title: "HTML Output"
+description: "EdgeParse HTML output format with semantic markup."
+---
+
+## Overview
+
+The `--format html` output produces semantic HTML with proper heading tags, table elements, and list structures.
+
+## Usage
+
+```python
+import edgeparse
+
+html = edgeparse.convert("document.pdf", format="html")
+```
+
+```bash
+edgeparse document.pdf -f html
+```
+
+## Features
+
+- **Semantic tags** — `<h1>`–`<h6>`, `<p>`, `<table>`, `<ul>`, `<ol>`
+- **Table structure** — `<thead>`, `<tbody>`, `<th>`, `<td>` with spans
+- **Clean markup** — no inline styles, minimal attributes
+- **Valid HTML** — well-formed, parseable output
+
+## Example Output
+
+```html
+<h1>Annual Report 2024</h1>
+<p>Revenue grew 23% year-over-year.</p>
+<table>
+  <thead>
+    <tr>
+      <th>Quarter</th>
+      <th>Revenue ($M)</th>
+      <th>YoY Growth</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Q1 2024</td>
+      <td>142.3</td>
+      <td>+18%</td>
+    </tr>
+  </tbody>
+</table>
+```

@@ -1,0 +1,106 @@
+@layer base, starlight, theme, components, utilities;
+
+@import '@astrojs/starlight-tailwind';
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@theme {
+	--font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+	--font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* Keyboard focus indicators — WCAG 2.4.7 */
+:focus-visible {
+	outline: 2px solid var(--sl-color-accent);
+	outline-offset: 2px;
+}
+
+a:focus-visible,
+button:focus-visible {
+	outline: 2px solid var(--sl-color-accent);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+/* Smooth scroll behavior */
+html {
+	scroll-behavior: smooth;
+}
+
+/* Landing page styles */
+.landing-section {
+	padding: 5rem 1.5rem;
+	max-width: 1152px;
+	margin: 0 auto;
+}
+
+.section-title {
+	font-size: clamp(1.5rem, 4vw, 2rem);
+	font-weight: 800;
+	margin-bottom: 0.75rem;
+	text-align: center;
+	color: var(--ep-text-primary, #111827);
+	letter-spacing: -0.02em;
+}
+
+.section-subtitle {
+	font-size: clamp(1rem, 2.5vw, 1.125rem);
+	color: var(--ep-color-muted, #6B7280);
+	max-width: 560px;
+	margin: 0 auto 3rem;
+	text-align: center;
+	line-height: 1.6;
+}
+
+/* Footer override */
+.site-footer {
+	border-top: 1px solid var(--ep-card-border, #E5E7EB);
+	padding: 3rem 1.5rem;
+	font-size: 0.875rem;
+	color: var(--ep-color-muted, #6B7280);
+}
+
+.site-footer a {
+	color: var(--ep-color-muted, #6B7280);
+	text-decoration: none;
+}
+
+.site-footer a:hover {
+	color: var(--sl-color-accent);
+}
+
+/* Smooth transitions for dark mode toggle */
+body,
+.main-pane,
+.site-footer,
+starlight-theme-select {
+	transition: background-color 200ms ease, color 200ms ease;
+}
+
+/* Selection color */
+::selection {
+	background: var(--sl-color-accent-low, #EEF2FF);
+	color: var(--sl-color-accent, #4F46E5);
+}
+
+/* Responsive mobile adjustments */
+@media (max-width: 540px) {
+	.landing-section { padding: 3rem 1rem; }
+}
+
+/* ─── Landing page: full-bleed layout ───────────────────────────────────────
+ * Starlight constrains .sl-container to --sl-content-width (67.5rem) and
+ * adds lateral padding to .content-panel. On the landing/splash page there
+ * is no sidebar, so we remove these width constraints so that the hero and
+ * each landing section can stretch edge-to-edge. Individual sections already
+ * apply their own max-width and padding internally via .landing-section.
+ * ─────────────────────────────────────────────────────────────────────────── */
+html:not([data-has-sidebar]) .content-panel {
+	padding-inline: 0;
+	padding-block: 0;
+}
+
+html:not([data-has-sidebar]) .sl-container {
+	max-width: 100%;
+	padding-inline: 0;
+}
