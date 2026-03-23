@@ -58,49 +58,54 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
                     continue;
                 }
 
-                if let Some(next_text) = next_mergeable_paragraph_text(doc.kids.get(i + 1)) {
-                    if should_demote_heading_to_paragraph(trimmed, &next_text) {
-                        let mut merged = trimmed.to_string();
-                        merge_paragraph_text(&mut merged, &next_text);
-                        output.push_str(&escape_md_line_start(merged.trim()));
-                        output.push_str("\n\n");
-                        i += 2;
-                        continue;
-                    }
-                }
-
-                let level = h.heading_level.unwrap_or(1).min(6);
-
-                // Merge consecutive heading fragments at the same level.
-                // When the PDF splits a title across multiple text elements,
-                // each becomes a separate heading; merge them into one.
-                let mut merged_heading = trimmed.to_string();
-                while let Some(ContentElement::Heading(next_h)) = doc.kids.get(i + 1) {
-                    let next_level = next_h.heading_level.unwrap_or(1).min(6);
-                    if next_level != level {
-                        break;
-                    }
-                    let next_text = next_h.base.base.value();
-                    let next_trimmed = next_text.trim();
-                    if next_trimmed.is_empty() || should_skip_heading_text(next_trimmed) {
-                        i += 1;
-                        continue;
-                    }
-                    // Only merge if the combined text stays under max heading length
-                    if merged_heading.len() + 1 + next_trimmed.len() > 200 {
-                        break;
-                    }
-                    merge_paragraph_text(&mut merged_heading, next_trimmed);
+                // Demote pipeline headings that look like sentence fragments
+                // ending with a period but are not numbered section headings.
+                if should_demote_period_heading(trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
                     i += 1;
+                    continue;
                 }
 
-                let hashes = "#".repeat(level as usize);
-                output.push_str(&format!("{} {}\n\n", hashes, merged_heading.trim()));
-            }
-            ContentElement::NumberHeading(nh) => {
-                let text = nh.base.base.base.value();
-                let trimmed = text.trim();
-                if trimmed.is_empty() || should_skip_heading_text(trimmed) {
+                // Demote headings ending with comma (footnotes / data labels).
+                if should_demote_comma_heading(trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
+                    i += 1;
+                    continue;
+                }
+
+                // Demote headings containing math symbols.
+                if should_demote_math_heading(trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
+                    i += 1;
+                    continue;
+                }
+
+                // Demote headings containing percentage signs.
+                if should_demote_percentage_heading(trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
+                    i += 1;
+                    continue;
+                }
+
+                // Demote headings that start with a known caption prefix
+                // (e.g. "Source:", "Figure", "Table") — these are captions,
+                // not section headings, regardless of pipeline classification.
+                if starts_with_caption_prefix(trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
+                    i += 1;
+                    continue;
+                }
+
+                // Demote bibliography entries: lines starting with a 4-digit
+                // year followed by a period (e.g. "2020. Title of paper...").
+                if should_demote_bibliography_heading(trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
                     i += 1;
                     continue;
                 }
@@ -116,9 +121,91 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
                     }
                 }
 
-                let level = nh.base.heading_level.unwrap_or(1).min(6);
-                let hashes = "#".repeat(level as usize);
-                output.push_str(&format!("{} {}\n\n", hashes, trimmed));
+                // Merge consecutive heading fragments.
+                // When the PDF splits a title across multiple text elements,
+                // each becomes a separate heading; merge them into one.
+                let mut merged_heading = trimmed.to_string();
+                while let Some(ContentElement::Heading(next_h)) = doc.kids.get(i + 1) {
+                    let next_text = next_h.base.base.value();
+                    let next_trimmed = next_text.trim();
+                    if next_trimmed.is_empty() || should_skip_heading_text(next_trimmed) {
+                        i += 1;
+                        continue;
+                    }
+                    // Only merge if the combined text stays under max heading length
+                    if merged_heading.len() + 1 + next_trimmed.len() > 200 {
+                        break;
+                    }
+                    merge_paragraph_text(&mut merged_heading, next_trimmed);
+                    i += 1;
+                }
+
+                let cleaned_heading = strip_trailing_page_number(merged_heading.trim());
+
+                // Check if this heading contains a merged subsection
+                if let Some(split_pos) = find_merged_subsection_split(cleaned_heading) {
+                    let first = cleaned_heading[..split_pos].trim();
+                    let second = cleaned_heading[split_pos..].trim();
+                    output.push_str(&format!("# {}\n\n", first));
+                    output.push_str(&format!("# {}\n\n", second));
+                } else {
+                    output.push_str(&format!("# {}\n\n", cleaned_heading));
+                }
+            }
+            ContentElement::NumberHeading(nh) => {
+                let text = nh.base.base.base.value();
+                let trimmed = text.trim();
+                if trimmed.is_empty() || should_skip_heading_text(trimmed) {
+                    i += 1;
+                    continue;
+                }
+
+                // Demote number headings ending with comma (footnotes).
+                if should_demote_comma_heading(trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
+                    i += 1;
+                    continue;
+                }
+
+                // Demote number headings containing math symbols.
+                if should_demote_math_heading(trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
+                    i += 1;
+                    continue;
+                }
+
+                // Demote number headings containing percentage signs.
+                if should_demote_percentage_heading(trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
+                    i += 1;
+                    continue;
+                }
+
+                if let Some(next_text) = next_mergeable_paragraph_text(doc.kids.get(i + 1)) {
+                    if should_demote_heading_to_paragraph(trimmed, &next_text) {
+                        let mut merged = trimmed.to_string();
+                        merge_paragraph_text(&mut merged, &next_text);
+                        output.push_str(&escape_md_line_start(merged.trim()));
+                        output.push_str("\n\n");
+                        i += 2;
+                        continue;
+                    }
+                }
+
+                let cleaned = strip_trailing_page_number(trimmed);
+
+                // Check if this heading contains a merged subsection
+                if let Some(split_pos) = find_merged_subsection_split(cleaned) {
+                    let first = cleaned[..split_pos].trim();
+                    let second = cleaned[split_pos..].trim();
+                    output.push_str(&format!("# {}\n\n", first));
+                    output.push_str(&format!("# {}\n\n", second));
+                } else {
+                    output.push_str(&format!("# {}\n\n", cleaned));
+                }
             }
             ContentElement::Paragraph(_) | ContentElement::TextBlock(_) | ContentElement::TextLine(_) => {
                 let element = &doc.kids[i];
@@ -135,7 +222,16 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
                 }
 
                 if should_render_paragraph_as_heading(doc, i, trimmed, doc.kids.get(i + 1)) {
-                    output.push_str(&format!("# {}\n\n", trimmed));
+                    let cleaned = strip_trailing_page_number(trimmed);
+                    // Check if this heading contains a merged subsection
+                    if let Some(split_pos) = find_merged_subsection_split(cleaned) {
+                        let first = cleaned[..split_pos].trim();
+                        let second = cleaned[split_pos..].trim();
+                        output.push_str(&format!("# {}\n\n", first));
+                        output.push_str(&format!("# {}\n\n", second));
+                    } else {
+                        output.push_str(&format!("# {}\n\n", cleaned));
+                    }
                     i += 1;
                     continue;
                 }
@@ -454,7 +550,7 @@ fn extend_contents_lines_from_rows(lines: &mut Vec<String>, rows: Vec<Vec<String
     }
 
     if is_toc_table(&rows) {
-        for row in rows {
+        for row in &rows {
             let title = row.first().map(|s| s.trim()).unwrap_or("");
             let page = row.get(1).map(|s| s.trim()).unwrap_or("");
             let combined = if !title.is_empty() && !page.is_empty() {
@@ -463,6 +559,19 @@ fn extend_contents_lines_from_rows(lines: &mut Vec<String>, rows: Vec<Vec<String
                 format!("{title}{page}")
             };
             if !combined.trim().is_empty() {
+                lines.push(combined);
+            }
+        }
+    } else {
+        // Non-TOC table in a contents document: concatenate cell text as a line.
+        for row in &rows {
+            let combined: String = row
+                .iter()
+                .map(|c| c.trim())
+                .filter(|c| !c.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ");
+            if !combined.is_empty() {
                 lines.push(combined);
             }
         }
@@ -623,9 +732,7 @@ fn render_element(out: &mut String, element: &ContentElement) {
             if should_skip_heading_text(trimmed) {
                 return;
             }
-            let level = h.heading_level.unwrap_or(1).min(6);
-            let hashes = "#".repeat(level as usize);
-            out.push_str(&format!("{} {}\n\n", hashes, trimmed));
+            out.push_str(&format!("# {}\n\n", trimmed));
         }
         ContentElement::Paragraph(p) => {
             let text = p.base.value();
@@ -661,7 +768,7 @@ fn render_element(out: &mut String, element: &ContentElement) {
                 };
 
                 if is_list_section_heading(&combined) {
-                    out.push_str(&format!("## {}\n\n", combined.trim_end_matches(':').trim()));
+                    out.push_str(&format!("# {}\n\n", combined.trim_end_matches(':').trim()));
                     i += 1;
                     continue;
                 }
@@ -711,9 +818,7 @@ fn render_element(out: &mut String, element: &ContentElement) {
             if should_skip_heading_text(trimmed) {
                 return;
             }
-            let level = nh.base.heading_level.unwrap_or(1).min(6);
-            let hashes = "#".repeat(level as usize);
-            out.push_str(&format!("{} {}\n\n", hashes, trimmed));
+            out.push_str(&format!("# {}\n\n", trimmed));
         }
         ContentElement::Image(_) => {
             out.push_str("![Image](image)\n\n");
@@ -1007,6 +1112,11 @@ fn is_heading_rescue_candidate(
         return false;
     }
 
+    // Reject text containing math/special symbols or percentage signs.
+    if should_demote_math_heading(trimmed) || should_demote_percentage_heading(trimmed) {
+        return false;
+    }
+
     // Must not be fully parenthesized (citations)
     if trimmed.starts_with('(') && trimmed.ends_with(')') {
         return false;
@@ -1107,10 +1217,14 @@ fn should_rescue_numbered_heading(
     // Must not end with sentence punctuation — EXCEPT when the text matches
     // a keyword+number pattern (e.g. "Activity 4. Determining CEC…") where
     // the trailing period is part of the heading format, not sentence ending.
-    if trimmed.ends_with(['!', '?', ';']) {
+    if trimmed.ends_with(['!', '?', ';', ',']) {
         return false;
     }
     if trimmed.ends_with('.') && !looks_like_keyword_numbered_section(trimmed) {
+        return false;
+    }
+    // Reject numbered headings containing math symbols or percentage signs.
+    if should_demote_math_heading(trimmed) || should_demote_percentage_heading(trimmed) {
         return false;
     }
 
@@ -1280,7 +1394,12 @@ fn should_rescue_allcaps_heading(
     }
 
     // Must not end with sentence punctuation
-    if trimmed.ends_with(['.', ';']) {
+    if trimmed.ends_with(['.', ';', ',']) {
+        return false;
+    }
+
+    // Reject all-caps headings containing math symbols or percentage signs.
+    if should_demote_math_heading(trimmed) || should_demote_percentage_heading(trimmed) {
         return false;
     }
 
@@ -1356,9 +1475,23 @@ fn should_render_element_as_heading(
         && trimmed.len() <= 40
         && !trimmed.ends_with(['.', '!', '?', ';', ':']);
 
+    // Reject attribution prefixes that are clearly not section headings
+    // (more targeted than starts_with_caption_prefix to avoid false demotions
+    // of legitimate headings starting with common words like "Graph", "Table").
+    let is_attribution = {
+        let lower = trimmed.to_ascii_lowercase();
+        lower.starts_with("source:")
+            || lower.starts_with("credit:")
+            || lower.starts_with("photo by ")
+            || lower.starts_with("photo credit")
+            || lower.starts_with("image by ")
+            || lower.starts_with("image credit")
+    };
+
     title_like
         && matches!(next, Some(ContentElement::List(_)))
         && !looks_like_chart_label_heading(element, trimmed)
+        && !is_attribution
 }
 
 fn looks_like_top_margin_running_header(doc: &PdfDocument, idx: usize, text: &str) -> bool {
@@ -1490,6 +1623,7 @@ fn is_list_section_heading(text: &str) -> bool {
     let trimmed = text.trim();
     trimmed.ends_with(':')
         && trimmed.len() <= 80
+        && trimmed.split_whitespace().count() <= 8
         && trimmed.chars().any(char::is_alphabetic)
         && !trimmed.chars().next().is_some_and(|c| c.is_ascii_digit())
         && !trimmed.starts_with(|c: char| "•‣◦●○◆◇▪▫–—-".contains(c))
@@ -1629,6 +1763,117 @@ fn looks_like_bottom_margin_heading(doc: &PdfDocument, idx: usize) -> bool {
 
     // If this heading is at the very bottom of the page content, skip it.
     bbox.bottom_y <= page_bottom + 24.0
+}
+
+/// Demote a pipeline heading that ends with a period when it doesn't look like
+/// a genuine section heading (e.g. "United Kingdom." or "New Investment (a Challenger).").
+/// Returns true when the heading should be rendered as a paragraph instead.
+fn should_demote_period_heading(text: &str) -> bool {
+    let trimmed = text.trim();
+    if !trimmed.ends_with('.') {
+        return false;
+    }
+    // Keep numbered section headings: "I. Introduction", "4.2. Results",
+    // "Activity 4. Determining CEC…"
+    if looks_like_numbered_section(trimmed) || looks_like_keyword_numbered_section(trimmed) {
+        return false;
+    }
+    // Keep headings whose text without the trailing period still looks like a
+    // proper title — at least 3 words, first word uppercase, and the period
+    // is clearly sentence-ending rather than part of a title pattern.
+    let without_dot = trimmed.trim_end_matches('.');
+    let word_count = without_dot.split_whitespace().count();
+    // Very short fragments ending with '.' (like "Kingdom.") are almost
+    // certainly not headings.
+    if word_count <= 2 {
+        return true;
+    }
+    false
+}
+
+/// Demote headings that end with a comma — these are never real headings
+/// (e.g. footnote references like "29 Pope," or "32 Beawes, 33 M.M.,").
+fn should_demote_comma_heading(text: &str) -> bool {
+    text.trim().ends_with(',')
+}
+
+/// Demote headings containing mathematical/special symbols that never appear
+/// in real section headings (e.g. "HL ¼", "P ≪ P", "LH þ HL:").
+fn should_demote_math_heading(text: &str) -> bool {
+    text.chars().any(|c| matches!(c,
+        '¼' | '½' | '¾' | '≪' | '≫' | 'þ' | 'ð' |
+        '∑' | '∫' | '∂' | '∏' | '√' | '∞' | '≈' | '÷'
+    ))
+}
+
+/// Demote headings containing a percentage sign — these are typically data
+/// labels rather than section headings (e.g. "56% AGREE").
+fn should_demote_percentage_heading(text: &str) -> bool {
+    text.contains('%')
+}
+
+/// Demote bibliography entries that start with a 4-digit year followed by
+/// a period and space (e.g. "2020. Measuring massive multitask...").
+fn should_demote_bibliography_heading(text: &str) -> bool {
+    let t = text.trim();
+    if t.len() < 6 {
+        return false;
+    }
+    let bytes = t.as_bytes();
+    bytes[0..4].iter().all(|b| b.is_ascii_digit())
+        && bytes[4] == b'.'
+        && (bytes[5] == b' ' || t.len() == 5)
+}
+
+/// Strip a trailing standalone page number from heading text.
+/// E.g. "Chapter 3. Numerical differentiation 35" → "Chapter 3. Numerical differentiation"
+/// Only strips when the last token is 1-4 digits and the heading has enough
+/// words to be meaningful without it.
+fn strip_trailing_page_number(text: &str) -> &str {
+    let trimmed = text.trim();
+    if let Some(last_space) = trimmed.rfind(' ') {
+        let suffix = &trimmed[last_space + 1..];
+        if !suffix.is_empty()
+            && suffix.len() <= 4
+            && suffix.chars().all(|c| c.is_ascii_digit())
+            && trimmed[..last_space].split_whitespace().count() >= 3
+        {
+            return trimmed[..last_space].trim();
+        }
+    }
+    trimmed
+}
+
+/// Try to split a heading that contains a merged subsection number.
+/// For example, "4 Results 4.1 Experimental Details" should become
+/// two headings: "4 Results" and "4.1 Experimental Details".
+/// Returns None if no split is needed, otherwise the split point byte offset.
+fn find_merged_subsection_split(text: &str) -> Option<usize> {
+    // Look for a subsection number pattern like "4.1" or "B.1" after initial content.
+    // Must appear at a word boundary (preceded by space).
+    let bytes = text.as_bytes();
+    // Start searching after the first few characters to skip the initial number
+    let mut i = 3;
+    while i < bytes.len() {
+        if bytes[i - 1] == b' ' {
+            // Check for digit.digit pattern (e.g., "4.1")
+            if bytes[i].is_ascii_digit() {
+                if let Some(dot_pos) = text[i..].find('.') {
+                    let after_dot = i + dot_pos + 1;
+                    if after_dot < bytes.len() && bytes[after_dot].is_ascii_digit() {
+                        // Found "N.N" pattern preceded by space
+                        return Some(i);
+                    }
+                }
+            }
+            // Check for letter.digit pattern (e.g., "B.1")
+            if bytes[i].is_ascii_uppercase() && i + 2 < bytes.len() && bytes[i + 1] == b'.' && bytes[i + 2].is_ascii_digit() {
+                return Some(i);
+            }
+        }
+        i += 1;
+    }
+    None
 }
 
 fn should_skip_heading_text(text: &str) -> bool {
@@ -1773,19 +2018,19 @@ fn merge_continuation_rows(rows: &mut Vec<Vec<String>>) {
 
 /// Render a SemanticTable as a markdown table.
 fn render_table(out: &mut String, table: &crate::models::semantic::SemanticTable) {
-    let rows = &table.table_border.rows;
-    if rows.is_empty() {
-        return;
-    }
+    // Delegate to render_table_border which handles cross-page linking.
+    render_table_border(out, &table.table_border);
+}
 
-    let num_cols = table.table_border.num_columns.max(1);
-
-    // Collect non-empty rows (skip rows where all cells have no content).
+/// Collect rendered rows from a single TableBorder (no cross-page chaining).
+fn collect_table_border_rows(table: &crate::models::table::TableBorder) -> Vec<Vec<String>> {
+    let num_cols = table.num_columns.max(1);
     let mut rendered_rows: Vec<Vec<String>> = Vec::new();
-    for row in rows.iter() {
+    for row in &table.rows {
         let cell_texts: Vec<String> = (0..num_cols)
             .map(|col| {
-                row.cells.iter()
+                row.cells
+                    .iter()
                     .find(|c| c.col_number == col)
                     .map(|c| cell_text_content(c))
                     .unwrap_or_default()
@@ -1795,67 +2040,23 @@ fn render_table(out: &mut String, table: &crate::models::semantic::SemanticTable
             rendered_rows.push(cell_texts);
         }
     }
-
-    if rendered_rows.is_empty() {
-        return;
-    }
-
-    // Merge multi-line header rows into a single header row.
-    merge_continuation_rows(&mut rendered_rows);
-
-    // ToC detection: render table-of-contents as plain text pairs, not a markdown table.
-    if is_toc_table(&rendered_rows) {
-        render_toc_rows(out, &rendered_rows);
-        return;
-    }
-
-    for (row_idx, cell_texts) in rendered_rows.iter().enumerate() {
-        out.push('|');
-        for cell_text in cell_texts {
-            out.push_str(&format!(" {} |", cell_text.trim()));
-        }
-        out.push('\n');
-
-        // Add separator after first row (header)
-        if row_idx == 0 {
-            out.push('|');
-            for _ in 0..num_cols {
-                out.push_str(" --- |");
-            }
-            out.push('\n');
-        }
-    }
-    out.push('\n');
+    rendered_rows
 }
 
 /// Render a TableBorder directly as a markdown table.
+///
+/// When the table has a `next_table` link (cross-page continuation), the
+/// continuation rows are appended so the entire logical table is emitted
+/// as a single pipe table.
 fn render_table_border(out: &mut String, table: &crate::models::table::TableBorder) {
-    let rows = &table.rows;
-    if rows.is_empty() {
+    if table.rows.is_empty() {
         return;
     }
 
     let num_cols = table.num_columns.max(1);
 
-    // Collect row texts, skipping entirely empty rows (artifact of line-art grid detection).
-    // Empty rows arise when thin horizontal grid lines are detected as row separators,
-    // producing rows with no corresponding text content from the content assigner.
-    let mut rendered_rows: Vec<Vec<String>> = Vec::new();
-    for row in rows.iter() {
-        let cell_texts: Vec<String> = (0..num_cols)
-            .map(|col| {
-                row.cells.iter()
-                    .find(|c| c.col_number == col)
-                    .map(|c| cell_text_content(c))
-                    .unwrap_or_default()
-            })
-            .collect();
-        // Skip row if all cells are empty (whitespace only).
-        let is_empty = cell_texts.iter().all(|t| t.trim().is_empty());
-        if !is_empty {
-            rendered_rows.push(cell_texts);
-        }
-    }
+    // Collect rows from this table.
+    let mut rendered_rows = collect_table_border_rows(table);
 
     if rendered_rows.is_empty() {
         return;
@@ -2016,6 +2217,20 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
         t.starts_with('|') && t.ends_with('|') && t.len() > 2
     }
 
+    fn pad_pipe_row(line: &str, target_cols: usize) -> String {
+        let t = line.trim();
+        let current_cols = count_pipe_cols(t);
+        if current_cols >= target_cols {
+            return t.to_string();
+        }
+        // Append extra empty cells after the existing trailing |
+        let mut result = t.to_string();
+        for _ in current_cols..target_cols {
+            result.push_str("  |");
+        }
+        result
+    }
+
     // Identify pipe table blocks: (start, sep_idx, end, col_count).
     struct Block {
         start: usize,
@@ -2047,35 +2262,115 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
         return markdown.to_string();
     }
 
-    // Group adjacent blocks that can be merged (only blanks between, same cols).
-    // merge_leader[i] = the first block index this block merges into, or None.
+    // Group adjacent blocks: allow different column counts.
+    // Merge when separated by blank lines only, or by heading markers
+    // (lines starting with #) that represent table cells misclassified
+    // as headings by the pipeline.
+    // Track group max cols during merge to use for heading gap decisions.
     let mut merge_leader: Vec<Option<usize>> = vec![None; blocks.len()];
+    let mut group_cols: Vec<usize> = blocks.iter().map(|b| b.cols).collect();
     for bi in 1..blocks.len() {
         let prev = &blocks[bi - 1];
         let curr = &blocks[bi];
-        let gap_all_blank = (prev.end + 1..curr.start)
-            .all(|li| lines[li].trim().is_empty());
-        if gap_all_blank && prev.cols == curr.cols && prev.cols > 0 {
-            let leader = merge_leader[bi - 1].unwrap_or(bi - 1);
-            merge_leader[bi] = Some(leader);
+        let gap_range = prev.end + 1..curr.start;
+        let gap_all_blank = gap_range.clone().all(|li| lines[li].trim().is_empty());
+        // For heading gap check, use the group's max cols (not individual block).
+        // This handles chains like [2-col] → blank → [1-col] → heading → [2-col]
+        // where the 1-col intermediary is already merged with the 2-col leader.
+        let leader_idx = merge_leader[bi - 1].unwrap_or(bi - 1);
+        let effective_prev_cols = group_cols[leader_idx];
+        let gap_heading_only = if !gap_all_blank && effective_prev_cols >= 2 && curr.cols >= 2 {
+            let non_blank: Vec<usize> = gap_range.clone()
+                .filter(|li| !lines[*li].trim().is_empty())
+                .collect();
+            // Only merge when gap has 1-2 heading lines
+            non_blank.len() >= 1
+                && non_blank.len() <= 2
+                && non_blank.iter().all(|li| {
+                    let t = lines[*li].trim();
+                    t.starts_with('#') && t.len() < 100
+                })
+        } else {
+            false
+        };
+        // Short displaced cell: a single short plain-text word between two
+        // multi-column tables is almost certainly a cell value that the PDF
+        // pipeline displaced out of the table grid.
+        let gap_short_fragment = if !gap_all_blank && !gap_heading_only
+            && effective_prev_cols >= 2 && curr.cols >= 2
+        {
+            let non_blank: Vec<usize> = gap_range.clone()
+                .filter(|li| !lines[*li].trim().is_empty())
+                .collect();
+            non_blank.len() == 1 && {
+                let t = lines[non_blank[0]].trim();
+                t.len() < 30
+                    && !t.starts_with('#')
+                    && !t.starts_with('-')
+                    && !t.starts_with('*')
+                    && !t.contains(':')
+                    && !t.contains("TABLE")
+            }
+        } else {
+            false
+        };
+        if (gap_all_blank || gap_heading_only || gap_short_fragment) && prev.cols > 0 && curr.cols > 0 {
+            merge_leader[bi] = Some(leader_idx);
+            // Update group max cols
+            if curr.cols > group_cols[leader_idx] {
+                group_cols[leader_idx] = curr.cols;
+            }
         }
     }
 
-    // Build the set of line ranges to skip (gap blanks + merged header/sep).
+    let mut pad_target: Vec<usize> = vec![0; blocks.len()];
+    for bi in 0..blocks.len() {
+        let leader = merge_leader[bi].unwrap_or(bi);
+        pad_target[bi] = group_cols[leader];
+    }
+
+    // Mark lines to skip: blank gap lines + separator of merged blocks.
+    // Non-blank gap lines become pipe table rows instead of being skipped.
+    // Keep the header row (curr.start) — it becomes a data row.
     let mut skip = vec![false; lines.len()];
+    let mut convert_to_pipe_row = vec![false; lines.len()];
     for (bi, leader) in merge_leader.iter().enumerate() {
         if leader.is_none() {
             continue;
         }
-        let prev_bi = bi - 1;
-        let prev_end = blocks[prev_bi].end;
+        let prev_end = blocks[bi - 1].end;
         let curr = &blocks[bi];
-        // Skip blank lines in the gap between prev and curr.
         for li in (prev_end + 1)..curr.start {
-            skip[li] = true;
+            if lines[li].trim().is_empty() {
+                skip[li] = true;
+            } else {
+                // Non-blank gap line: convert to pipe row
+                convert_to_pipe_row[li] = true;
+            }
         }
-        // Skip the separator line of the merged block.
+        // Only skip separator, header row becomes a data row
         skip[curr.sep] = true;
+    }
+
+    // Map each line to its block index (or the block it belongs to via gap conversion).
+    let mut line_to_block: Vec<Option<usize>> = vec![None; lines.len()];
+    for (bi, block) in blocks.iter().enumerate() {
+        for li in block.start..=block.end {
+            line_to_block[li] = Some(bi);
+        }
+    }
+    // Assign gap lines to the preceding block for padding purposes.
+    for (bi, leader) in merge_leader.iter().enumerate() {
+        if leader.is_none() {
+            continue;
+        }
+        let prev_end = blocks[bi - 1].end;
+        let curr = &blocks[bi];
+        for li in (prev_end + 1)..curr.start {
+            if convert_to_pipe_row[li] {
+                line_to_block[li] = Some(bi - 1);
+            }
+        }
     }
 
     let mut result = String::new();
@@ -2083,8 +2378,44 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
         if skip[li] {
             continue;
         }
-        result.push_str(line);
-        result.push('\n');
+        if convert_to_pipe_row[li] {
+            // Convert non-blank gap text/heading into a pipe table row.
+            let text = line.trim().trim_start_matches('#').trim();
+            if let Some(bi) = line_to_block[li] {
+                let target = pad_target[bi];
+                if target > 0 && !text.is_empty() {
+                    result.push_str(&format!("| {} ", text));
+                    for _ in 1..target {
+                        result.push_str("|  ");
+                    }
+                    result.push_str("|\n");
+                    continue;
+                }
+            }
+            // Fallback: emit as-is if no block context
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+        if let Some(bi) = line_to_block[li] {
+            let target = pad_target[bi];
+            if target > 0 && is_pipe_row(line) && !is_separator(line) {
+                result.push_str(&pad_pipe_row(line, target));
+                result.push('\n');
+            } else if target > 0 && is_separator(line) {
+                result.push('|');
+                for _ in 0..target {
+                    result.push_str(" --- |");
+                }
+                result.push('\n');
+            } else {
+                result.push_str(line);
+                result.push('\n');
+            }
+        } else {
+            result.push_str(line);
+            result.push('\n');
+        }
     }
 
     result
@@ -2665,5 +2996,28 @@ mod tests {
         let md = to_markdown(&doc).unwrap();
         assert!(md.contains("| Added cation | Relative Size & Settling Rates of Floccules |"));
         assert!(md.contains("| K+ |  |"));
+    }
+
+    #[test]
+    fn test_merge_tables_across_heading() {
+        let input = "some text\n\n\
+                      | Area | Competence |\n\
+                      | --- | --- |\n\
+                      | Row1 | Val1 |\n\
+                      | Row2 | Val2 |\n\
+                      \n\
+                      # Heading Between\n\
+                      \n\
+                      | Row3 | Val3 |\n\
+                      | --- | --- |\n\
+                      \n\
+                      more text\n";
+        let result = merge_adjacent_pipe_tables(input);
+        // Heading should be converted to a pipe row
+        assert!(result.contains("| Heading Between |"), "Heading should be in pipe row: {}", result);
+        // Should NOT have # heading marker
+        assert!(!result.contains("# Heading Between"), "Heading marker should be removed: {}", result);
+        // Row3 should still be present
+        assert!(result.contains("| Row3 |") || result.contains("Row3"), "Row3 should exist: {}", result);
     }
 }
