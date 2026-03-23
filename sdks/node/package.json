@@ -21,10 +21,10 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "@edgeparse/pdf-linux-x64-gnu": "0.1.0",
-    "@edgeparse/pdf-linux-arm64-gnu": "0.1.0",
-    "@edgeparse/pdf-darwin-x64": "0.1.0",
     "@edgeparse/pdf-darwin-arm64": "0.1.0",
+    "@edgeparse/pdf-darwin-x64": "0.1.0",
+    "@edgeparse/pdf-linux-arm64-gnu": "0.1.0",
+    "@edgeparse/pdf-linux-x64-gnu": "0.1.0",
     "@edgeparse/pdf-win32-x64-msvc": "0.1.0"
   },
   "engines": {
@@ -36,7 +36,15 @@
     "url": "https://github.com/opendataloader-project/edgeparse.git",
     "directory": "sdks/node"
   },
-  "keywords": ["pdf", "extraction", "markdown", "json", "rag", "llm", "rust"],
+  "keywords": [
+    "pdf",
+    "extraction",
+    "markdown",
+    "json",
+    "rag",
+    "llm",
+    "rust"
+  ],
   "scripts": {
     "build:native": "cargo build --manifest-path ../../crates/edgeparse-node/Cargo.toml --release",
     "build:ts": "npx tsup src/index.ts src/cli.ts --format cjs,esm --dts",
@@ -44,6 +52,7 @@
     "test": "npx vitest run"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
     "vitest": "^3.0.0"
