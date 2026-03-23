@@ -19,7 +19,10 @@
         bench-engines bench-non-ocr bench-ocr bench-compare-all bench-report \
         run demo \
         publish-rust publish-rust-dry publish-python publish-python-dry \
-        publish-node publish-node-dry publish-all \
+        publish-node publish-node-dry \
+        publish-cli publish-cli-dry \
+        publish-brew publish-brew-dry \
+        publish-all \
         clean clean-bench clean-all
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -32,9 +35,17 @@ DIM    := \033[2m
 RESET  := \033[0m
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-BINARY    := target/release/edgeparse
-BENCH_DIR := benchmark
-EXAMPLES  := examples/pdf
+BINARY      := target/release/edgeparse
+BENCH_DIR   := benchmark
+EXAMPLES    := examples/pdf
+RELEASE_DIR := target/release-dist
+
+# ── Version (read from workspace Cargo.toml) ──────────────────────────────────
+VERSION := $(shell grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+
+# ── Homebrew tap repository ───────────────────────────────────────────────────
+# Override to point at a fork:  make publish-brew BREW_TAP_REPO=your-org/homebrew-edgeparse
+BREW_TAP_REPO ?= raphaelmansuy/homebrew-edgeparse
 
 # ── Benchmark engine configuration ────────────────────────────────────────────
 # Override OCR_ENGINES to run a subset:  make bench-ocr OCR_ENGINES=docling
@@ -226,38 +237,274 @@ publish-rust: ## Publish edgeparse-core then edgeparse-cli to crates.io
 	@cargo publish -p edgeparse-cli
 	$(call ok,Rust crates published)
 
-# ── Python / PyPI ─────────────────────────────────────────────────────────────
-publish-python-dry: ## Dry-run: build Python wheel and validate with twine
-	$(call log,maturin build  [sdks/python/])
-	@cd sdks/python && maturin build --release --out dist/
-	$(call log,twine check)
+# ── Python / PyPI — all architectures ────────────────────────────────────────
+# Linux   : manylinux Docker container (requires Docker)
+# macOS   : native cross-compilation via rustup targets
+# Windows : zig cross-linker (pip install "maturin[zig]" + brew install zig)
+PYTHON_LINUX_TARGETS  := x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu
+PYTHON_DARWIN_TARGETS := x86_64-apple-darwin aarch64-apple-darwin
+PYTHON_WIN_TARGETS    := x86_64-pc-windows-gnu
+# Python versions to target for Linux cross-compilation wheels:
+PYTHON_VERSIONS       := python3.10 python3.11 python3.12 python3.13
+
+publish-python-dry: ## Dry-run: build all-arch Python wheels and validate with twine
+	$(call log,Building all-arch Python wheels [dry-run] ...)
+	@rm -rf sdks/python/dist && mkdir -p sdks/python/dist
+	@rustup target add $(PYTHON_LINUX_TARGETS) $(PYTHON_DARWIN_TARGETS) 2>/dev/null || true
+	@for t in $(PYTHON_LINUX_TARGETS); do \
+	  for pyver in $(PYTHON_VERSIONS); do \
+	    which $$pyver >/dev/null 2>&1 || continue; \
+	    printf " $(CYAN)→$(RESET) maturin build --target $$t --zig --compatibility manylinux2014 -i $$pyver\n"; \
+	    (cd sdks/python && maturin build --release --target $$t --zig --compatibility manylinux2014 -i $$pyver --out dist/) \
+	      || printf "$(YELLOW)  ⚠ Linux $$t ($$pyver) skipped$(RESET)\n"; \
+	  done; \
+	done
+	@for t in $(PYTHON_DARWIN_TARGETS); do \
+	  printf " $(CYAN)→$(RESET) maturin build --target $$t\n"; \
+	  (cd sdks/python && maturin build --release --target $$t --out dist/) || exit 1; \
+	done
+	@for t in $(PYTHON_WIN_TARGETS); do \
+	  printf " $(CYAN)→$(RESET) maturin build --target $$t --zig\n"; \
+	  for pyver in $(PYTHON_VERSIONS); do \
+	    which $$pyver >/dev/null 2>&1 || continue; \
+	    (cd sdks/python && maturin build --release --target $$t --zig -i $$pyver --out dist/) \
+	      || printf "$(YELLOW)  ⚠ Windows zig build skipped ($$pyver)$(RESET)\n"; \
+	  done; \
+	done
+	$(call log,twine check — validating all wheels ...)
 	@twine check sdks/python/dist/*.whl
-	$(call ok,Python dry-run passed — wheel is valid)
+	$(call ok,Python dry-run passed — all wheels valid)
 
-publish-python: ## Build Python manylinux wheel and upload to PyPI
-	$(call log,maturin publish  [sdks/python/])
-	@cd sdks/python && maturin publish
-	$(call ok,Python SDK published to PyPI)
+publish-python: ## Build all-arch Python wheels (Linux · macOS · Windows) and upload to PyPI
+	$(call log,Building all-arch Python wheels ...)
+	@rm -rf sdks/python/dist && mkdir -p sdks/python/dist
+	@rustup target add $(PYTHON_LINUX_TARGETS) $(PYTHON_DARWIN_TARGETS) 2>/dev/null || true
+	@for t in $(PYTHON_LINUX_TARGETS); do \
+	  for pyver in $(PYTHON_VERSIONS); do \
+	    which $$pyver >/dev/null 2>&1 || continue; \
+	    printf " $(CYAN)→$(RESET) maturin build --target $$t --zig --compatibility manylinux2014 -i $$pyver\n"; \
+	    (cd sdks/python && maturin build --release --target $$t --zig --compatibility manylinux2014 -i $$pyver --out dist/) \
+	      || printf "$(YELLOW)  ⚠ Linux $$t ($$pyver) skipped$(RESET)\n"; \
+	  done; \
+	done
+	@for t in $(PYTHON_DARWIN_TARGETS); do \
+	  printf " $(CYAN)→$(RESET) maturin build --target $$t\n"; \
+	  (cd sdks/python && maturin build --release --target $$t --out dist/) || exit 1; \
+	done
+	@for t in $(PYTHON_WIN_TARGETS); do \
+	  printf " $(CYAN)→$(RESET) maturin build --target $$t --zig\n"; \
+	  for pyver in $(PYTHON_VERSIONS); do \
+	    which $$pyver >/dev/null 2>&1 || continue; \
+	    (cd sdks/python && maturin build --release --target $$t --zig -i $$pyver --out dist/) \
+	      || printf "$(YELLOW)  ⚠ Windows zig build skipped ($$pyver)$(RESET)\n"; \
+	  done; \
+	done
+	$(call log,Building source distribution ...)
+	@cd sdks/python && maturin sdist --out dist/
+	$(call log,Uploading all wheels + sdist to PyPI ...)
+	@twine upload sdks/python/dist/* --username __token__ --password "$$PYPI_PASSWORD"
+	$(call ok,Python SDK published to PyPI — all architectures)
 
-# ── Node.js / npm ─────────────────────────────────────────────────────────────
-publish-node-dry: ## Dry-run: build TypeScript and show what would be published
-	$(call log,npm pack --dry-run  [sdks/node/])
-	@cd sdks/node && npm install --ignore-scripts
-	@cd sdks/node && npm run build:ts
+# ── Node.js / npm — all architectures ────────────────────────────────────────
+# macOS   : cargo (native) after rustup target add
+# Linux   : cargo zigbuild (zig as cross-linker, no Docker needed).
+# Windows : cargo zigbuild; skipped gracefully if cross-compilation fails.
+publish-node-dry: ## Dry-run: build all-arch Node.js .node binaries + show what npm would publish
+	$(call log,Installing Rust cross-compilation targets ...)
+	@rustup target add aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu 2>/dev/null || true
+	$(call log,Building macOS ARM64 ...)
+	@cargo build --release --target aarch64-apple-darwin -p edgeparse-node
+	@mkdir -p sdks/node/npm/darwin-arm64
+	@cp target/aarch64-apple-darwin/release/libedgeparse_node.dylib \
+	   sdks/node/npm/darwin-arm64/edgeparse-node.darwin-arm64.node
+	$(call log,Building macOS x86_64 ...)
+	@cargo build --release --target x86_64-apple-darwin -p edgeparse-node
+	@mkdir -p sdks/node/npm/darwin-x64
+	@cp target/x86_64-apple-darwin/release/libedgeparse_node.dylib \
+	   sdks/node/npm/darwin-x64/edgeparse-node.darwin-x64.node
+	$(call log,Building Linux x86_64 [zigbuild] ...)
+	@{ cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.17 -p edgeparse-node \
+	  && mkdir -p sdks/node/npm/linux-x64-gnu \
+	  && cp target/x86_64-unknown-linux-gnu/release/libedgeparse_node.so \
+	       sdks/node/npm/linux-x64-gnu/edgeparse-node.linux-x64-gnu.node; } \
+	  || printf "$(YELLOW)  ⚠ Linux x86_64 node skipped$(RESET)\n"
+	$(call log,Building Linux ARM64 [zigbuild] ...)
+	@{ cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p edgeparse-node \
+	  && mkdir -p sdks/node/npm/linux-arm64-gnu \
+	  && cp target/aarch64-unknown-linux-gnu/release/libedgeparse_node.so \
+	       sdks/node/npm/linux-arm64-gnu/edgeparse-node.linux-arm64-gnu.node; } \
+	  || printf "$(YELLOW)  ⚠ Linux ARM64 node skipped$(RESET)\n"
+	$(call log,Building Windows x86_64 [zigbuild — optional] ...)
+	@{ rustup target add x86_64-pc-windows-gnu 2>/dev/null || true; \
+	   cargo zigbuild --release --target x86_64-pc-windows-gnu -p edgeparse-node \
+	  && mkdir -p sdks/node/npm/win32-x64-msvc \
+	  && cp target/x86_64-pc-windows-gnu/release/edgeparse_node.dll \
+	       sdks/node/npm/win32-x64-msvc/edgeparse-node.win32-x64-msvc.node; } \
+	  || printf "$(YELLOW)  ⚠ Windows target skipped$(RESET)\n"
+	$(call log,Building TypeScript ...)
+	@cd sdks/node && npm install --ignore-scripts && npm run build:ts
+	$(call log,npm pack --dry-run [platform packages] ...)
+	@for dir in sdks/node/npm/*/; do \
+	  [ -f "$$dir/package.json" ] && (cd "$$dir" && npm pack --dry-run) || true; \
+	done
+	$(call log,npm pack --dry-run [main package] ...)
 	@cd sdks/node && npm pack --dry-run
-	$(call ok,Node.js dry-run passed — package looks good)
+	$(call ok,Node.js dry-run passed — all architectures)
 
-publish-node: ## Build and publish @edgeparse/pdf to npm
-	$(call log,Building Node.js SDK ...)
-	@cd sdks/node && npm install --ignore-scripts
-	@cd sdks/node && npm run build:ts
-	$(call log,npm publish  [@edgeparse/pdf])
+publish-node: ## Build all-arch Node.js .node binaries and publish all platform + main packages to npm
+	$(call log,Installing Rust cross-compilation targets ...)
+	@rustup target add aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu 2>/dev/null || true
+	$(call log,Building macOS ARM64 ...)
+	@cargo build --release --target aarch64-apple-darwin -p edgeparse-node
+	@mkdir -p sdks/node/npm/darwin-arm64
+	@cp target/aarch64-apple-darwin/release/libedgeparse_node.dylib \
+	   sdks/node/npm/darwin-arm64/edgeparse-node.darwin-arm64.node
+	$(call log,Building macOS x86_64 ...)
+	@cargo build --release --target x86_64-apple-darwin -p edgeparse-node
+	@mkdir -p sdks/node/npm/darwin-x64
+	@cp target/x86_64-apple-darwin/release/libedgeparse_node.dylib \
+	   sdks/node/npm/darwin-x64/edgeparse-node.darwin-x64.node
+	$(call log,Building Linux x86_64 [zigbuild] ...)
+	@{ cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.17 -p edgeparse-node \
+	  && mkdir -p sdks/node/npm/linux-x64-gnu \
+	  && cp target/x86_64-unknown-linux-gnu/release/libedgeparse_node.so \
+	       sdks/node/npm/linux-x64-gnu/edgeparse-node.linux-x64-gnu.node; } \
+	  || printf "$(YELLOW)  ⚠ Linux x86_64 node skipped$(RESET)\n"
+	$(call log,Building Linux ARM64 [zigbuild] ...)
+	@{ cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p edgeparse-node \
+	  && mkdir -p sdks/node/npm/linux-arm64-gnu \
+	  && cp target/aarch64-unknown-linux-gnu/release/libedgeparse_node.so \
+	       sdks/node/npm/linux-arm64-gnu/edgeparse-node.linux-arm64-gnu.node; } \
+	  || printf "$(YELLOW)  ⚠ Linux ARM64 node skipped$(RESET)\n"
+	$(call log,Building Windows x86_64 [zigbuild — optional] ...)
+	@{ rustup target add x86_64-pc-windows-gnu 2>/dev/null || true; \
+	   cargo zigbuild --release --target x86_64-pc-windows-gnu -p edgeparse-node \
+	  && mkdir -p sdks/node/npm/win32-x64-msvc \
+	  && cp target/x86_64-pc-windows-gnu/release/edgeparse_node.dll \
+	       sdks/node/npm/win32-x64-msvc/edgeparse-node.win32-x64-msvc.node; } \
+	  || printf "$(YELLOW)  ⚠ Windows target skipped$(RESET)\n"
+	$(call log,Building TypeScript ...)
+	@cd sdks/node && npm install --ignore-scripts && npm run build:ts
+	$(call log,Publishing platform packages to npm ...)
+	@for dir in sdks/node/npm/*/; do \
+	  [ -f "$$dir/package.json" ] \
+	    && (cd "$$dir" && npm publish --access public \
+	         && printf "$(GREEN)  ✓$(RESET) published $$dir\n") \
+	    || printf "$(YELLOW)  ⚠$(RESET) skip $$dir (no package.json)\n"; \
+	done
+	$(call log,Publishing main edgeparse package to npm ...)
 	@cd sdks/node && npm publish --access public
-	$(call ok,Node.js SDK published to npm)
+	$(call ok,Node.js SDK published to npm — all architectures)
+
+# ── CLI binaries + GitHub Release — all architectures ─────────────────────────
+# Builds the `edgeparse` CLI binary for every platform, packages each into a
+# tarball or zip, and attaches them to a GitHub Release.
+#
+# Prerequisites:
+#   macOS native:   cargo + rustup   (already present)
+#   Linux/Windows:  cargo install cargo-zigbuild  +  brew install zig
+#   GitHub release: gh CLI authenticated
+#
+publish-cli-dry: ## Dry-run: show all CLI artifacts that would be built
+	$(call log,CLI build plan — v$(VERSION))
+	@printf "  $(CYAN)aarch64-apple-darwin$(RESET)         → edgeparse-$(VERSION)-aarch64-apple-darwin.tar.gz\n"
+	@printf "  $(CYAN)x86_64-apple-darwin$(RESET)          → edgeparse-$(VERSION)-x86_64-apple-darwin.tar.gz\n"
+	@printf "  $(CYAN)x86_64-unknown-linux-gnu$(RESET)     → edgeparse-$(VERSION)-x86_64-unknown-linux-gnu.tar.gz\n"
+	@printf "  $(CYAN)aarch64-unknown-linux-gnu$(RESET)    → edgeparse-$(VERSION)-aarch64-unknown-linux-gnu.tar.gz\n"
+	@printf "  $(CYAN)x86_64-pc-windows-msvc$(RESET)       → edgeparse-$(VERSION)-x86_64-pc-windows-msvc.zip  (skipped if Docker unavailable)\n"
+	$(call ok,CLI dry-run — artifacts would be uploaded to GitHub Release v$(VERSION))
+
+publish-cli: ## Build all-arch CLI binaries and attach to GitHub Release v$(VERSION)
+	$(call log,Building CLI v$(VERSION) for all architectures ...)
+	@rm -rf $(RELEASE_DIR) && mkdir -p $(RELEASE_DIR)
+	@rustup target add aarch64-apple-darwin x86_64-apple-darwin 2>/dev/null || true
+	$(call log,Building macOS ARM64 ...)
+	@cargo build --release --target aarch64-apple-darwin -p edgeparse-cli
+	@cp target/aarch64-apple-darwin/release/edgeparse $(RELEASE_DIR)/edgeparse
+	@tar -czf $(RELEASE_DIR)/edgeparse-$(VERSION)-aarch64-apple-darwin.tar.gz \
+	   -C $(RELEASE_DIR) edgeparse \
+	   -C $(CURDIR) README.md LICENSE
+	$(call log,Building macOS x86_64 ...)
+	@cargo build --release --target x86_64-apple-darwin -p edgeparse-cli
+	@cp target/x86_64-apple-darwin/release/edgeparse $(RELEASE_DIR)/edgeparse
+	@tar -czf $(RELEASE_DIR)/edgeparse-$(VERSION)-x86_64-apple-darwin.tar.gz \
+	   -C $(RELEASE_DIR) edgeparse \
+	   -C $(CURDIR) README.md LICENSE
+	$(call log,Building Linux x86_64 [zigbuild] ...)
+	@rustup target add x86_64-unknown-linux-gnu 2>/dev/null || true
+	@{ cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.17 -p edgeparse-cli \
+	  && cp target/x86_64-unknown-linux-gnu/release/edgeparse $(RELEASE_DIR)/edgeparse \
+	  && tar -czf $(RELEASE_DIR)/edgeparse-$(VERSION)-x86_64-unknown-linux-gnu.tar.gz \
+	     -C $(RELEASE_DIR) edgeparse \
+	     -C $(CURDIR) README.md LICENSE; } \
+	  || printf "$(YELLOW)  ⚠ Linux x86_64 skipped (cargo-zigbuild unavailable)$(RESET)\n"
+	$(call log,Building Linux ARM64 [zigbuild] ...)
+	@rustup target add aarch64-unknown-linux-gnu 2>/dev/null || true
+	@{ cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p edgeparse-cli \
+	  && cp target/aarch64-unknown-linux-gnu/release/edgeparse $(RELEASE_DIR)/edgeparse \
+	  && tar -czf $(RELEASE_DIR)/edgeparse-$(VERSION)-aarch64-unknown-linux-gnu.tar.gz \
+	     -C $(RELEASE_DIR) edgeparse \
+	     -C $(CURDIR) README.md LICENSE; } \
+	  || printf "$(YELLOW)  ⚠ Linux ARM64 skipped (cargo-zigbuild unavailable)$(RESET)\n"
+	$(call log,Building Windows x86_64 [zigbuild] ...)
+	@rustup target add x86_64-pc-windows-gnu 2>/dev/null || true
+	@{ cargo zigbuild --release --target x86_64-pc-windows-gnu -p edgeparse-cli \
+	  && cp target/x86_64-pc-windows-gnu/release/edgeparse.exe $(RELEASE_DIR)/ \
+	  && cd $(RELEASE_DIR) \
+	  && zip -q edgeparse-$(VERSION)-x86_64-pc-windows-gnu.zip edgeparse.exe; } \
+	  || printf "$(YELLOW)  ⚠ Windows target skipped (cargo-zigbuild unavailable)$(RESET)\n"
+	@rm -f $(RELEASE_DIR)/edgeparse $(RELEASE_DIR)/edgeparse.exe
+	$(call log,Creating / updating GitHub Release v$(VERSION) ...)
+	@gh release view v$(VERSION) --repo raphaelmansuy/edgeparse >/dev/null 2>&1 \
+	  || gh release create v$(VERSION) \
+	       --repo raphaelmansuy/edgeparse \
+	       --title "v$(VERSION)" \
+	       --notes "Release v$(VERSION)"
+	$(call log,Uploading CLI artifacts ...)
+	@for f in $(RELEASE_DIR)/edgeparse-$(VERSION)-*.tar.gz \
+	           $(RELEASE_DIR)/edgeparse-$(VERSION)-*.zip; do \
+	  [ -f "$$f" ] || continue; \
+	  gh release upload v$(VERSION) "$$f" \
+	    --repo raphaelmansuy/edgeparse --clobber \
+	    && printf "$(GREEN)  ✓$(RESET) uploaded $$f\n"; \
+	done
+	$(call ok,CLI binaries v$(VERSION) attached to GitHub Release)
+
+# ── Homebrew tap — formula generation + push ──────────────────────────────────
+# Generates Formula/edgeparse.rb by downloading the macOS release assets
+# from the GitHub Release and computing their SHA-256, then pushes the
+# formula to the tap repo (BREW_TAP_REPO).  Run AFTER publish-cli.
+#
+# Prerequisites:  gh CLI authenticated, git, curl, shasum
+#
+publish-brew-dry: ## Dry-run: generate Homebrew formula from published release assets (no push)
+	$(call log,Generating Homebrew formula [dry-run] v$(VERSION) ...)
+	@mkdir -p Formula
+	@bash scripts/gen-formula.sh $(VERSION) Formula/edgeparse.rb
+	@printf "$(GREEN)  ✓$(RESET) Formula/edgeparse.rb written (dry-run — not pushed)\n"
+	@cat Formula/edgeparse.rb
+
+publish-brew: ## Generate Homebrew formula and push to $(BREW_TAP_REPO)
+	$(call log,Generating Homebrew formula v$(VERSION) ...)
+	@mkdir -p Formula
+	@bash scripts/gen-formula.sh $(VERSION) Formula/edgeparse.rb
+	$(call log,Pushing formula to $(BREW_TAP_REPO) ...)
+	@TAPDIR=$$(mktemp -d); \
+	 git clone "https://github.com/$(BREW_TAP_REPO).git" "$$TAPDIR" 2>&1; \
+	 mkdir -p "$$TAPDIR/Formula"; \
+	 cp Formula/edgeparse.rb "$$TAPDIR/Formula/edgeparse.rb"; \
+	 cd "$$TAPDIR" \
+	   && git config user.email "actions@github.com" \
+	   && git config user.name "EdgeParse Release Bot" \
+	   && git add Formula/edgeparse.rb \
+	   && git commit -m "edgeparse $(VERSION)" \
+	   && git push origin HEAD; \
+	 rm -rf "$$TAPDIR"
+	$(call ok,Homebrew formula v$(VERSION) pushed to $(BREW_TAP_REPO))
 
 # ── Combined ──────────────────────────────────────────────────────────────────
-publish-all: publish-rust publish-python publish-node ## Publish Rust + Python + Node.js SDKs in sequence
-	$(call ok,All SDKs published)
+publish-all: publish-rust publish-python publish-node publish-cli publish-brew ## Publish everything: Rust crates + Python wheels + Node.js packages + CLI binaries + Homebrew formula
+	$(call ok,All SDKs + CLI + Homebrew tap published)
 
 # ══════════════════════════════════════════════════════════════════════════════
 ## Clean
