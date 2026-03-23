@@ -13,7 +13,7 @@
     }
   },
   "bin": {
-    "edgeparse": "./dist/cli.js"
+    "edgeparse": "dist/cli.js"
   },
   "files": [
     "dist/",
@@ -34,7 +34,7 @@
   "homepage": "https://github.com/raphaelmansuy/edgeparse#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/raphaelmansuy/edgeparse.git",
+    "url": "git+https://github.com/raphaelmansuy/edgeparse.git",
     "directory": "sdks/node"
   },
   "keywords": [
