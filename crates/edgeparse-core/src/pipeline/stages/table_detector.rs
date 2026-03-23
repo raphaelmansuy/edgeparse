@@ -139,7 +139,9 @@ fn build_table_borders(h_lines: &[LineChunk], v_lines: &[LineChunk]) -> Vec<Tabl
     // reject full-page layout artifacts.
     groups
         .into_iter()
-        .filter(|g| g.vertex_count() >= MIN_VERTEXES && !g.h_lines.is_empty() && !g.v_lines.is_empty())
+        .filter(|g| {
+            g.vertex_count() >= MIN_VERTEXES && !g.h_lines.is_empty() && !g.v_lines.is_empty()
+        })
         .filter_map(|g| g.to_table_border())
         .map(merge_gutter_columns)
         .filter(|tb| {
@@ -227,8 +229,16 @@ impl TableGroup {
         // Sort Y descending (top-to-bottom in PDF)
         y_coords.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
 
-        let num_cols = if x_coords.len() > 1 { x_coords.len() - 1 } else { return None };
-        let num_rows = if y_coords.len() > 1 { y_coords.len() - 1 } else { return None };
+        let num_cols = if x_coords.len() > 1 {
+            x_coords.len() - 1
+        } else {
+            return None;
+        };
+        let num_rows = if y_coords.len() > 1 {
+            y_coords.len() - 1
+        } else {
+            return None;
+        };
 
         // Build cell grid
         let mut rows = Vec::with_capacity(num_rows);
@@ -240,7 +250,7 @@ impl TableGroup {
                     x_coords[c],
                     y_coords[r + 1], // bottom (lower Y)
                     x_coords[c + 1],
-                    y_coords[r],     // top (higher Y)
+                    y_coords[r], // top (higher Y)
                 );
                 cells.push(TableBorderCell {
                     bbox: cell_bbox,
@@ -306,10 +316,10 @@ fn merge_gutter_columns(mut table: TableBorder) -> TableBorder {
     // Identify which physical columns are narrow gutters
     let num_cols = table.num_columns;
     let mut keep_col = vec![true; num_cols];
-    for c in 0..num_cols {
+    for (c, kept) in keep_col.iter_mut().enumerate() {
         let width = table.x_coordinates[c + 1] - table.x_coordinates[c];
         if width < MIN_COLUMN_WIDTH {
-            keep_col[c] = false;
+            *kept = false;
         }
     }
 
@@ -321,8 +331,8 @@ fn merge_gutter_columns(mut table: TableBorder) -> TableBorder {
     // Build mapping: old_col → new_col (gutters share the previous kept column)
     let mut new_col_idx = Vec::with_capacity(num_cols);
     let mut new_idx: usize = 0;
-    for c in 0..num_cols {
-        if keep_col[c] {
+    for &kept in keep_col.iter() {
+        if kept {
             new_col_idx.push(new_idx);
             new_idx += 1;
         } else {
@@ -340,8 +350,8 @@ fn merge_gutter_columns(mut table: TableBorder) -> TableBorder {
     // Build new x_coordinates: keep only the boundaries of non-gutter columns
     let mut new_x: Vec<f64> = Vec::with_capacity(new_num_cols + 1);
     new_x.push(table.x_coordinates[0]); // leftmost boundary
-    for c in 0..num_cols {
-        if keep_col[c] {
+    for (c, &kept) in keep_col.iter().enumerate() {
+        if kept {
             new_x.push(table.x_coordinates[c + 1]);
         }
     }
@@ -353,11 +363,10 @@ fn merge_gutter_columns(mut table: TableBorder) -> TableBorder {
     // Rebuild rows with merged cells
     for row in &mut table.rows {
         let mut merged_cells: Vec<TableBorderCell> = Vec::with_capacity(new_num_cols);
-        for c in 0..num_cols {
-            let target = new_col_idx[c];
+        for (&target, cell_c) in new_col_idx.iter().zip(row.cells.iter()) {
             if target >= merged_cells.len() {
                 // Start a new merged cell
-                let mut cell = row.cells[c].clone();
+                let mut cell = cell_c.clone();
                 cell.col_number = target;
                 // Expand bbox to cover gutter if this is a real column
                 if target < new_x.len().saturating_sub(1) {
@@ -373,10 +382,10 @@ fn merge_gutter_columns(mut table: TableBorder) -> TableBorder {
             } else {
                 // Merge this gutter cell's content into the existing cell
                 let existing = &mut merged_cells[target];
-                existing.content.extend(row.cells[c].content.clone());
-                existing.contents.extend(row.cells[c].contents.clone());
+                existing.content.extend(cell_c.content.clone());
+                existing.contents.extend(cell_c.contents.clone());
                 // Expand bbox
-                existing.bbox = existing.bbox.union(&row.cells[c].bbox);
+                existing.bbox = existing.bbox.union(&cell_c.bbox);
             }
         }
         // Update col_span for merged cells
@@ -447,10 +456,14 @@ fn groups_connected(a: &TableGroup, b: &TableGroup) -> bool {
 
 /// Check if a horizontal and vertical line intersect.
 fn lines_intersect(h: &LineChunk, v: &LineChunk) -> bool {
-    if v.bbox.right_x + LINE_EPSILON < h.bbox.left_x || v.bbox.left_x - LINE_EPSILON > h.bbox.right_x {
+    if v.bbox.right_x + LINE_EPSILON < h.bbox.left_x
+        || v.bbox.left_x - LINE_EPSILON > h.bbox.right_x
+    {
         return false;
     }
-    if h.bbox.top_y + LINE_EPSILON < v.bbox.bottom_y || h.bbox.bottom_y - LINE_EPSILON > v.bbox.top_y {
+    if h.bbox.top_y + LINE_EPSILON < v.bbox.bottom_y
+        || h.bbox.bottom_y - LINE_EPSILON > v.bbox.top_y
+    {
         return false;
     }
     true
@@ -746,7 +759,9 @@ fn is_single_cell_artifact_table(table: &TableBorder) -> bool {
         })
         .count();
 
-    if (normalized.starts_with("figure") || normalized.starts_with("fig") || normalized.starts_with("diagram"))
+    if (normalized.starts_with("figure")
+        || normalized.starts_with("fig")
+        || normalized.starts_with("diagram"))
         && table.bbox.width() <= 360.0
         && table.bbox.height() <= 80.0
     {
@@ -783,8 +798,7 @@ fn is_single_cell_artifact_table(table: &TableBorder) -> bool {
 
     table.bbox.width() <= 320.0
         && table.bbox.height() <= 90.0
-        && word_count >= 4
-        && word_count <= 20
+        && (4..=20).contains(&word_count)
         && char_count <= 160
         && trimmed.contains(':')
         && digit_count <= 6
@@ -823,21 +837,15 @@ fn has_recoverable_pre_cluster_signal(cell: &TableBorderCell) -> bool {
         return false;
     }
 
-    let anchor = match rows
-        .iter()
-        .max_by(|a, b| {
+    let anchor = match rows.iter().max_by(|a, b| {
+        a.segments.len().cmp(&b.segments.len()).then_with(|| {
             a.segments
-                .len()
-                .cmp(&b.segments.len())
-                .then_with(|| {
-                    a.segments
-                        .iter()
-                        .map(|seg| seg.word_count)
-                        .sum::<usize>()
-                        .cmp(&b.segments.iter().map(|seg| seg.word_count).sum::<usize>())
-                })
+                .iter()
+                .map(|seg| seg.word_count)
+                .sum::<usize>()
+                .cmp(&b.segments.iter().map(|seg| seg.word_count).sum::<usize>())
         })
-    {
+    }) {
         Some(row) => row,
         None => return false,
     };
@@ -860,7 +868,7 @@ fn has_recoverable_pre_cluster_signal(cell: &TableBorderCell) -> bool {
     if anchor_cols >= PRE_CLUSTER_STRONG_COLUMNS {
         stable_rows >= PRE_CLUSTER_MIN_ROWS
     } else {
-        stable_rows >= PRE_CLUSTER_MIN_ROWS + 1
+        stable_rows > PRE_CLUSTER_MIN_ROWS
     }
 }
 
@@ -1040,10 +1048,7 @@ fn is_viable_pre_cluster_row(segments: &[PreClusterSegment]) -> bool {
     max_words <= 12 && total_words <= 28
 }
 
-fn pre_cluster_row_matches_anchor(
-    row: &PreClusterRowSignal,
-    anchor: &PreClusterRowSignal,
-) -> bool {
+fn pre_cluster_row_matches_anchor(row: &PreClusterRowSignal, anchor: &PreClusterRowSignal) -> bool {
     let tol = PRE_CLUSTER_ALIGN_TOLERANCE * row.font_size.max(anchor.font_size).max(1.0);
     let matches = row
         .segments
@@ -1157,7 +1162,8 @@ fn is_wrapped_prose_grid_table(table: &TableBorder) -> bool {
         .filter(|text| text.chars().any(|ch| ch.is_ascii_digit()))
         .count();
 
-    if wordy_cells * 10 < populated_cells.len() * 8 || punctuated_cells > 0 || numericish_cells > 1 {
+    if wordy_cells * 10 < populated_cells.len() * 8 || punctuated_cells > 0 || numericish_cells > 1
+    {
         return false;
     }
 
@@ -1204,8 +1210,7 @@ fn is_brochure_card_table(table: &TableBorder) -> bool {
         .filter(|cell| {
             let text = cell_text(cell);
             let first = text.chars().find(|c| c.is_alphanumeric());
-            first.is_some_and(|c| c.is_uppercase())
-                && !text.contains(['.', '?', '!'])
+            first.is_some_and(|c| c.is_uppercase()) && !text.contains(['.', '?', '!'])
         })
         .count();
     let numericish_count = populated_cells
@@ -1323,9 +1328,8 @@ fn normalize_table_keyword_text(text: &str) -> String {
 
 fn repair_fragmented_table_text(text: &str) -> String {
     const STOPWORDS: &[&str] = &[
-        "a", "an", "and", "are", "as", "at", "be", "by", "can", "for", "from", "if", "in",
-        "into", "is", "it", "may", "must", "not", "of", "on", "or", "per", "that", "the",
-        "to", "with",
+        "a", "an", "and", "are", "as", "at", "be", "by", "can", "for", "from", "if", "in", "into",
+        "is", "it", "may", "must", "not", "of", "on", "or", "per", "that", "the", "to", "with",
     ];
 
     let mut parts: Vec<String> = text.split_whitespace().map(str::to_string).collect();
@@ -1384,6 +1388,7 @@ fn starts_with_ordered_index(text: &str) -> bool {
     matches!(chars.next(), Some('.' | ')')) && chars.next().is_some_and(char::is_whitespace)
 }
 
+#[allow(dead_code)]
 fn is_short_numeric_text(text: &str) -> bool {
     let trimmed = text.trim();
     !trimmed.is_empty() && trimmed.len() <= 4 && trimmed.chars().all(|c| c.is_ascii_digit())
@@ -1428,7 +1433,11 @@ fn parse_page_marker(text: &str) -> Option<u32> {
     }
 
     let lower = trimmed.to_ascii_lowercase();
-    if lower.len() <= 10 && lower.chars().all(|c| matches!(c, 'i' | 'v' | 'x' | 'l' | 'c' | 'd' | 'm')) {
+    if lower.len() <= 10
+        && lower
+            .chars()
+            .all(|c| matches!(c, 'i' | 'v' | 'x' | 'l' | 'c' | 'd' | 'm'))
+    {
         return roman_to_int(&lower);
     }
 
@@ -1532,7 +1541,6 @@ fn merge_toc_row_cells(left: &TableBorderCell, right: &TableBorderCell) -> Optio
     Some(ContentElement::TextChunk(chunk))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1547,8 +1555,16 @@ mod tests {
             bbox: BoundingBox::new(Some(1), x1, y - 0.5, x2, y + 0.5),
             index: None,
             level: None,
-            start: Vertex { x: x1, y, radius: 0.0 },
-            end: Vertex { x: x2, y, radius: 0.0 },
+            start: Vertex {
+                x: x1,
+                y,
+                radius: 0.0,
+            },
+            end: Vertex {
+                x: x2,
+                y,
+                radius: 0.0,
+            },
             width: 1.0,
             is_horizontal_line: true,
             is_vertical_line: false,
@@ -1561,8 +1577,16 @@ mod tests {
             bbox: BoundingBox::new(Some(1), x - 0.5, y1, x + 0.5, y2),
             index: None,
             level: None,
-            start: Vertex { x, y: y1, radius: 0.0 },
-            end: Vertex { x, y: y2, radius: 0.0 },
+            start: Vertex {
+                x,
+                y: y1,
+                radius: 0.0,
+            },
+            end: Vertex {
+                x,
+                y: y2,
+                radius: 0.0,
+            },
             width: 1.0,
             is_horizontal_line: false,
             is_vertical_line: true,
@@ -1622,7 +1646,10 @@ mod tests {
 
         let result = detect_table_borders(elements);
 
-        let tables: Vec<_> = result.iter().filter(|e| matches!(e, ContentElement::TableBorder(_))).collect();
+        let tables: Vec<_> = result
+            .iter()
+            .filter(|e| matches!(e, ContentElement::TableBorder(_)))
+            .collect();
         assert_eq!(tables.len(), 1, "Expected 1 table, found {}", tables.len());
 
         if let ContentElement::TableBorder(t) = &tables[0] {
@@ -1635,15 +1662,15 @@ mod tests {
 
     #[test]
     fn test_no_lines_no_table() {
-        let elements = vec![
-            ContentElement::Image(crate::models::chunks::ImageChunk {
-                bbox: BoundingBox::new(Some(1), 100.0, 100.0, 200.0, 200.0),
-                index: None,
-                level: None,
-            }),
-        ];
+        let elements = vec![ContentElement::Image(crate::models::chunks::ImageChunk {
+            bbox: BoundingBox::new(Some(1), 100.0, 100.0, 200.0, 200.0),
+            index: None,
+            level: None,
+        })];
         let result = detect_table_borders(elements);
-        assert!(result.iter().all(|e| !matches!(e, ContentElement::TableBorder(_))));
+        assert!(result
+            .iter()
+            .all(|e| !matches!(e, ContentElement::TableBorder(_))));
     }
 
     #[test]
@@ -1654,7 +1681,9 @@ mod tests {
             ContentElement::Line(h_line(100.0, 680.0, 300.0)),
         ];
         let result = detect_table_borders(elements);
-        assert!(result.iter().all(|e| !matches!(e, ContentElement::TableBorder(_))));
+        assert!(result
+            .iter()
+            .all(|e| !matches!(e, ContentElement::TableBorder(_))));
     }
 
     #[test]
@@ -1664,7 +1693,9 @@ mod tests {
             ContentElement::Line(v_line(300.0, 500.0, 600.0)), // far away
         ];
         let result = detect_table_borders(elements);
-        assert!(result.iter().all(|e| !matches!(e, ContentElement::TableBorder(_))));
+        assert!(result
+            .iter()
+            .all(|e| !matches!(e, ContentElement::TableBorder(_))));
     }
 
     #[test]
@@ -1753,7 +1784,9 @@ mod tests {
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
         assert_eq!(result.len(), 2);
-        assert!(result.iter().all(|e| matches!(e, ContentElement::TextLine(_))));
+        assert!(result
+            .iter()
+            .all(|e| matches!(e, ContentElement::TextLine(_))));
     }
 
     #[test]
@@ -1922,8 +1955,12 @@ mod tests {
         };
 
         let result = release_pre_cluster_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| !matches!(e, ContentElement::TableBorder(_))));
-        assert!(result.iter().any(|e| matches!(e, ContentElement::TextLine(_))));
+        assert!(result
+            .iter()
+            .all(|e| !matches!(e, ContentElement::TableBorder(_))));
+        assert!(result
+            .iter()
+            .any(|e| matches!(e, ContentElement::TextLine(_))));
     }
 
     #[test]
@@ -1999,7 +2036,10 @@ mod tests {
         };
 
         let result = release_pre_cluster_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(matches!(result.first(), Some(ContentElement::TableBorder(_))));
+        assert!(matches!(
+            result.first(),
+            Some(ContentElement::TableBorder(_))
+        ));
     }
 
     #[test]
@@ -2043,7 +2083,9 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| !matches!(e, ContentElement::TableBorder(_))));
+        assert!(result
+            .iter()
+            .all(|e| !matches!(e, ContentElement::TableBorder(_))));
     }
 
     #[test]
@@ -2087,7 +2129,9 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| !matches!(e, ContentElement::TableBorder(_))));
+        assert!(result
+            .iter()
+            .all(|e| !matches!(e, ContentElement::TableBorder(_))));
     }
 
     #[test]
@@ -2131,7 +2175,9 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| !matches!(e, ContentElement::TableBorder(_))));
+        assert!(result
+            .iter()
+            .all(|e| !matches!(e, ContentElement::TableBorder(_))));
     }
 
     #[test]
@@ -2175,26 +2221,43 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| !matches!(e, ContentElement::TableBorder(_))));
+        assert!(result
+            .iter()
+            .all(|e| !matches!(e, ContentElement::TableBorder(_))));
     }
 
     #[test]
     fn test_release_pre_cluster_keeps_multirow_single_column_table() {
         let rows = (0..3)
             .map(|row_number| TableBorderRow {
-                bbox: BoundingBox::new(Some(1), 0.0, 300.0 - row_number as f64 * 40.0, 900.0, 340.0 - row_number as f64 * 40.0),
+                bbox: BoundingBox::new(
+                    Some(1),
+                    0.0,
+                    300.0 - row_number as f64 * 40.0,
+                    900.0,
+                    340.0 - row_number as f64 * 40.0,
+                ),
                 index: None,
                 level: None,
                 row_number,
                 cells: vec![TableBorderCell {
-                    bbox: BoundingBox::new(Some(1), 0.0, 300.0 - row_number as f64 * 40.0, 900.0, 340.0 - row_number as f64 * 40.0),
+                    bbox: BoundingBox::new(
+                        Some(1),
+                        0.0,
+                        300.0 - row_number as f64 * 40.0,
+                        900.0,
+                        340.0 - row_number as f64 * 40.0,
+                    ),
                     index: None,
                     level: None,
                     row_number,
                     col_number: 0,
                     row_span: 1,
                     col_span: 1,
-                    content: vec![make_token("[image]", 11.0), make_token("Chart axis label", 11.0)],
+                    content: vec![
+                        make_token("[image]", 11.0),
+                        make_token("Chart axis label", 11.0),
+                    ],
                     contents: Vec::new(),
                     semantic_type: None,
                 }],
@@ -2220,7 +2283,10 @@ mod tests {
         };
 
         let result = release_pre_cluster_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(matches!(result.first(), Some(ContentElement::TableBorder(_))));
+        assert!(matches!(
+            result.first(),
+            Some(ContentElement::TableBorder(_))
+        ));
     }
 
     #[test]
@@ -2282,7 +2348,9 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| matches!(e, ContentElement::TextLine(_))));
+        assert!(result
+            .iter()
+            .all(|e| matches!(e, ContentElement::TextLine(_))));
         let texts: Vec<String> = result
             .iter()
             .filter_map(|e| match e {
@@ -2290,7 +2358,9 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert!(texts.iter().any(|t| t.contains("1. Overview of OCR Pack 1")));
+        assert!(texts
+            .iter()
+            .any(|t| t.contains("1. Overview of OCR Pack 1")));
     }
 
     #[test]
@@ -2345,8 +2415,12 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| matches!(e, ContentElement::TextLine(_))));
-        assert!(result.iter().all(|e| !matches!(e, ContentElement::TableBorder(_))));
+        assert!(result
+            .iter()
+            .all(|e| matches!(e, ContentElement::TextLine(_))));
+        assert!(result
+            .iter()
+            .all(|e| !matches!(e, ContentElement::TableBorder(_))));
     }
 
     #[test]
@@ -2408,7 +2482,9 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| matches!(e, ContentElement::TextLine(_))));
+        assert!(result
+            .iter()
+            .all(|e| matches!(e, ContentElement::TextLine(_))));
         let texts: Vec<String> = result
             .iter()
             .filter_map(|e| match e {
@@ -2416,7 +2492,9 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert!(texts.iter().any(|t| t.contains("Experiment #1: Hydrostatic Pressure 3")));
+        assert!(texts
+            .iter()
+            .any(|t| t.contains("Experiment #1: Hydrostatic Pressure 3")));
         assert!(texts.iter().any(|t| t.contains("References 101")));
     }
 
@@ -2425,7 +2503,11 @@ mod tests {
         let mut rows = Vec::new();
         let labels = [
             ["Our Purpose", "Our Mission", "What We Do"],
-            ["Making AI Beneficial", "Easy-to-apply AI, Everywhere", "Providing easy-to-use AI solutions"],
+            [
+                "Making AI Beneficial",
+                "Easy-to-apply AI, Everywhere",
+                "Providing easy-to-use AI solutions",
+            ],
         ];
 
         for (row_number, texts) in labels.into_iter().enumerate() {
@@ -2477,7 +2559,9 @@ mod tests {
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
         assert_eq!(result.len(), 6);
-        assert!(result.iter().all(|e| matches!(e, ContentElement::TextLine(_))));
+        assert!(result
+            .iter()
+            .all(|e| matches!(e, ContentElement::TextLine(_))));
     }
 
     #[test]
@@ -2521,26 +2605,43 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| matches!(e, ContentElement::TextLine(_))));
+        assert!(result
+            .iter()
+            .all(|e| matches!(e, ContentElement::TextLine(_))));
     }
 
     #[test]
     fn test_filter_suspicious_single_column_list_table_kept() {
         let rows = (0..4)
             .map(|row_number| TableBorderRow {
-                bbox: BoundingBox::new(Some(1), 80.0, 300.0 - row_number as f64 * 40.0, 320.0, 330.0 - row_number as f64 * 40.0),
+                bbox: BoundingBox::new(
+                    Some(1),
+                    80.0,
+                    300.0 - row_number as f64 * 40.0,
+                    320.0,
+                    330.0 - row_number as f64 * 40.0,
+                ),
                 index: None,
                 level: None,
                 row_number,
                 cells: vec![TableBorderCell {
-                    bbox: BoundingBox::new(Some(1), 80.0, 300.0 - row_number as f64 * 40.0, 320.0, 330.0 - row_number as f64 * 40.0),
+                    bbox: BoundingBox::new(
+                        Some(1),
+                        80.0,
+                        300.0 - row_number as f64 * 40.0,
+                        320.0,
+                        330.0 - row_number as f64 * 40.0,
+                    ),
                     index: None,
                     level: None,
                     row_number,
                     col_number: 0,
                     row_span: 1,
                     col_span: 1,
-                    content: vec![make_token(&format!("#{}: Circular economy", row_number + 1), 11.0)],
+                    content: vec![make_token(
+                        &format!("#{}: Circular economy", row_number + 1),
+                        11.0,
+                    )],
                     contents: Vec::new(),
                     semantic_type: None,
                 }],
@@ -2566,18 +2667,17 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(matches!(result.first(), Some(ContentElement::TableBorder(_))));
+        assert!(matches!(
+            result.first(),
+            Some(ContentElement::TableBorder(_))
+        ));
     }
 
     #[test]
     fn test_filter_suspicious_two_row_marketing_grid() {
         let mut rows = Vec::new();
         let labels = [
-            [
-                "Our Purpose",
-                "Our Mission",
-                "What We Do",
-            ],
+            ["Our Purpose", "Our Mission", "What We Do"],
             [
                 "Making AI Beneficial",
                 "Easy-to-apply AI Everywhere",
@@ -2633,6 +2733,8 @@ mod tests {
         };
 
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
-        assert!(result.iter().all(|e| matches!(e, ContentElement::TextLine(_))));
+        assert!(result
+            .iter()
+            .all(|e| matches!(e, ContentElement::TextLine(_))));
     }
 }

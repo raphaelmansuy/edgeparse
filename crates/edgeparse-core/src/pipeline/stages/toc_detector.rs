@@ -19,12 +19,12 @@ pub fn detect_toc(pages: &mut [Vec<ContentElement>]) {
         }
 
         // Identify which indices are TOC-like
-        let toc_flags: Vec<bool> = page.iter().map(|e| is_toc_entry(e)).collect();
+        let toc_flags: Vec<bool> = page.iter().map(is_toc_entry).collect();
 
         // Find runs of consecutive TOC-like entries
         let mut run_start: Option<usize> = None;
-        for i in 0..toc_flags.len() {
-            match (toc_flags[i], run_start) {
+        for (i, &flag) in toc_flags.iter().enumerate() {
+            match (flag, run_start) {
                 (true, None) => run_start = Some(i),
                 (true, Some(_)) => {}
                 (false, Some(start)) => {
@@ -125,9 +125,7 @@ fn looks_like_toc_line(text: &str) -> bool {
         return false;
     }
 
-    let has_leader = title.contains("...")
-        || title.contains('…')
-        || title.contains('·');
+    let has_leader = title.contains("...") || title.contains('…') || title.contains('·');
     if has_leader {
         return true;
     }
@@ -171,12 +169,10 @@ fn looks_like_toc_support_heading(text: &str) -> bool {
 }
 
 fn ends_with_page_marker(text: &str) -> bool {
-    text.split_whitespace()
-        .last()
-        .is_some_and(|token| {
-            let stripped = token.trim_matches(|c: char| matches!(c, '.' | ',' | ')' | '('));
-            (1..=4).contains(&stripped.len()) && stripped.chars().all(|c| c.is_ascii_digit())
-        })
+    text.split_whitespace().last().is_some_and(|token| {
+        let stripped = token.trim_matches(|c: char| matches!(c, '.' | ',' | ')' | '('));
+        (1..=4).contains(&stripped.len()) && stripped.chars().all(|c| c.is_ascii_digit())
+    })
 }
 
 /// Mark a run of elements as TOC if it's long enough.
@@ -225,7 +221,8 @@ fn is_toc_title(text: &str) -> bool {
 
 fn promote_explicit_toc_titles(page: &mut [ContentElement]) {
     for idx in 0..page.len().saturating_sub(1) {
-        let is_title = matches!(&page[idx], ContentElement::Paragraph(p) if is_toc_title(&p.base.value()));
+        let is_title =
+            matches!(&page[idx], ContentElement::Paragraph(p) if is_toc_title(&p.base.value()));
         if !is_title || !next_element_looks_like_toc(page, idx + 1) {
             continue;
         }
@@ -245,7 +242,8 @@ fn next_element_looks_like_toc(page: &[ContentElement], mut idx: usize) -> bool 
         match &page[idx] {
             ContentElement::List(lst) => return lst.list_items.len() >= MIN_TOC_ENTRIES,
             ContentElement::Paragraph(p) => {
-                return p.base.semantic_type == SemanticType::TableOfContent || is_toc_entry(&page[idx]);
+                return p.base.semantic_type == SemanticType::TableOfContent
+                    || is_toc_entry(&page[idx]);
             }
             ContentElement::Heading(_) => return false,
             ContentElement::HeaderFooter(_) => idx += 1,
@@ -424,11 +422,23 @@ mod tests {
     #[test]
     fn test_mixed_toc_page_with_part_headings_detected() {
         let mut pages = vec![vec![
-            make_para("Part V. Chapter Five - Comparing Associations Between Multiple Variables", 712.0),
+            make_para(
+                "Part V. Chapter Five - Comparing Associations Between Multiple Variables",
+                712.0,
+            ),
             make_para("Section 5.1: The Linear Model 35", 700.0),
-            make_para("Part VI. Chapter Six - Comparing Three or More Group Means", 688.0),
-            make_para("Section 6.1: Between Versus Within Group Analyses 49", 676.0),
-            make_para("Part VII. Chapter Seven - Moderation and Mediation Analyses", 664.0),
+            make_para(
+                "Part VI. Chapter Six - Comparing Three or More Group Means",
+                688.0,
+            ),
+            make_para(
+                "Section 6.1: Between Versus Within Group Analyses 49",
+                676.0,
+            ),
+            make_para(
+                "Part VII. Chapter Seven - Moderation and Mediation Analyses",
+                664.0,
+            ),
             make_para("Section 7.1: Mediation and Moderation Models 64", 652.0),
         ]];
 
@@ -446,28 +456,30 @@ mod tests {
         use crate::models::list::{ListBody, ListItem, ListLabel, PDFList};
 
         let title = make_para("Contents", 712.0);
-        let mk_row = |value: &str| vec![vec![crate::models::table::TableToken {
-            base: TextChunk {
-                value: value.to_string(),
-                bbox: BoundingBox::new(Some(1), 72.0, 700.0, 500.0, 712.0),
-                font_name: "Arial".to_string(),
-                font_size: 10.0,
-                font_weight: 400.0,
-                italic_angle: 0.0,
-                font_color: "000000".to_string(),
-                contrast_ratio: 21.0,
-                symbol_ends: vec![],
-                text_format: TextFormat::Normal,
-                text_type: TextType::Regular,
-                pdf_layer: PdfLayer::Main,
-                ocg_visible: true,
-                index: None,
-                page_number: Some(1),
-                level: None,
-                mcid: None,
-            },
-            token_type: crate::models::table::TableTokenType::Text,
-        }]];
+        let mk_row = |value: &str| {
+            vec![vec![crate::models::table::TableToken {
+                base: TextChunk {
+                    value: value.to_string(),
+                    bbox: BoundingBox::new(Some(1), 72.0, 700.0, 500.0, 712.0),
+                    font_name: "Arial".to_string(),
+                    font_size: 10.0,
+                    font_weight: 400.0,
+                    italic_angle: 0.0,
+                    font_color: "000000".to_string(),
+                    contrast_ratio: 21.0,
+                    symbol_ends: vec![],
+                    text_format: TextFormat::Normal,
+                    text_type: TextType::Regular,
+                    pdf_layer: PdfLayer::Main,
+                    ocg_visible: true,
+                    index: None,
+                    page_number: Some(1),
+                    level: None,
+                    mcid: None,
+                },
+                token_type: crate::models::table::TableTokenType::Text,
+            }]]
+        };
 
         let list = ContentElement::List(PDFList {
             bbox: BoundingBox::new(Some(1), 72.0, 640.0, 500.0, 700.0),

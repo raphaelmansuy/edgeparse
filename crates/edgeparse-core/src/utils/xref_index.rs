@@ -76,7 +76,10 @@ impl CrossReferenceIndex {
         self.heading_index
             .iter()
             .filter(|(key, _)| key.contains(&query_lower))
-            .flat_map(|(_, ids)| ids.iter().filter_map(|id| self.entries.get(id).map(|e| (*id, e))))
+            .flat_map(|(_, ids)| {
+                ids.iter()
+                    .filter_map(|id| self.entries.get(id).map(|e| (*id, e)))
+            })
             .collect()
     }
 
@@ -131,18 +134,12 @@ fn extract_heading_info(elem: &ContentElement) -> (Option<String>, Option<u32>) 
         ContentElement::Heading(h) => {
             let text = h.base.base.value().trim().to_string();
             let level = h.heading_level;
-            (
-                if text.is_empty() { None } else { Some(text) },
-                level,
-            )
+            (if text.is_empty() { None } else { Some(text) }, level)
         }
         ContentElement::NumberHeading(nh) => {
             let text = nh.base.base.base.value().trim().to_string();
             let level = nh.base.heading_level;
-            (
-                if text.is_empty() { None } else { Some(text) },
-                level,
-            )
+            (if text.is_empty() { None } else { Some(text) }, level)
         }
         _ => (None, None),
     }
@@ -221,10 +218,7 @@ mod tests {
 
     #[test]
     fn test_elements_on_page() {
-        let pages = vec![
-            vec![make_text("A"), make_text("B")],
-            vec![make_text("C")],
-        ];
+        let pages = vec![vec![make_text("A"), make_text("B")], vec![make_text("C")]];
         let index = CrossReferenceIndex::from_pages(&pages);
         assert_eq!(index.elements_on_page(1).len(), 2);
         assert_eq!(index.elements_on_page(2).len(), 1);

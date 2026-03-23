@@ -13,7 +13,9 @@ pub enum PageResult<T> {
     Ok(T),
     /// Page processing failed with an error message
     Failed {
+        /// Zero-based index of the page that failed.
         page_index: usize,
+        /// Human-readable description of the error.
         error: String,
     },
 }
@@ -22,11 +24,7 @@ pub enum PageResult<T> {
 ///
 /// Returns a Vec of successful results. Failed pages are logged and skipped,
 /// with the original content preserved as fallback.
-pub fn process_pages_with_recovery<T, F>(
-    pages: Vec<T>,
-    stage_name: &str,
-    mut op: F,
-) -> Vec<T>
+pub fn process_pages_with_recovery<T, F>(pages: Vec<T>, stage_name: &str, mut op: F) -> Vec<T>
 where
     T: Send + Default + 'static,
     F: FnMut(T) -> T,
@@ -73,7 +71,8 @@ pub struct PipelineErrors {
 impl PipelineErrors {
     /// Record an error.
     pub fn record(&mut self, stage: &str, page_index: usize, error: &str) {
-        self.errors.push((stage.to_string(), page_index, error.to_string()));
+        self.errors
+            .push((stage.to_string(), page_index, error.to_string()));
     }
 
     /// Whether any errors were recorded.

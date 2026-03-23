@@ -10,14 +10,12 @@ use crate::models::content::ContentElement;
 use crate::models::enums::SemanticType;
 
 /// Regex for superscript footnote markers in body text (e.g., "¹", "²³").
-static SUPERSCRIPT_MARKER_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"[¹²³⁴⁵⁶⁷⁸⁹⁰]+").unwrap()
-});
+static SUPERSCRIPT_MARKER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[¹²³⁴⁵⁶⁷⁸⁹⁰]+").unwrap());
 
 /// Regex for extracting the marker number from a footnote body.
-static FOOTNOTE_BODY_MARKER_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^[\s]*(\d{1,3}|[¹²³⁴⁵⁶⁷⁸⁹⁰]+)[\.\)\s]").unwrap()
-});
+static FOOTNOTE_BODY_MARKER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[\s]*(\d{1,3}|[¹²³⁴⁵⁶⁷⁸⁹⁰]+)[\.\)\s]").unwrap());
 
 /// A linked footnote — marker in text paired with footnote body.
 #[derive(Debug, Clone)]
@@ -66,26 +64,23 @@ pub fn link_footnotes(pages: &[Vec<ContentElement>]) -> FootnoteLinkResult {
         let page_num = (page_idx + 1) as u32;
 
         for elem in page {
-            match elem {
-                ContentElement::Paragraph(p) => {
-                    if p.base.semantic_type == SemanticType::Note {
-                        // This is a footnote body
-                        let text = p.base.value();
-                        if let Some(num) = extract_footnote_number(&text) {
-                            bodies.push((num, page_num, text));
-                        }
-                    } else {
-                        // Check for superscript markers in body text
-                        let text = p.base.value();
-                        for m in SUPERSCRIPT_MARKER_RE.find_iter(&text) {
-                            let marker_str = m.as_str();
-                            if let Some(num) = superscript_to_number(marker_str) {
-                                markers.push((marker_str.to_string(), num, page_num));
-                            }
+            if let ContentElement::Paragraph(p) = elem {
+                if p.base.semantic_type == SemanticType::Note {
+                    // This is a footnote body
+                    let text = p.base.value();
+                    if let Some(num) = extract_footnote_number(&text) {
+                        bodies.push((num, page_num, text));
+                    }
+                } else {
+                    // Check for superscript markers in body text
+                    let text = p.base.value();
+                    for m in SUPERSCRIPT_MARKER_RE.find_iter(&text) {
+                        let marker_str = m.as_str();
+                        if let Some(num) = superscript_to_number(marker_str) {
+                            markers.push((marker_str.to_string(), num, page_num));
                         }
                     }
                 }
-                _ => {}
             }
         }
     }

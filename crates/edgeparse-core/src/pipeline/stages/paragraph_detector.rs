@@ -117,7 +117,10 @@ fn should_merge(a: &TextBlock, b: &TextBlock) -> bool {
     }
 
     // Same alignment preferred
-    if a.text_alignment.is_some() && b.text_alignment.is_some() && a.text_alignment != b.text_alignment {
+    if a.text_alignment.is_some()
+        && b.text_alignment.is_some()
+        && a.text_alignment != b.text_alignment
+    {
         return false;
     }
 
@@ -141,11 +144,15 @@ fn should_merge(a: &TextBlock, b: &TextBlock) -> bool {
     // This prevents the paragraph_detector from re-merging blocks that the
     // text_block_grouper correctly split at paragraph boundaries.
     if a.text_lines.len() >= 3 {
-        let a_right = a.text_lines.iter()
+        let a_right = a
+            .text_lines
+            .iter()
             .map(|l| l.bbox.right_x)
             .fold(f64::NEG_INFINITY, f64::max);
         let tol = ALIGNMENT_TOLERANCE * 2.0;
-        let near_margin = a.text_lines.iter()
+        let near_margin = a
+            .text_lines
+            .iter()
             .filter(|l| (a_right - l.bbox.right_x) < tol)
             .count();
         // At least 60% of lines reach the right margin → justified text
@@ -209,7 +216,9 @@ fn should_merge_parenthetical_heading_stack(a: &TextBlock, b: &TextBlock) -> boo
     }
 
     match (block_dominant_font_name(a), block_dominant_font_name(b)) {
-        (Some(name_a), Some(name_b)) if normalize_font_family(&name_a) != normalize_font_family(&name_b) => {
+        (Some(name_a), Some(name_b))
+            if normalize_font_family(&name_a) != normalize_font_family(&name_b) =>
+        {
             return false;
         }
         _ => {}
@@ -290,8 +299,31 @@ fn starts_with_list_marker(text: &str) -> bool {
     let first = trimmed.chars().next().unwrap();
     if matches!(
         first,
-        '•' | '◦' | '▪' | '▸' | '▹' | '►' | '▻' | '●' | '○' | '■' | '□' | '◆' | '◇'
-            | '→' | '➤' | '✓' | '✔' | '★' | '☆' | '➜' | '➢' | '⁃' | '‣' | '∙' | '⦿' | '⦾'
+        '•' | '◦'
+            | '▪'
+            | '▸'
+            | '▹'
+            | '►'
+            | '▻'
+            | '●'
+            | '○'
+            | '■'
+            | '□'
+            | '◆'
+            | '◇'
+            | '→'
+            | '➤'
+            | '✓'
+            | '✔'
+            | '★'
+            | '☆'
+            | '➜'
+            | '➢'
+            | '⁃'
+            | '‣'
+            | '∙'
+            | '⦿'
+            | '⦾'
     ) {
         return true;
     }
@@ -348,17 +380,22 @@ fn are_compatible_block_weights(a: &TextBlock, b: &TextBlock) -> bool {
 /// italic headings or headings in a different typeface from being merged with
 /// body paragraphs. Uses the dominant (by character count) font name from the
 /// first text line of each block.
+#[allow(dead_code)]
 fn are_compatible_block_font_names(a: &TextBlock, b: &TextBlock) -> bool {
     let name_a = block_dominant_font_name(a);
     let name_b = block_dominant_font_name(b);
     match (name_a, name_b) {
         (Some(na), Some(nb)) => {
             // Short blocks (≤ 2 chunks total) may be symbols or subscripts
-            let a_chars: usize = a.text_lines.iter()
+            let a_chars: usize = a
+                .text_lines
+                .iter()
                 .flat_map(|l| l.text_chunks.iter())
                 .map(|c| c.value.chars().count())
                 .sum();
-            let b_chars: usize = b.text_lines.iter()
+            let b_chars: usize = b
+                .text_lines
+                .iter()
                 .flat_map(|l| l.text_chunks.iter())
                 .map(|c| c.value.chars().count())
                 .sum();
@@ -413,7 +450,11 @@ fn block_dominant_weight(block: &TextBlock) -> f64 {
         Some(l) => l,
         None => return 400.0,
     };
-    let total: usize = first_line.text_chunks.iter().map(|c| c.value.len().max(1)).sum();
+    let total: usize = first_line
+        .text_chunks
+        .iter()
+        .map(|c| c.value.len().max(1))
+        .sum();
     if total == 0 {
         return 400.0;
     }
@@ -437,7 +478,10 @@ fn block_dominant_weight(block: &TextBlock) -> f64 {
 ///
 /// The old `overlap / min_width` metric caused full-width blocks to unconditionally
 /// merge with any narrower block that starts at the same left edge.
-fn horizontal_overlap(a: &crate::models::bbox::BoundingBox, b: &crate::models::bbox::BoundingBox) -> f64 {
+fn horizontal_overlap(
+    a: &crate::models::bbox::BoundingBox,
+    b: &crate::models::bbox::BoundingBox,
+) -> f64 {
     let left = a.left_x.max(b.left_x);
     let right = a.right_x.min(b.right_x);
     let overlap_width = (right - left).max(0.0);
@@ -536,6 +580,7 @@ fn dominant_font_weight(block: &TextBlock) -> f64 {
 }
 
 /// Compute the dominant (most characters) font name from all TextChunks in a block.
+#[allow(dead_code)]
 fn dominant_font_name(block: &TextBlock) -> Option<String> {
     use std::collections::HashMap;
     let mut name_counts: HashMap<&str, usize> = HashMap::new();
@@ -609,7 +654,7 @@ fn should_split_heading(block: &TextBlock) -> bool {
 
     // First line must be heading-like: short text, but not a word fragment
     let first_chars: usize = first.text_chunks.iter().map(|c| c.value.len()).sum();
-    if first_chars > 80 || first_chars < 6 {
+    if !(6..=80).contains(&first_chars) {
         return false;
     }
 
@@ -621,7 +666,10 @@ fn should_split_heading(block: &TextBlock) -> bool {
         .last()
         .and_then(|c| c.value.chars().last())
         .unwrap_or(' ');
-    if matches!(last_char, '.' | ',' | ';' | ':' | '-' | '?' | '!' | ')' | ']') {
+    if matches!(
+        last_char,
+        '.' | ',' | ';' | ':' | '-' | '?' | '!' | ')' | ']'
+    ) {
         return false;
     }
 
@@ -720,7 +768,17 @@ mod tests {
         right_x: f64,
         top_y: f64,
     ) -> ContentElement {
-        make_text_block_with_style(text, page, left_x, bottom_y, right_x, top_y, "Helvetica", 12.0, 400.0)
+        make_text_block_with_style(
+            text,
+            page,
+            left_x,
+            bottom_y,
+            right_x,
+            top_y,
+            "Helvetica",
+            12.0,
+            400.0,
+        )
     }
 
     fn make_text_block_with_style(

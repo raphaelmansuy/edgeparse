@@ -178,7 +178,10 @@ fn write_outputs(
 
     for fmt in &config.formats {
         let (ext, content) = match fmt {
-            OutputFormat::Json => ("json", output::legacy_json::to_legacy_json_string(doc, stem)?),
+            OutputFormat::Json => (
+                "json",
+                output::legacy_json::to_legacy_json_string(doc, stem)?,
+            ),
             OutputFormat::Text => ("txt", output::text::to_text(doc)?),
             OutputFormat::Html => ("html", output::html::to_html(doc)?),
             OutputFormat::Markdown

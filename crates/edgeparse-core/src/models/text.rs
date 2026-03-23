@@ -147,8 +147,7 @@ impl TextLine {
         };
 
         let mut result = String::with_capacity(
-            real_chunks.iter().map(|c| c.value.len()).sum::<usize>()
-                + real_chunks.len(),
+            real_chunks.iter().map(|c| c.value.len()).sum::<usize>() + real_chunks.len(),
         );
         result.push_str(&real_chunks[0].value);
 
@@ -306,9 +305,9 @@ impl TextBlock {
                 if result.ends_with('-') {
                     // Check it's a real hyphenation (lowercase letter before hyphen)
                     let before_hyphen = result[..result.len() - 1].chars().last();
-                    if before_hyphen.map_or(false, |c| c.is_alphabetic()) {
+                    if before_hyphen.is_some_and(|c| c.is_alphabetic()) {
                         result.pop(); // Remove the hyphen
-                        // Don't add a space — the word continues
+                                      // Don't add a space — the word continues
                     } else {
                         result.push(' ');
                     }

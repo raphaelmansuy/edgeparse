@@ -62,7 +62,11 @@ fn render_element(out: &mut String, element: &ContentElement) {
             for item in &list.list_items {
                 let label = token_rows_text(&item.label.content);
                 let body = token_rows_text(&item.body.content);
-                out.push_str(&format!("<li>{}{}</li>\n", html_escape(label.trim()), html_escape(body.trim())));
+                out.push_str(&format!(
+                    "<li>{}{}</li>\n",
+                    html_escape(label.trim()),
+                    html_escape(body.trim())
+                ));
             }
             out.push_str("</ul>\n");
         }

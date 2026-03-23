@@ -101,22 +101,22 @@ const LINES_PENALTY_FACTOR: f64 = 0.05;
 const NUMBERED_SECTION_ONE_SIDED_SUPPORT: f64 = 0.45;
 
 // Scoring when fonts are the same (HEADING_PROBABILITY_PARAMS_SAME_FONT).
-const SAME_FONT_HEAVIER_BOOST: f64 = 0.55;       // [0]
-const SAME_FONT_LIGHTER_PENALTY: f64 = 0.15;     // [1]
-const SAME_FONT_LARGER_SIZE_BOOST: f64 = 0.55;   // [2]
+const SAME_FONT_HEAVIER_BOOST: f64 = 0.55; // [0]
+const SAME_FONT_LIGHTER_PENALTY: f64 = 0.15; // [1]
+const SAME_FONT_LARGER_SIZE_BOOST: f64 = 0.55; // [2]
 const SAME_FONT_SMALLER_MAX_SIZE_PENALTY: f64 = 0.4; // [3]
-const SAME_FONT_LARGER_PLAIN_BOOST: f64 = 0.5;   // [4]
+const SAME_FONT_LARGER_PLAIN_BOOST: f64 = 0.5; // [4]
 const SAME_FONT_SMALLER_PLAIN_PENALTY: f64 = 0.15; // [5]
-const SAME_FONT_LARGE_RATIO_BOOST: f64 = 0.1;    // [6]
+const SAME_FONT_LARGE_RATIO_BOOST: f64 = 0.1; // [6]
 
 // Scoring when fonts differ (HEADING_PROBABILITY_PARAMS_DIFF_FONT).
-const DIFF_FONT_HEAVIER_BOOST: f64 = 0.46;       // [0]
-const DIFF_FONT_LIGHTER_PENALTY: f64 = 0.1;      // [1]
-const DIFF_FONT_LARGER_SIZE_BOOST: f64 = 0.4;    // [2]
+const DIFF_FONT_HEAVIER_BOOST: f64 = 0.46; // [0]
+const DIFF_FONT_LIGHTER_PENALTY: f64 = 0.1; // [1]
+const DIFF_FONT_LARGER_SIZE_BOOST: f64 = 0.4; // [2]
 const DIFF_FONT_SMALLER_MAX_SIZE_PENALTY: f64 = 0.23; // [3]
-const DIFF_FONT_LARGER_PLAIN_BOOST: f64 = 0.35;  // [4]
+const DIFF_FONT_LARGER_PLAIN_BOOST: f64 = 0.35; // [4]
 const DIFF_FONT_SMALLER_PLAIN_PENALTY: f64 = 0.1; // [5]
-const DIFF_FONT_LARGE_RATIO_BOOST: f64 = 0.1;    // [6]
+const DIFF_FONT_LARGE_RATIO_BOOST: f64 = 0.1; // [6]
 
 /// A sortable text style key for grouping headings by visual appearance.
 #[derive(Debug, Clone, PartialEq)]
@@ -422,8 +422,7 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
         let body_bold_count: usize = heading_styles
             .iter()
             .filter(|(s, _)| {
-                stats.is_body_font_size(s.font_size)
-                    && s.font_weight >= BOLD_WEIGHT_THRESHOLD
+                stats.is_body_font_size(s.font_size) && s.font_weight >= BOLD_WEIGHT_THRESHOLD
             })
             .map(|(_, positions)| positions.len())
             .sum();
@@ -437,8 +436,7 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
             let styles_to_remove: Vec<TextStyle> = heading_styles
                 .keys()
                 .filter(|s| {
-                    stats.is_body_font_size(s.font_size)
-                        && s.font_weight >= BOLD_WEIGHT_THRESHOLD
+                    stats.is_body_font_size(s.font_size) && s.font_weight >= BOLD_WEIGHT_THRESHOLD
                 })
                 .cloned()
                 .collect();
@@ -566,7 +564,10 @@ fn find_neighbor_info(
                 }
                 return Some(NeighborInfo {
                     font_size: p.base.font_size.unwrap_or(0.0),
-                    max_font_size: p.base.max_font_size.unwrap_or(p.base.font_size.unwrap_or(0.0)),
+                    max_font_size: p
+                        .base
+                        .max_font_size
+                        .unwrap_or(p.base.font_size.unwrap_or(0.0)),
                     font_weight: p.base.font_weight.unwrap_or(400.0),
                     font_name: p.base.font_name.clone(),
                     text_color: p.base.text_color.clone(),
@@ -581,7 +582,10 @@ fn find_neighbor_info(
                 let p = &h.base;
                 return Some(NeighborInfo {
                     font_size: p.base.font_size.unwrap_or(0.0),
-                    max_font_size: p.base.max_font_size.unwrap_or(p.base.font_size.unwrap_or(0.0)),
+                    max_font_size: p
+                        .base
+                        .max_font_size
+                        .unwrap_or(p.base.font_size.unwrap_or(0.0)),
                     font_weight: p.base.font_weight.unwrap_or(400.0),
                     font_name: p.base.font_name.clone(),
                     text_color: p.base.text_color.clone(),
@@ -726,7 +730,11 @@ fn score_against_neighbor(
     }
 
     let same_font = c_font == n_font;
-    let size_eps = if same_font { SAME_FONT_SIZE_EPSILON } else { DIFF_FONT_SIZE_EPSILON };
+    let size_eps = if same_font {
+        SAME_FONT_SIZE_EPSILON
+    } else {
+        DIFF_FONT_SIZE_EPSILON
+    };
 
     // 5-arg headingProbability: font weight + font size comparison
     let mut score = 0.0;
@@ -738,12 +746,10 @@ fn score_against_neighbor(
         } else if n_weight > c_weight + WEIGHT_EPSILON {
             score -= SAME_FONT_LIGHTER_PENALTY;
         }
-    } else {
-        if c_weight > n_weight + WEIGHT_EPSILON {
-            score += DIFF_FONT_HEAVIER_BOOST;
-        } else if n_weight > c_weight + WEIGHT_EPSILON {
-            score -= DIFF_FONT_LIGHTER_PENALTY;
-        }
+    } else if c_weight > n_weight + WEIGHT_EPSILON {
+        score += DIFF_FONT_HEAVIER_BOOST;
+    } else if n_weight > c_weight + WEIGHT_EPSILON {
+        score -= DIFF_FONT_LIGHTER_PENALTY;
     }
 
     // Font size comparison (size epsilon varies by font match)
@@ -757,16 +763,14 @@ fn score_against_neighbor(
         } else if n_size > c_size + size_eps {
             score -= SAME_FONT_SMALLER_PLAIN_PENALTY;
         }
-    } else {
-        if c_size > n_max_size + size_eps {
-            score += DIFF_FONT_LARGER_SIZE_BOOST;
-        } else if n_size > c_max_size + size_eps {
-            score -= DIFF_FONT_SMALLER_MAX_SIZE_PENALTY;
-        } else if c_size > n_size + size_eps {
-            score += DIFF_FONT_LARGER_PLAIN_BOOST;
-        } else if n_size > c_size + size_eps {
-            score -= DIFF_FONT_SMALLER_PLAIN_PENALTY;
-        }
+    } else if c_size > n_max_size + size_eps {
+        score += DIFF_FONT_LARGER_SIZE_BOOST;
+    } else if n_size > c_max_size + size_eps {
+        score -= DIFF_FONT_SMALLER_MAX_SIZE_PENALTY;
+    } else if c_size > n_size + size_eps {
+        score += DIFF_FONT_LARGER_PLAIN_BOOST;
+    } else if n_size > c_size + size_eps {
+        score -= DIFF_FONT_SMALLER_PLAIN_PENALTY;
     }
 
     // DataLoader mode: extra boost if candidate is ≥ 1.5× neighbor size
@@ -774,10 +778,8 @@ fn score_against_neighbor(
         if c_size > 1.5 * n_size + size_eps {
             score += SAME_FONT_LARGE_RATIO_BOOST;
         }
-    } else {
-        if c_size > 1.5 * n_size + size_eps {
-            score += DIFF_FONT_LARGE_RATIO_BOOST;
-        }
+    } else if c_size > 1.5 * n_size + size_eps {
+        score += DIFF_FONT_LARGE_RATIO_BOOST;
     }
 
     // Text color difference (HEADING_PROBABILITY_PARAMS[4])
@@ -785,7 +787,11 @@ fn score_against_neighbor(
         let diff: f64 = if c_color.len() != n_color.len() {
             1.0 // Different color spaces = different colors
         } else {
-            c_color.iter().zip(n_color.iter()).map(|(a, b)| (a - b).abs()).sum()
+            c_color
+                .iter()
+                .zip(n_color.iter())
+                .map(|(a, b)| (a - b).abs())
+                .sum()
         };
         if diff > 0.01 {
             score += TEXT_COLOR_BOOST;
@@ -840,14 +846,22 @@ fn compute_neighbor_score(
     let prev_score_raw = match prev {
         Some(n) => {
             let s = score_against_neighbor(para, n, false);
-            if s.is_finite() { Some(s) } else { None }
+            if s.is_finite() {
+                Some(s)
+            } else {
+                None
+            }
         }
         None => None, // null neighbor
     };
     let next_score_raw = match next {
         Some(n) => {
             let s = score_against_neighbor(para, n, true);
-            if s.is_finite() { Some(s) } else { None }
+            if s.is_finite() {
+                Some(s)
+            } else {
+                None
+            }
         }
         None => None, // null neighbor
     };
@@ -862,7 +876,11 @@ fn compute_neighbor_score(
             // Only prev exists:
             // The reference implementation returns min(prev_score, 1.0) for next=null.
             // If prev is heading, the reference implementation uses next-only path which returns 1.0 for null next.
-            if prev_is_heading { 1.0 } else { ps.min(1.0) }
+            if prev_is_heading {
+                1.0
+            } else {
+                ps.min(1.0)
+            }
         }
         (None, Some(ns)) => {
             // Only next exists:
@@ -943,7 +961,10 @@ fn contains_internal_sentence_break(text: &str) -> bool {
             continue;
         }
         // Skip periods preceded by a single uppercase letter (abbreviations: "U.S.")
-        if i >= 2 && bytes[i - 1].is_ascii_uppercase() && (i < 3 || !bytes[i - 2].is_ascii_alphanumeric()) {
+        if i >= 2
+            && bytes[i - 1].is_ascii_uppercase()
+            && (i < 3 || !bytes[i - 2].is_ascii_alphanumeric())
+        {
             continue;
         }
         // Skip periods too close to the start (short prefixes: "Dr. Smith", "Mr. Jones")
@@ -959,17 +980,36 @@ fn contains_internal_sentence_break(text: &str) -> bool {
 /// Publication metadata is never a section heading.
 fn is_standalone_date(text: &str) -> bool {
     const MONTHS: &[&str] = &[
-        "january", "february", "march", "april", "may", "june",
-        "july", "august", "september", "october", "november", "december",
-        "jan", "feb", "mar", "apr", "jun", "jul", "aug",
-        "sep", "oct", "nov", "dec",
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "oct",
+        "nov",
+        "dec",
     ];
     let words: Vec<&str> = text.split_whitespace().collect();
     if words.len() != 2 {
         return false;
     }
     let word0_lower = words[0].to_lowercase();
-    let is_month = MONTHS.iter().any(|m| *m == word0_lower.as_str());
+    let is_month = MONTHS.contains(&word0_lower.as_str());
     let is_year = words[1].len() == 4 && words[1].chars().all(|c| c.is_ascii_digit());
     is_month && is_year
 }
@@ -1014,7 +1054,7 @@ fn is_standalone_page_number(para: &SemanticParagraph, stats: &DocFontStats) -> 
     let at_bottom = bottom_y < 80.0;
 
     // Also check with typical A4 (842pt) and Letter (792pt) ranges.
-    let at_top_a4 = top_y > 758.0;    // top 10% of 842pt page
+    let at_top_a4 = top_y > 758.0; // top 10% of 842pt page
     let at_bottom_a4 = bottom_y < 84.0; // bottom 10% of 842pt page
 
     // Use body font mode size as additional signal: if the page number font
@@ -1072,7 +1112,20 @@ fn starts_with_bullet_or_arrow(text: &str) -> bool {
     let first = text.chars().next();
     matches!(
         first,
-        Some('⮚' | '▶' | '►' | '➤' | '☛' | '→' | '➜' | '➔' | '⯈' | '◆' | '◉' | '▸' | '‣')
+        Some(
+            '⮚' | '▶'
+                | '►'
+                | '➤'
+                | '☛'
+                | '→'
+                | '➜'
+                | '➔'
+                | '⯈'
+                | '◆'
+                | '◉'
+                | '▸'
+                | '‣'
+        )
     )
 }
 
@@ -1217,9 +1270,8 @@ impl DocFontStats {
 
     /// Check if a font size matches the body text mode (quantized to 0.1pt).
     fn is_body_font_size(&self, size: f64) -> bool {
-        self.mode_size.map_or(false, |m| {
-            (size * 10.0).round() as i32 == (m * 10.0).round() as i32
-        })
+        self.mode_size
+            .is_some_and(|m| (size * 10.0).round() as i32 == (m * 10.0).round() as i32)
     }
 }
 
@@ -1230,9 +1282,7 @@ fn rarity_boost(value: f64, higher_values: &[f64], max_boost: f64) -> f64 {
     }
 
     // Find position in sorted list (tolerance-based matching, 0.2pt resolution)
-    let pos = higher_values
-        .iter()
-        .position(|&v| (v - value).abs() < 0.2);
+    let pos = higher_values.iter().position(|&v| (v - value).abs() < 0.2);
 
     match pos {
         Some(i) => {
@@ -1250,13 +1300,25 @@ fn rarity_boost(value: f64, higher_values: &[f64], max_boost: f64) -> f64 {
 fn content_element_font_size(elem: &ContentElement) -> Option<f64> {
     match elem {
         ContentElement::TextLine(tl) => {
-            if tl.font_size > 0.0 { Some(tl.font_size) } else { None }
+            if tl.font_size > 0.0 {
+                Some(tl.font_size)
+            } else {
+                None
+            }
         }
         ContentElement::TextBlock(tb) => {
-            if tb.font_size > 0.0 { Some(tb.font_size) } else { None }
+            if tb.font_size > 0.0 {
+                Some(tb.font_size)
+            } else {
+                None
+            }
         }
         ContentElement::TextChunk(tc) => {
-            if tc.font_size > 0.0 { Some(tc.font_size) } else { None }
+            if tc.font_size > 0.0 {
+                Some(tc.font_size)
+            } else {
+                None
+            }
         }
         ContentElement::Paragraph(p) => p.base.font_size.filter(|&s| s > 0.0),
         _ => None,
@@ -1327,15 +1389,40 @@ fn collect_statistics(pages: &[Vec<ContentElement>]) -> DocFontStats {
         }
     }
 
-    let size_mode = find_mode(&size_counts, FONT_SIZE_DOMINANT_MIN, FONT_SIZE_DOMINANT_MAX, 10.0)
-        .or_else(|| {
-            // Fallback: use the most frequent font size overall as body text
-            size_counts.iter().max_by_key(|&(_, &count)| count).map(|(&key, _)| key as f64 / 10.0)
-        });
-    let higher_sizes = find_higher_values(&size_counts, size_mode, FONT_SIZE_HEADING_MIN, FONT_SIZE_HEADING_MAX, 10.0);
+    let size_mode = find_mode(
+        &size_counts,
+        FONT_SIZE_DOMINANT_MIN,
+        FONT_SIZE_DOMINANT_MAX,
+        10.0,
+    )
+    .or_else(|| {
+        // Fallback: use the most frequent font size overall as body text
+        size_counts
+            .iter()
+            .max_by_key(|&(_, &count)| count)
+            .map(|(&key, _)| key as f64 / 10.0)
+    });
+    let higher_sizes = find_higher_values(
+        &size_counts,
+        size_mode,
+        FONT_SIZE_HEADING_MIN,
+        FONT_SIZE_HEADING_MAX,
+        10.0,
+    );
 
-    let weight_mode = find_mode(&weight_counts, FONT_WEIGHT_DOMINANT_MIN, FONT_WEIGHT_DOMINANT_MAX, 1.0);
-    let higher_weights = find_higher_values(&weight_counts, weight_mode, FONT_WEIGHT_HEADING_MIN, FONT_WEIGHT_HEADING_MAX, 1.0);
+    let weight_mode = find_mode(
+        &weight_counts,
+        FONT_WEIGHT_DOMINANT_MIN,
+        FONT_WEIGHT_DOMINANT_MAX,
+        1.0,
+    );
+    let higher_weights = find_higher_values(
+        &weight_counts,
+        weight_mode,
+        FONT_WEIGHT_HEADING_MIN,
+        FONT_WEIGHT_HEADING_MAX,
+        1.0,
+    );
 
     DocFontStats {
         mode_size: size_mode,
@@ -1400,26 +1487,29 @@ fn promote_tagged_headings(
     let mut tagged_set = HashSet::new();
 
     for (page_idx, page) in pages.iter_mut().enumerate() {
-        for elem_idx in 0..page.len() {
-            let p = match &page[elem_idx] {
-                ContentElement::Paragraph(p) => p,
-                _ => continue,
-            };
-
-            // Walk all TextChunks to find any MCID that maps to a heading tag
-            if let Some(level) = find_tagged_heading_level(p, mcid_map) {
-                // Clone the paragraph and convert to heading
-                let para = match &page[elem_idx] {
-                    ContentElement::Paragraph(p) => p.clone(),
-                    _ => unreachable!(),
-                };
-                let heading = SemanticHeading {
-                    base: para,
-                    heading_level: Some(level.min(6)),
-                };
-                page[elem_idx] = ContentElement::Heading(heading);
-                tagged_set.insert((page_idx, elem_idx));
-            }
+        // First pass: identify paragraphs to promote and build headings
+        let to_promote: Vec<(usize, SemanticHeading)> = page
+            .iter()
+            .enumerate()
+            .filter_map(|(elem_idx, elem)| {
+                if let ContentElement::Paragraph(p) = elem {
+                    let level = find_tagged_heading_level(p, mcid_map)?;
+                    Some((
+                        elem_idx,
+                        SemanticHeading {
+                            base: p.clone(),
+                            heading_level: Some(level.min(6)),
+                        },
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        // Second pass: apply promotions
+        for (elem_idx, heading) in to_promote {
+            page[elem_idx] = ContentElement::Heading(heading);
+            tagged_set.insert((page_idx, elem_idx));
         }
     }
 
@@ -1662,7 +1752,11 @@ mod tests {
                 }
             }
         }
-        assert!(max_level <= 6, "Heading level should be clamped at 6, got {}", max_level);
+        assert!(
+            max_level <= 6,
+            "Heading level should be clamped at 6, got {}",
+            max_level
+        );
     }
 
     #[test]
@@ -1762,11 +1856,18 @@ mod tests {
         }
 
         // Use first line's properties as dominant (will be overridden for body after split)
-        let dominant_fs = lines.iter().map(|(_, fs, _)| *fs)
-            .fold(0.0_f64, |acc, x| if acc == 0.0 { x } else { acc.min(x) });
+        let dominant_fs = lines.iter().map(|(_, fs, _)| *fs).fold(0.0_f64, |acc, x| {
+            if acc == 0.0 {
+                x
+            } else {
+                acc.min(x)
+            }
+        });
         let dominant_fw = 400.0; // Body text dominates in a merged paragraph
 
-        let outer_bbox = text_lines.iter().fold(text_lines[0].bbox.clone(), |acc, l| acc.union(&l.bbox));
+        let outer_bbox = text_lines
+            .iter()
+            .fold(text_lines[0].bbox.clone(), |acc, l| acc.union(&l.bbox));
         let block = TextBlock {
             bbox: outer_bbox.clone(),
             index: None,
@@ -1823,12 +1924,23 @@ mod tests {
         // This verifies that detect_headings matches the reference behaviour exactly:
         // paragraphs are evaluated as-is, never torn apart inside this stage.
         let mut pages = vec![vec![
-            make_multiline_paragraph(&[
-                ("Abstract", 12.0, 700.0),
-                ("This paper presents a novel approach to irradiance", 10.9, 400.0),
-                ("fields using neural networks and deep learning.", 10.9, 400.0),
-                ("We demonstrate significant improvements.", 10.9, 400.0),
-            ], 1),
+            make_multiline_paragraph(
+                &[
+                    ("Abstract", 12.0, 700.0),
+                    (
+                        "This paper presents a novel approach to irradiance",
+                        10.9,
+                        400.0,
+                    ),
+                    (
+                        "fields using neural networks and deep learning.",
+                        10.9,
+                        400.0,
+                    ),
+                    ("We demonstrate significant improvements.", 10.9, 400.0),
+                ],
+                1,
+            ),
             make_paragraph("Body text continues", 1, 10.9, 400.0, 600.0),
         ]];
 
@@ -1847,7 +1959,13 @@ mod tests {
     fn test_table_overlapping_label_is_not_promoted_to_heading() {
         let mut pages = vec![vec![
             make_paragraph("Reference frameworks:", 1, 13.0, 700.0, 730.0),
-            make_paragraph("2. Embracing complexity in sustainability", 1, 11.0, 700.0, 230.0),
+            make_paragraph(
+                "2. Embracing complexity in sustainability",
+                1,
+                11.0,
+                700.0,
+                230.0,
+            ),
             ContentElement::TableBorder(TableBorder {
                 bbox: BoundingBox::new(Some(1), 70.0, 180.0, 540.0, 260.0),
                 index: None,
@@ -1874,5 +1992,4 @@ mod tests {
         assert!(matches!(pages[0][0], ContentElement::Heading(_)));
         assert!(matches!(pages[0][1], ContentElement::Paragraph(_)));
     }
-
 }

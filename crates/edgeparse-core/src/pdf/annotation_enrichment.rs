@@ -19,12 +19,19 @@ pub struct AnnotationGroup {
 /// Summary statistics for annotations in a document.
 #[derive(Debug, Clone, Default)]
 pub struct AnnotationStats {
+    /// Total number of annotations.
     pub total: usize,
+    /// Number of highlight annotations.
     pub highlights: usize,
+    /// Number of comment/note annotations.
     pub comments: usize,
+    /// Number of link annotations.
     pub links: usize,
+    /// Number of stamp annotations.
     pub stamps: usize,
+    /// Number of other annotation types.
     pub other: usize,
+    /// Number of pages that contain at least one annotation.
     pub pages_with_annotations: usize,
 }
 
@@ -60,7 +67,12 @@ pub fn group_by_type_and_page(annotations: &[PdfAnnotation]) -> Vec<AnnotationGr
 pub fn filter_user_annotations(annotations: &[PdfAnnotation]) -> Vec<PdfAnnotation> {
     annotations
         .iter()
-        .filter(|a| !matches!(a.annotation_type, AnnotationType::Popup | AnnotationType::Link))
+        .filter(|a| {
+            !matches!(
+                a.annotation_type,
+                AnnotationType::Popup | AnnotationType::Link
+            )
+        })
         .cloned()
         .collect()
 }
@@ -123,10 +135,7 @@ pub fn annotations_to_markdown(annotations: &[PdfAnnotation]) -> String {
             out.push_str(&format!("### Page {}\n\n", current_page));
         }
         let type_label = type_to_key(&ann.annotation_type);
-        let content = ann
-            .contents
-            .as_deref()
-            .unwrap_or("(no content)");
+        let content = ann.contents.as_deref().unwrap_or("(no content)");
         let author = ann
             .author
             .as_deref()
@@ -226,9 +235,7 @@ mod tests {
 
     #[test]
     fn test_annotations_to_markdown() {
-        let annotations = vec![
-            make_ann(AnnotationType::Highlight, 1, Some("key point")),
-        ];
+        let annotations = vec![make_ann(AnnotationType::Highlight, 1, Some("key point"))];
         let md = annotations_to_markdown(&annotations);
         assert!(md.contains("## Annotations"));
         assert!(md.contains("### Page 1"));

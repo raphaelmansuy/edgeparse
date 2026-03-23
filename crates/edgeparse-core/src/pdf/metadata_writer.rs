@@ -6,11 +6,17 @@ use lopdf::{Document, Object};
 /// Metadata fields that can be written to a PDF.
 #[derive(Debug, Clone, Default)]
 pub struct PdfMetadata {
+    /// Document title.
     pub title: Option<String>,
+    /// Document author.
     pub author: Option<String>,
+    /// Document subject.
     pub subject: Option<String>,
+    /// Keywords associated with the document.
     pub keywords: Option<String>,
+    /// Application that created the document.
     pub creator: Option<String>,
+    /// Application that produced the PDF.
     pub producer: Option<String>,
 }
 
@@ -88,12 +94,10 @@ pub fn read_metadata(doc: &Document) -> PdfMetadata {
 }
 
 fn get_string(dict: &lopdf::Dictionary, key: &[u8]) -> Option<String> {
-    dict.get(key)
-        .ok()
-        .and_then(|o| match o {
-            Object::String(s, _) => Some(String::from_utf8_lossy(s).to_string()),
-            _ => None,
-        })
+    dict.get(key).ok().and_then(|o| match o {
+        Object::String(s, _) => Some(String::from_utf8_lossy(s).to_string()),
+        _ => None,
+    })
 }
 
 fn get_or_create_info_dict(doc: &mut Document) -> lopdf::ObjectId {

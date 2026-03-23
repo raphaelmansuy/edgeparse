@@ -129,12 +129,7 @@ pub fn detect_paragraph_lists(elements: Vec<ContentElement>) -> Vec<ContentEleme
 
                 // No label (or incompatible label): check if it's a body continuation.
                 if consecutive_body < max_body
-                    && is_list_body_continuation(
-                        &elements,
-                        run_end,
-                        last_labeled_idx,
-                        is_bracket,
-                    )
+                    && is_list_body_continuation(&elements, run_end, last_labeled_idx, is_bracket)
                 {
                     consecutive_body += 1;
                     run_end += 1;
@@ -146,9 +141,7 @@ pub fn detect_paragraph_lists(elements: Vec<ContentElement>) -> Vec<ContentEleme
             // Count labeled entries in the run, including items from absorbed Lists.
             let labeled_count: usize = (run_start..run_end)
                 .map(|j| {
-                    if paragraph_label_type(&elements[j])
-                        .map_or(false, |lt| lt == label_type)
-                    {
+                    if paragraph_label_type(&elements[j]) == Some(label_type) {
                         return 1;
                     }
                     if let ContentElement::List(ref list) = elements[j] {
@@ -222,7 +215,7 @@ const MAX_BRIDGE_GAP: i64 = 4;
 /// Only left-margin-aligned candidates are considered, matching the reference
 /// TextLine-level backward search which naturally restricts to same-column
 /// items due to alignment-based break conditions.
-pub fn detect_common_prefix_lists_document(pages: &mut Vec<Vec<ContentElement>>) {
+pub fn detect_common_prefix_lists_document(pages: &mut [Vec<ContentElement>]) {
     let mut convert_set: std::collections::HashSet<(usize, usize)> =
         std::collections::HashSet::new();
 
@@ -255,10 +248,7 @@ pub fn detect_common_prefix_lists_document(pages: &mut Vec<Vec<ContentElement>>)
         // The reference backward search naturally limits matches to same-column items.
         // We approximate this by keeping only candidates whose leftX is close
         // to the minimum leftX across all candidates for this prefix.
-        let min_left_x = candidates
-            .iter()
-            .map(|c| c.left_x)
-            .fold(f64::MAX, f64::min);
+        let min_left_x = candidates.iter().map(|c| c.left_x).fold(f64::MAX, f64::min);
         candidates.retain(|c| (c.left_x - min_left_x).abs() < LEFT_MARGIN_TOLERANCE);
         if candidates.len() < 2 {
             continue;
@@ -284,8 +274,7 @@ pub fn detect_common_prefix_lists_document(pages: &mut Vec<Vec<ContentElement>>)
                 if gap == 1 {
                     // Strictly sequential — always extend.
                     seq_end += 1;
-                } else if gap >= 2
-                    && gap <= MAX_BRIDGE_GAP
+                } else if (2..=MAX_BRIDGE_GAP).contains(&gap)
                     && (prev_num + 1..curr_num).all(|n| all_numbers.contains(&n))
                 {
                     // Gap bridgeable: all intermediate numbers exist in the
@@ -474,14 +463,13 @@ fn is_list_body_continuation(
     // Use font size approximation from label bbox height, clamped to reasonable range.
     let font_approx = (label_bbox.top_y - label_bbox.bottom_y)
         .abs()
-        .max(8.0)
-        .min(20.0);
+        .clamp(8.0, 20.0);
 
     // Compute vertical distance: how far below the previous element the candidate sits.
     // In PDF coords Y increases upward, so "below" means smaller Y.
     // Distance = bottom of prev - top of cand (positive means gap, negative means overlap).
-    let vertical_dist = prev_bbox.bottom_y.min(prev_bbox.top_y)
-        - cand_bbox.bottom_y.max(cand_bbox.top_y);
+    let vertical_dist =
+        prev_bbox.bottom_y.min(prev_bbox.top_y) - cand_bbox.bottom_y.max(cand_bbox.top_y);
     // Allow overlap (negative distance) and gap up to 2.5× font size.
     if vertical_dist > font_approx * 2.5 {
         return false;
@@ -535,7 +523,19 @@ fn paragraph_label_type(elem: &ContentElement) -> Option<LabelType> {
     // Bullet characters
     if matches!(
         first_char,
-        '•' | '◦' | '▪' | '▫' | '●' | '○' | '■' | '□' | '►' | '▸' | '‣' | '⁃' | '–' | '—'
+        '•' | '◦'
+            | '▪'
+            | '▫'
+            | '●'
+            | '○'
+            | '■'
+            | '□'
+            | '►'
+            | '▸'
+            | '‣'
+            | '⁃'
+            | '–'
+            | '—'
     ) {
         return Some(LabelType::Bullet);
     }
@@ -556,15 +556,14 @@ fn paragraph_label_type(elem: &ContentElement) -> Option<LabelType> {
         let rest = &trimmed[1..];
         // Consume more digits
         let after_digits = rest.trim_start_matches(|c: char| c.is_ascii_digit());
-        if after_digits.starts_with('.') {
+        if let Some(after_dot) = after_digits.strip_prefix('.') {
             // Ensure the '.' is a label terminator (followed by space or end of text),
             // not a decimal point (followed by more digits).
             // "1. Item text" is a list label; "75.9 score" is a decimal number.
-            let after_dot = &after_digits[1..];
-            if after_dot.is_empty() || after_dot.starts_with(' ') || after_dot.starts_with('\t') {
-                if font_weight < BOLD_WEIGHT_THRESHOLD {
-                    return Some(LabelType::Number);
-                }
+            if (after_dot.is_empty() || after_dot.starts_with(' ') || after_dot.starts_with('\t'))
+                && font_weight < BOLD_WEIGHT_THRESHOLD
+            {
+                return Some(LabelType::Number);
             }
         } else if after_digits.starts_with(')') {
             // Bold numbered paragraphs are likely section headings, not list items.
@@ -597,7 +596,8 @@ fn paragraph_label_type(elem: &ContentElement) -> Option<LabelType> {
     // are almost always name initials or abbreviations, not list labels.
     if first_char.is_ascii_lowercase() && trimmed.len() > 1 {
         let second = trimmed.chars().nth(1)?;
-        if (second == '.' || second == ')') && (trimmed.len() == 2 || trimmed.chars().nth(2) == Some(' '))
+        if (second == '.' || second == ')')
+            && (trimmed.len() == 2 || trimmed.chars().nth(2) == Some(' '))
         {
             return Some(LabelType::Letter);
         }
@@ -625,8 +625,7 @@ fn paragraph_bracket_number(elem: &ContentElement) -> Option<i64> {
         _ => return None,
     };
     let trimmed = text.trim_start();
-    if trimmed.starts_with('[') {
-        let after = &trimmed[1..];
+    if let Some(after) = trimmed.strip_prefix('[') {
         if let Some(end) = after.find(']') {
             let between = &after[..end];
             if !between.is_empty() && between.chars().all(|c| c.is_ascii_digit()) {
@@ -679,20 +678,14 @@ fn letter_value_from_text(text: &str) -> Option<i64> {
 fn list_first_item_label_type(list: &PDFList) -> Option<LabelType> {
     let first_item = list.list_items.first()?;
     // Try to get text from ANY content element type (TextLine, TextBlock, Paragraph)
-    let text = first_item
-        .contents
-        .iter()
-        .find_map(|e| content_element_text(e))?;
+    let text = first_item.contents.iter().find_map(content_element_text)?;
     text_label_type(&text)
 }
 
 /// Extract the letter sequence value from an existing List's first item.
 fn list_first_item_letter_value(list: &PDFList) -> Option<i64> {
     let first_item = list.list_items.first()?;
-    let text = first_item
-        .contents
-        .iter()
-        .find_map(|e| content_element_text(e))?;
+    let text = first_item.contents.iter().find_map(content_element_text)?;
     letter_value_from_text(&text)
 }
 
@@ -718,7 +711,19 @@ fn text_label_type(text: &str) -> Option<LabelType> {
     // Bullet characters
     if matches!(
         first_char,
-        '•' | '◦' | '▪' | '▫' | '●' | '○' | '■' | '□' | '►' | '▸' | '‣' | '⁃' | '–' | '—'
+        '•' | '◦'
+            | '▪'
+            | '▫'
+            | '●'
+            | '○'
+            | '■'
+            | '□'
+            | '►'
+            | '▸'
+            | '‣'
+            | '⁃'
+            | '–'
+            | '—'
     ) {
         return Some(LabelType::Bullet);
     }
@@ -749,7 +754,8 @@ fn text_label_type(text: &str) -> Option<LabelType> {
     // Lowercase letter followed by . or )
     if first_char.is_ascii_lowercase() && trimmed.len() > 1 {
         let second = trimmed.chars().nth(1)?;
-        if (second == '.' || second == ')') && (trimmed.len() == 2 || trimmed.chars().nth(2) == Some(' '))
+        if (second == '.' || second == ')')
+            && (trimmed.len() == 2 || trimmed.chars().nth(2) == Some(' '))
         {
             return Some(LabelType::Letter);
         }
@@ -857,7 +863,7 @@ fn split_bracket_list_at_columns(list: PDFList) -> Vec<PDFList> {
             let text = item
                 .contents
                 .iter()
-                .find_map(|e| content_element_text(e))
+                .find_map(content_element_text)
                 .unwrap_or_default();
             if text.trim_start().starts_with('[') {
                 Some(i)
@@ -959,7 +965,19 @@ fn detect_label_length(text: &str) -> usize {
     // Bullet: single char + space
     if matches!(
         first,
-        '•' | '◦' | '▪' | '▫' | '●' | '○' | '■' | '□' | '►' | '▸' | '‣' | '⁃' | '–' | '—'
+        '•' | '◦'
+            | '▪'
+            | '▫'
+            | '●'
+            | '○'
+            | '■'
+            | '□'
+            | '►'
+            | '▸'
+            | '‣'
+            | '⁃'
+            | '–'
+            | '—'
     ) {
         return leading_spaces + first.len_utf8() + 1;
     }

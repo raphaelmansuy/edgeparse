@@ -54,7 +54,10 @@ pub fn convert(
     for (&page_num, &page_id) in &pages_map {
         let page_chunks = extract_page_chunks(&raw_doc.document, page_num, page_id)?;
         let mut recovered_tables = Vec::new();
-        if let Some(page_info) = page_info_list.iter().find(|info| info.page_number == page_num) {
+        if let Some(page_info) = page_info_list
+            .iter()
+            .find(|info| info.page_number == page_num)
+        {
             recovered_tables = recover_raster_table_borders(
                 input_path,
                 &page_info.crop_box,
@@ -87,16 +90,19 @@ pub fn convert(
                 .into_iter()
                 .map(ContentElement::LineArt),
         );
-        elements.extend(recovered_tables.into_iter().map(ContentElement::TableBorder));
+        elements.extend(
+            recovered_tables
+                .into_iter()
+                .map(ContentElement::TableBorder),
+        );
 
         page_contents.push(elements);
     }
 
     // Run the processing pipeline
     let mcid_map = build_mcid_map(&raw_doc.document);
-    let mut pipeline_state =
-        PipelineState::with_mcid_map(page_contents, config.clone(), mcid_map)
-            .with_page_info(page_info_list);
+    let mut pipeline_state = PipelineState::with_mcid_map(page_contents, config.clone(), mcid_map)
+        .with_page_info(page_info_list);
     run_pipeline(&mut pipeline_state)?;
 
     // Build the output document
@@ -163,7 +169,10 @@ impl From<lopdf::Error> for EdgePdfError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lopdf::{dictionary, content::{Content, Operation}, Object, Stream};
+    use lopdf::{
+        content::{Content, Operation},
+        dictionary, Object, Stream,
+    };
     use std::io::Write;
 
     /// Create a synthetic PDF file for integration testing.
@@ -238,7 +247,10 @@ mod tests {
 
         let doc = result.unwrap();
         assert_eq!(doc.number_of_pages, 1);
-        assert!(!doc.kids.is_empty(), "Expected content elements in document");
+        assert!(
+            !doc.kids.is_empty(),
+            "Expected content elements in document"
+        );
 
         // Check that we extracted content (may be TextChunks, TextLines, or TextBlocks after pipeline)
         let mut all_text = String::new();
@@ -268,11 +280,18 @@ mod tests {
             }
         }
 
-        assert!(all_text.contains("Hello"), "Expected 'Hello' in extracted text, got: {}", all_text);
-        assert!(all_text.contains("Second"), "Expected 'Second' in extracted text, got: {}", all_text);
+        assert!(
+            all_text.contains("Hello"),
+            "Expected 'Hello' in extracted text, got: {}",
+            all_text
+        );
+        assert!(
+            all_text.contains("Second"),
+            "Expected 'Second' in extracted text, got: {}",
+            all_text
+        );
 
         // Cleanup
         let _ = std::fs::remove_file(&pdf_path);
     }
-
 }

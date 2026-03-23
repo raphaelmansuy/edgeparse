@@ -30,21 +30,22 @@ fn decompose_ligature(ch: char) -> Option<&'static str> {
         '\u{FB02}' => Some("fl"),
         '\u{FB03}' => Some("ffi"),
         '\u{FB04}' => Some("ffl"),
-        '\u{FB05}' => Some("st"),  // long s + t
-        '\u{FB06}' => Some("st"),  // st ligature
-        '\u{0132}' => Some("IJ"),  // Dutch IJ
-        '\u{0133}' => Some("ij"),  // Dutch ij
-        '\u{0152}' => Some("OE"),  // OE ligature
-        '\u{0153}' => Some("oe"),  // oe ligature
-        '\u{00C6}' => Some("AE"),  // Æ
-        '\u{00E6}' => Some("ae"),  // æ
+        '\u{FB05}' => Some("st"), // long s + t
+        '\u{FB06}' => Some("st"), // st ligature
+        '\u{0132}' => Some("IJ"), // Dutch IJ
+        '\u{0133}' => Some("ij"), // Dutch ij
+        '\u{0152}' => Some("OE"), // OE ligature
+        '\u{0153}' => Some("oe"), // oe ligature
+        '\u{00C6}' => Some("AE"), // Æ
+        '\u{00E6}' => Some("ae"), // æ
         _ => None,
     }
 }
 
 /// Characters that should be stripped from extracted text.
 fn is_ignorable(ch: char) -> bool {
-    matches!(ch,
+    matches!(
+        ch,
         '\u{00AD}'   // soft hyphen
         | '\u{200B}' // zero-width space
         | '\u{200C}' // zero-width non-joiner
@@ -93,10 +94,10 @@ pub fn normalize_typography(text: &str) -> String {
         match ch {
             '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}' => result.push('\''),
             '\u{201C}' | '\u{201D}' | '\u{201E}' | '\u{201F}' => result.push('"'),
-            '\u{2013}' => result.push('-'), // en dash
-            '\u{2014}' => result.push_str("--"), // em dash
+            '\u{2013}' => result.push('-'),       // en dash
+            '\u{2014}' => result.push_str("--"),  // em dash
             '\u{2026}' => result.push_str("..."), // ellipsis
-            '\u{00A0}' => result.push(' '), // non-breaking space
+            '\u{00A0}' => result.push(' '),       // non-breaking space
             '\u{2002}' | '\u{2003}' | '\u{2009}' => result.push(' '), // en/em/thin space
             _ => result.push(ch),
         }

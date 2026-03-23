@@ -76,16 +76,13 @@ pub fn extract_image_chunks(
             let dict = &stream.dict;
 
             // Check if this is an Image XObject (Subtype = Image)
-            let subtype = dict
-                .get(b"Subtype")
-                .ok()
-                .and_then(|o| {
-                    if let Object::Name(ref n) = o {
-                        Some(String::from_utf8_lossy(n).to_string())
-                    } else {
-                        None
-                    }
-                });
+            let subtype = dict.get(b"Subtype").ok().and_then(|o| {
+                if let Object::Name(ref n) = o {
+                    Some(String::from_utf8_lossy(n).to_string())
+                } else {
+                    None
+                }
+            });
 
             if subtype.as_deref() != Some("Image") {
                 continue;
@@ -102,13 +99,7 @@ pub fn extract_image_chunks(
 
             // Create bbox — position will be refined using content stream cm/Do operators
             // For now, use placeholder position based on image dimensions
-            let bbox = BoundingBox::new(
-                Some(page_number),
-                0.0,
-                0.0,
-                width,
-                height,
-            );
+            let bbox = BoundingBox::new(Some(page_number), 0.0, 0.0, width, height);
 
             chunks.push(ImageChunk {
                 bbox,
@@ -166,16 +157,13 @@ pub fn extract_image_data(
         if let Ok(stream) = xobj.as_stream() {
             let dict = &stream.dict;
 
-            let subtype = dict
-                .get(b"Subtype")
-                .ok()
-                .and_then(|o| {
-                    if let Object::Name(ref n) = o {
-                        Some(String::from_utf8_lossy(n).to_string())
-                    } else {
-                        None
-                    }
-                });
+            let subtype = dict.get(b"Subtype").ok().and_then(|o| {
+                if let Object::Name(ref n) = o {
+                    Some(String::from_utf8_lossy(n).to_string())
+                } else {
+                    None
+                }
+            });
 
             if subtype.as_deref() != Some("Image") {
                 continue;
@@ -213,7 +201,9 @@ pub fn extract_image_data(
                 stream.content.clone()
             } else {
                 // Try to decompress
-                stream.decompressed_content().unwrap_or_else(|_| stream.content.clone())
+                stream
+                    .decompressed_content()
+                    .unwrap_or_else(|_| stream.content.clone())
             };
 
             let bbox = BoundingBox::new(Some(0), 0.0, 0.0, width as f64, height as f64);
@@ -239,10 +229,7 @@ pub fn extract_image_data(
 
 fn resolve_obj(doc: &Document, obj: &Object) -> Object {
     match obj {
-        Object::Reference(id) => doc
-            .get_object(*id)
-            .cloned()
-            .unwrap_or(Object::Null),
+        Object::Reference(id) => doc.get_object(*id).cloned().unwrap_or(Object::Null),
         other => other.clone(),
     }
 }

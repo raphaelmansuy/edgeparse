@@ -7,11 +7,17 @@
 /// Represents the transform: x' = a*x + c*y + e, y' = b*x + d*y + f
 #[derive(Debug, Clone, Copy)]
 pub struct Matrix {
+    /// Horizontal scaling component.
     pub a: f64,
+    /// Horizontal skewing component.
     pub b: f64,
+    /// Vertical skewing component.
     pub c: f64,
+    /// Vertical scaling component.
     pub d: f64,
+    /// Horizontal translation.
     pub e: f64,
+    /// Vertical translation.
     pub f: f64,
 }
 

@@ -202,7 +202,7 @@ impl ChunkParserState {
                 }
                 "gs" => {
                     // Extended Graphics State — look up in /ExtGState resources
-                    if let Some(name) = op.operands.first().and_then(|o| obj_name_bytes(o)) {
+                    if let Some(name) = op.operands.first().and_then(obj_name_bytes) {
                         self.apply_ext_gstate(doc, resources, &name);
                     }
                 }
@@ -555,8 +555,7 @@ impl ChunkParserState {
                             let (x2, y2) = self.transform_point(x + w, y);
                             let (x3, y3) = self.transform_point(x + w, y + h);
                             let (x4, y4) = self.transform_point(x, y + h);
-                            self.current_path
-                                .push(PathSegment::Line { x1, y1, x2, y2 });
+                            self.current_path.push(PathSegment::Line { x1, y1, x2, y2 });
                             self.current_path.push(PathSegment::Line {
                                 x1: x2,
                                 y1: y2,
@@ -608,13 +607,8 @@ impl ChunkParserState {
 
                 // ── XObject (Do) — Image and Form XObject handling ──
                 "Do" => {
-                    if let Some(name_bytes) = op.operands.first().and_then(|o| obj_name_bytes(o)) {
-                        self.handle_do_operator(
-                            doc,
-                            resources,
-                            &name_bytes,
-                            recursion_depth,
-                        );
+                    if let Some(name_bytes) = op.operands.first().and_then(obj_name_bytes) {
+                        self.handle_do_operator(doc, resources, &name_bytes, recursion_depth);
                     }
                 }
 
@@ -644,9 +638,7 @@ impl ChunkParserState {
             .font_cache
             .get(&self.gs_stack.current.text_state.font_name)
             .cloned()
-            .unwrap_or_else(|| {
-                PdfFont::default_font(&self.gs_stack.current.text_state.font_name)
-            });
+            .unwrap_or_else(|| PdfFont::default_font(&self.gs_stack.current.text_state.font_name));
         let active_mcid = self.active_mcid();
 
         if let Some(chunk) = create_text_chunk(
@@ -666,9 +658,7 @@ impl ChunkParserState {
             .font_cache
             .get(&self.gs_stack.current.text_state.font_name)
             .cloned()
-            .unwrap_or_else(|| {
-                PdfFont::default_font(&self.gs_stack.current.text_state.font_name)
-            });
+            .unwrap_or_else(|| PdfFont::default_font(&self.gs_stack.current.text_state.font_name));
         let active_mcid = self.active_mcid();
 
         for item in arr {
@@ -801,8 +791,7 @@ impl ChunkParserState {
         // Concatenate form matrix with current CTM (like the reference implementation: xFormGraphicsState.getCTM().concatenate(matrix))
         self.gs_stack.save();
         let m = form_matrix;
-        self.gs_stack
-            .concat_ctm(m.a, m.b, m.c, m.d, m.e, m.f);
+        self.gs_stack.concat_ctm(m.a, m.b, m.c, m.d, m.e, m.f);
 
         // Resolve form's own resources, falling back to parent
         let form_resources = match stream.dict.get(b"Resources") {
@@ -1016,9 +1005,7 @@ impl ChunkParserState {
             for seg in &path {
                 let (sx, sy, ex, ey) = match seg {
                     PathSegment::Line { x1, y1, x2, y2 } => (*x1, *y1, *x2, *y2),
-                    PathSegment::Curve {
-                        x1, y1, x2, y2, ..
-                    } => (*x1, *y1, *x2, *y2),
+                    PathSegment::Curve { x1, y1, x2, y2, .. } => (*x1, *y1, *x2, *y2),
                 };
                 min_x = min_x.min(sx).min(ex);
                 min_y = min_y.min(sy).min(ey);
@@ -1393,7 +1380,7 @@ fn extract_mcid_from_bdc(operands: &[Object]) -> Option<i64> {
 fn obj_to_f64(obj: Object) -> Option<f64> {
     match obj {
         Object::Integer(i) => Some(i as f64),
-        Object::Real(f) => Some(f as f64),
+        Object::Real(f) => Some(f),
         _ => None,
     }
 }
@@ -1426,8 +1413,8 @@ fn color_space_components(name: &str) -> u8 {
 fn default_color_for_space(components: u8) -> Vec<f64> {
     match components {
         4 => vec![0.0, 0.0, 0.0, 1.0], // CMYK: default black
-        3 => vec![0.0, 0.0, 0.0],       // RGB: default black
-        _ => vec![0.0],                  // Gray: default black
+        3 => vec![0.0, 0.0, 0.0],      // RGB: default black
+        _ => vec![0.0],                // Gray: default black
     }
 }
 
@@ -1470,8 +1457,7 @@ mod tests {
             ],
         };
 
-        let content_id =
-            doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
 
         let page_id = doc.add_object(dictionary! {
             "Type" => "Page",
@@ -1556,8 +1542,7 @@ mod tests {
             ],
         };
 
-        let content_id =
-            doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
 
         let page_id = doc.add_object(dictionary! {
             "Type" => "Page",
@@ -1677,10 +1662,8 @@ mod tests {
             ],
         };
 
-        let content_id = doc.add_object(Stream::new(
-            dictionary! {},
-            page_content.encode().unwrap(),
-        ));
+        let content_id =
+            doc.add_object(Stream::new(dictionary! {}, page_content.encode().unwrap()));
 
         let page_id = doc.add_object(dictionary! {
             "Type" => "Page",
@@ -1732,8 +1715,7 @@ mod tests {
             ],
         };
 
-        let content_id =
-            doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
 
         let page_id = doc.add_object(dictionary! {
             "Type" => "Page",

@@ -37,8 +37,7 @@ pub fn extract_line_chunks(
             message: format!("Page {} is not a dictionary: {}", page_number, e),
         })?;
 
-    let content_bytes =
-        crate::pdf::text_extractor::get_page_content(doc, page_dict)?;
+    let content_bytes = crate::pdf::text_extractor::get_page_content(doc, page_dict)?;
     if content_bytes.is_empty() {
         return Ok((Vec::new(), Vec::new()));
     }
@@ -46,7 +45,10 @@ pub fn extract_line_chunks(
     let content = lopdf::content::Content::decode(&content_bytes).map_err(|e| {
         EdgePdfError::PipelineError {
             stage: 1,
-            message: format!("Failed to decode content stream for page {}: {}", page_number, e),
+            message: format!(
+                "Failed to decode content stream for page {}: {}",
+                page_number, e
+            ),
         }
     })?;
 
@@ -69,15 +71,9 @@ pub fn extract_line_chunks(
             "Q" => gs_stack.restore(),
             "cm" => {
                 if op.operands.len() >= 6 {
-                    let vals: Vec<f64> = op
-                        .operands
-                        .iter()
-                        .filter_map(get_number)
-                        .collect();
+                    let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 6 {
-                        gs_stack.concat_ctm(
-                            vals[0], vals[1], vals[2], vals[3], vals[4], vals[5],
-                        );
+                        gs_stack.concat_ctm(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
                     }
                 }
             }
@@ -124,11 +120,7 @@ pub fn extract_line_chunks(
             "c" => {
                 // curveto (cubic Bézier)
                 if op.operands.len() >= 6 {
-                    let vals: Vec<f64> = op
-                        .operands
-                        .iter()
-                        .filter_map(get_number)
-                        .collect();
+                    let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 6 {
                         let (tx, ty) = transform_point(&gs_stack, vals[4], vals[5]);
                         if let Some((cx, cy)) = current_point {
@@ -152,11 +144,7 @@ pub fn extract_line_chunks(
             "v" => {
                 // curveto (initial point replicated)
                 if op.operands.len() >= 4 {
-                    let vals: Vec<f64> = op
-                        .operands
-                        .iter()
-                        .filter_map(get_number)
-                        .collect();
+                    let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 4 {
                         let (tx, ty) = transform_point(&gs_stack, vals[2], vals[3]);
                         if let Some((cx, cy)) = current_point {
@@ -179,11 +167,7 @@ pub fn extract_line_chunks(
             "y" => {
                 // curveto (final point replicated)
                 if op.operands.len() >= 4 {
-                    let vals: Vec<f64> = op
-                        .operands
-                        .iter()
-                        .filter_map(get_number)
-                        .collect();
+                    let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 4 {
                         let (tx, ty) = transform_point(&gs_stack, vals[2], vals[3]);
                         if let Some((cx, cy)) = current_point {
@@ -220,11 +204,7 @@ pub fn extract_line_chunks(
             "re" => {
                 // rectangle
                 if op.operands.len() >= 4 {
-                    let vals: Vec<f64> = op
-                        .operands
-                        .iter()
-                        .filter_map(get_number)
-                        .collect();
+                    let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 4 {
                         let (x, y, w, h) = (vals[0], vals[1], vals[2], vals[3]);
                         let (x1, y1) = transform_point(&gs_stack, x, y);
@@ -368,7 +348,9 @@ fn classify_path(
         return;
     }
 
-    let has_curves = segments.iter().any(|s| matches!(s, PathSegment::Curve { .. }));
+    let has_curves = segments
+        .iter()
+        .any(|s| matches!(s, PathSegment::Curve { .. }));
 
     if !has_curves && segments.len() <= 4 {
         // Try to classify individual segments as line chunks
@@ -451,9 +433,7 @@ fn classify_path(
         for seg in segments {
             let (sx, sy, ex, ey) = match seg {
                 PathSegment::Line { x1, y1, x2, y2 } => (*x1, *y1, *x2, *y2),
-                PathSegment::Curve {
-                    x1, y1, x2, y2, ..
-                } => (*x1, *y1, *x2, *y2),
+                PathSegment::Curve { x1, y1, x2, y2, .. } => (*x1, *y1, *x2, *y2),
             };
             min_x = min_x.min(sx).min(ex);
             min_y = min_y.min(sy).min(ey);
@@ -472,8 +452,16 @@ fn classify_path(
                 bbox: lbbox,
                 index: Some(*index),
                 level: None,
-                start: Vertex { x: sx, y: sy, radius: 0.0 },
-                end: Vertex { x: ex, y: ey, radius: 0.0 },
+                start: Vertex {
+                    x: sx,
+                    y: sy,
+                    radius: 0.0,
+                },
+                end: Vertex {
+                    x: ex,
+                    y: ey,
+                    radius: 0.0,
+                },
                 width: line_width,
                 is_horizontal_line: false,
                 is_vertical_line: false,
@@ -530,8 +518,16 @@ fn try_classify_rectangle(
         bbox: BoundingBox::new(Some(page_number), min_x, min_y, max_x, max_y),
         index: Some(*index),
         level: None,
-        start: Vertex { x: min_x, y: min_y, radius: 0.0 },
-        end: Vertex { x: max_x, y: max_y, radius: 0.0 },
+        start: Vertex {
+            x: min_x,
+            y: min_y,
+            radius: 0.0,
+        },
+        end: Vertex {
+            x: max_x,
+            y: max_y,
+            radius: 0.0,
+        },
         width: w.min(h),
         is_horizontal_line: w > h * LINE_ASPECT_RATIO,
         is_vertical_line: h > w * LINE_ASPECT_RATIO,
@@ -542,7 +538,7 @@ fn try_classify_rectangle(
 fn get_number(obj: &Object) -> Option<f64> {
     match obj {
         Object::Integer(i) => Some(*i as f64),
-        Object::Real(f) => Some(f64::from(*f)),
+        Object::Real(f) => Some(*f),
         _ => None,
     }
 }

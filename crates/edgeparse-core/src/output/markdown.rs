@@ -207,7 +207,9 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
                     output.push_str(&format!("# {}\n\n", cleaned));
                 }
             }
-            ContentElement::Paragraph(_) | ContentElement::TextBlock(_) | ContentElement::TextLine(_) => {
+            ContentElement::Paragraph(_)
+            | ContentElement::TextBlock(_)
+            | ContentElement::TextLine(_) => {
                 let element = &doc.kids[i];
                 let text = match &doc.kids[i] {
                     ContentElement::Paragraph(p) => clean_paragraph_text(&p.base.value()),
@@ -236,7 +238,8 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
                     continue;
                 }
 
-                if matches!(element, ContentElement::Paragraph(p) if p.base.semantic_type == SemanticType::TableOfContent) {
+                if matches!(element, ContentElement::Paragraph(p) if p.base.semantic_type == SemanticType::TableOfContent)
+                {
                     output.push_str(&escape_md_line_start(trimmed));
                     output.push('\n');
                     i += 1;
@@ -245,7 +248,9 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
 
                 if is_short_caption_label(trimmed) {
                     if let Some(next_text) = next_mergeable_paragraph_text(doc.kids.get(i + 1)) {
-                        if let Some((caption_tail, body)) = split_following_caption_tail_and_body(&next_text) {
+                        if let Some((caption_tail, body)) =
+                            split_following_caption_tail_and_body(&next_text)
+                        {
                             let mut caption = trimmed.to_string();
                             caption.push('\n');
                             caption.push_str(caption_tail);
@@ -262,7 +267,9 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
                             caption.push('\n');
                             caption.push_str(next_text.trim());
 
-                            if let Some(year_text) = next_mergeable_paragraph_text(doc.kids.get(i + 2)) {
+                            if let Some(year_text) =
+                                next_mergeable_paragraph_text(doc.kids.get(i + 2))
+                            {
                                 if looks_like_caption_year(&year_text) {
                                     caption.push('\n');
                                     caption.push_str(year_text.trim());
@@ -329,9 +336,12 @@ fn should_render_document_title_as_plaintext(doc: &PdfDocument, title: &str) -> 
     }
 
     let mut early = doc.kids.iter().take(6);
-    let has_explicit_heading = early
-        .clone()
-        .any(|element| matches!(element, ContentElement::Heading(_) | ContentElement::NumberHeading(_)));
+    let has_explicit_heading = early.clone().any(|element| {
+        matches!(
+            element,
+            ContentElement::Heading(_) | ContentElement::NumberHeading(_)
+        )
+    });
     let has_tableish_content = early.any(|element| {
         matches!(
             element,
@@ -449,15 +459,16 @@ fn looks_like_compact_toc_document(doc: &PdfDocument) -> bool {
         return false;
     }
 
-    let page_like = lines.iter().filter(|line| ends_with_page_marker(line)).count();
+    let page_like = lines
+        .iter()
+        .filter(|line| ends_with_page_marker(line))
+        .count();
     let support_like = lines
         .iter()
         .filter(|line| looks_like_toc_support_heading(line))
         .count();
 
-    page_like >= 3
-        && support_like >= 2
-        && (page_like + support_like) * 10 >= lines.len() * 8
+    page_like >= 3 && support_like >= 2 && (page_like + support_like) * 10 >= lines.len() * 8
 }
 
 fn render_compact_toc_document(doc: &PdfDocument) -> String {
@@ -519,7 +530,9 @@ fn collect_plain_lines(doc: &PdfDocument) -> Vec<String> {
                     } else if !label.trim().is_empty() {
                         label.trim().to_string()
                     } else {
-                        list_item_text_from_contents(&item.contents).trim().to_string()
+                        list_item_text_from_contents(&item.contents)
+                            .trim()
+                            .to_string()
                     };
                     if !combined.trim().is_empty() {
                         lines.push(combined);
@@ -529,7 +542,10 @@ fn collect_plain_lines(doc: &PdfDocument) -> Vec<String> {
             ContentElement::Table(table) => {
                 extend_contents_lines_from_rows(
                     &mut lines,
-                    collect_rendered_table_rows(&table.table_border.rows, table.table_border.num_columns),
+                    collect_rendered_table_rows(
+                        &table.table_border.rows,
+                        table.table_border.num_columns,
+                    ),
                 );
             }
             ContentElement::TableBorder(table) => {
@@ -665,14 +681,15 @@ fn is_short_caption_label(text: &str) -> bool {
     }
 
     let trimmed = text.trim();
-    trimmed.split_whitespace().count() <= 3
-        && trimmed.len() <= 24
-        && !trimmed.ends_with(['.', ':'])
+    trimmed.split_whitespace().count() <= 3 && trimmed.len() <= 24 && !trimmed.ends_with(['.', ':'])
 }
 
 fn split_following_caption_tail_and_body(text: &str) -> Option<(&str, &str)> {
     let trimmed = text.trim();
-    if trimmed.is_empty() || starts_with_caption_prefix(trimmed) || !starts_with_uppercase_word(trimmed) {
+    if trimmed.is_empty()
+        || starts_with_caption_prefix(trimmed)
+        || !starts_with_uppercase_word(trimmed)
+    {
         return None;
     }
 
@@ -717,11 +734,14 @@ fn looks_like_caption_year(text: &str) -> bool {
 
 /// Extract text from table token rows.
 fn token_rows_text(rows: &[TableTokenRow]) -> String {
-    repair_fragmented_words(&rows.iter()
-        .flat_map(|row| row.iter())
-        .map(|token| token.base.value.as_str())
-        .collect::<Vec<_>>()
-        .join(" "))
+    repair_fragmented_words(
+        &rows
+            .iter()
+            .flat_map(|row| row.iter())
+            .map(|token| token.base.value.as_str())
+            .collect::<Vec<_>>()
+            .join(" "),
+    )
 }
 
 fn render_element(out: &mut String, element: &ContentElement) {
@@ -861,10 +881,26 @@ fn escape_md_line_start(text: &str) -> String {
 fn starts_with_caption_prefix(text: &str) -> bool {
     let lower = text.trim_start().to_ascii_lowercase();
     [
-        "figure ", "fig. ", "table ", "tab. ", "chart ", "graph ", "image ", "illustration ",
-        "diagram ", "plate ", "map ", "exhibit ",
-        "photo by ", "photo credit", "image by ", "image credit",
-        "image courtesy", "photo courtesy", "credit: ", "source: ",
+        "figure ",
+        "fig. ",
+        "table ",
+        "tab. ",
+        "chart ",
+        "graph ",
+        "image ",
+        "illustration ",
+        "diagram ",
+        "plate ",
+        "map ",
+        "exhibit ",
+        "photo by ",
+        "photo credit",
+        "image by ",
+        "image credit",
+        "image courtesy",
+        "photo courtesy",
+        "credit: ",
+        "source: ",
     ]
     .iter()
     .any(|prefix| lower.starts_with(prefix))
@@ -1002,12 +1038,7 @@ fn should_render_paragraph_as_heading(
                 if let Some(fs) = p.base.font_size {
                     if fs >= 1.15 * body_font_size
                         && is_heading_rescue_candidate(doc, idx, text)
-                        && has_substantive_follow_up(
-                            doc,
-                            idx,
-                            text.split_whitespace().count(),
-                            4,
-                        )
+                        && has_substantive_follow_up(doc, idx, text.split_whitespace().count(), 4)
                     {
                         return true;
                     }
@@ -1020,7 +1051,12 @@ fn should_render_paragraph_as_heading(
 
 /// Check whether any element in the document is an explicit heading from the pipeline.
 fn doc_has_explicit_headings(doc: &PdfDocument) -> bool {
-    doc.kids.iter().any(|e| matches!(e, ContentElement::Heading(_) | ContentElement::NumberHeading(_)))
+    doc.kids.iter().any(|e| {
+        matches!(
+            e,
+            ContentElement::Heading(_) | ContentElement::NumberHeading(_)
+        )
+    })
 }
 
 /// Compute the dominant body font size from paragraphs with substantial text
@@ -1076,18 +1112,19 @@ fn heading_density(doc: &PdfDocument) -> f64 {
     let heading_count = doc
         .kids
         .iter()
-        .filter(|e| matches!(e, ContentElement::Heading(_) | ContentElement::NumberHeading(_)))
+        .filter(|e| {
+            matches!(
+                e,
+                ContentElement::Heading(_) | ContentElement::NumberHeading(_)
+            )
+        })
         .count();
     heading_count as f64 / total as f64
 }
 
 /// Rescue headings: identify short standalone paragraphs that likely serve
 /// as section headings.  Only runs when the pipeline produced zero headings.
-fn should_rescue_as_heading(
-    doc: &PdfDocument,
-    idx: usize,
-    text: &str,
-) -> bool {
+fn should_rescue_as_heading(doc: &PdfDocument, idx: usize, text: &str) -> bool {
     is_heading_rescue_candidate(doc, idx, text)
         && has_substantive_follow_up(doc, idx, text.split_whitespace().count(), 4)
 }
@@ -1095,11 +1132,7 @@ fn should_rescue_as_heading(
 /// Pure text-criteria check for title-case heading rescue.
 /// Returns true when the text looks like a heading based on casing,
 /// length, and character composition — without any lookahead.
-fn is_heading_rescue_candidate(
-    doc: &PdfDocument,
-    idx: usize,
-    text: &str,
-) -> bool {
+fn is_heading_rescue_candidate(doc: &PdfDocument, idx: usize, text: &str) -> bool {
     let trimmed = text.trim();
     if trimmed.is_empty() {
         return false;
@@ -1123,7 +1156,9 @@ fn is_heading_rescue_candidate(
     }
 
     // Must not look like a caption or chart label
-    if starts_with_caption_prefix(trimmed) || looks_like_chart_label_heading(&doc.kids[idx], trimmed) {
+    if starts_with_caption_prefix(trimmed)
+        || looks_like_chart_label_heading(&doc.kids[idx], trimmed)
+    {
         return false;
     }
 
@@ -1134,7 +1169,10 @@ fn is_heading_rescue_candidate(
     }
 
     // Must not be a purely numeric string
-    if trimmed.chars().all(|c| c.is_ascii_digit() || c == '.' || c == ' ') {
+    if trimmed
+        .chars()
+        .all(|c| c.is_ascii_digit() || c == '.' || c == ' ')
+    {
         return false;
     }
 
@@ -1166,27 +1204,30 @@ fn has_substantive_follow_up(
         match look_elem {
             ContentElement::Paragraph(p) => {
                 let next_text = p.base.value();
-                let nw = next_text.trim().split_whitespace().count();
+                let nw = next_text.split_whitespace().count();
                 if nw >= word_count * 3 || nw > 15 {
                     return true;
                 }
             }
             ContentElement::TextBlock(tb) => {
                 let next_text = tb.value();
-                let nw = next_text.trim().split_whitespace().count();
+                let nw = next_text.split_whitespace().count();
                 if nw >= word_count * 3 || nw > 15 {
                     return true;
                 }
             }
             ContentElement::TextLine(tl) => {
                 let next_text = tl.value();
-                let nw = next_text.trim().split_whitespace().count();
+                let nw = next_text.split_whitespace().count();
                 if nw >= word_count * 3 || nw > 15 {
                     return true;
                 }
             }
-            ContentElement::List(_) | ContentElement::Table(_) | ContentElement::TableBorder(_)
-            | ContentElement::Image(_) | ContentElement::Figure(_) => {
+            ContentElement::List(_)
+            | ContentElement::Table(_)
+            | ContentElement::TableBorder(_)
+            | ContentElement::Image(_)
+            | ContentElement::Figure(_) => {
                 return true;
             }
             _ => continue,
@@ -1198,11 +1239,7 @@ fn has_substantive_follow_up(
 
 /// Rescue numbered section headings like "01 - Find Open Educational Resources"
 /// or "4.2 Main Results" when heading density is low.
-fn should_rescue_numbered_heading(
-    doc: &PdfDocument,
-    idx: usize,
-    text: &str,
-) -> bool {
+fn should_rescue_numbered_heading(doc: &PdfDocument, idx: usize, text: &str) -> bool {
     let trimmed = text.trim();
     if trimmed.is_empty() || trimmed.len() > 100 {
         return false;
@@ -1236,25 +1273,28 @@ fn should_rescue_numbered_heading(
         }
         match &doc.kids[lookahead_idx] {
             ContentElement::Paragraph(p) => {
-                let nw = p.base.value().trim().split_whitespace().count();
+                let nw = p.base.value().split_whitespace().count();
                 if nw > 10 {
                     return true;
                 }
             }
             ContentElement::TextBlock(tb) => {
-                let nw = tb.value().trim().split_whitespace().count();
+                let nw = tb.value().split_whitespace().count();
                 if nw > 10 {
                     return true;
                 }
             }
             ContentElement::TextLine(tl) => {
-                let nw = tl.value().trim().split_whitespace().count();
+                let nw = tl.value().split_whitespace().count();
                 if nw > 10 {
                     return true;
                 }
             }
-            ContentElement::List(_) | ContentElement::Table(_) | ContentElement::TableBorder(_)
-            | ContentElement::Image(_) | ContentElement::Figure(_) => {
+            ContentElement::List(_)
+            | ContentElement::Table(_)
+            | ContentElement::TableBorder(_)
+            | ContentElement::Image(_)
+            | ContentElement::Figure(_) => {
                 return true;
             }
             _ => continue,
@@ -1337,9 +1377,25 @@ fn looks_like_numbered_section(text: &str) -> bool {
 
 /// Structural keywords that commonly precede a number to form a heading.
 const SECTION_KEYWORDS: &[&str] = &[
-    "activity", "appendix", "case", "chapter", "exercise", "experiment",
-    "lab", "lesson", "module", "part", "phase", "problem", "question",
-    "section", "stage", "step", "task", "topic", "unit",
+    "activity",
+    "appendix",
+    "case",
+    "chapter",
+    "exercise",
+    "experiment",
+    "lab",
+    "lesson",
+    "module",
+    "part",
+    "phase",
+    "problem",
+    "question",
+    "section",
+    "stage",
+    "step",
+    "task",
+    "topic",
+    "unit",
 ];
 
 /// Check if text matches "Keyword N. Title" or "Keyword #N: Title" pattern.
@@ -1351,7 +1407,10 @@ fn looks_like_keyword_numbered_section(text: &str) -> bool {
         None => return false,
     };
     let keyword = &trimmed[..space_pos];
-    if !SECTION_KEYWORDS.iter().any(|k| keyword.eq_ignore_ascii_case(k)) {
+    if !SECTION_KEYWORDS
+        .iter()
+        .any(|k| keyword.eq_ignore_ascii_case(k))
+    {
         return false;
     }
     // After keyword+space, expect a number (optionally preceded by #)
@@ -1370,11 +1429,7 @@ fn looks_like_keyword_numbered_section(text: &str) -> bool {
 
 /// Strict rescue for docs with some headings but low density: only promote
 /// ALL CAPS text that is clearly a section heading.
-fn should_rescue_allcaps_heading(
-    doc: &PdfDocument,
-    idx: usize,
-    text: &str,
-) -> bool {
+fn should_rescue_allcaps_heading(doc: &PdfDocument, idx: usize, text: &str) -> bool {
     let trimmed = text.trim();
     if trimmed.is_empty() {
         return false;
@@ -1409,7 +1464,10 @@ fn should_rescue_allcaps_heading(
     }
 
     // Must not be purely numeric or a page number
-    if trimmed.chars().all(|c| c.is_ascii_digit() || c == '.' || c == ' ') {
+    if trimmed
+        .chars()
+        .all(|c| c.is_ascii_digit() || c == '.' || c == ' ')
+    {
         return false;
     }
 
@@ -1423,25 +1481,28 @@ fn should_rescue_allcaps_heading(
         let look_elem = &doc.kids[lookahead_idx];
         match look_elem {
             ContentElement::Paragraph(p) => {
-                let nw = p.base.value().trim().split_whitespace().count();
+                let nw = p.base.value().split_whitespace().count();
                 if nw > 6 {
                     return true;
                 }
             }
             ContentElement::TextBlock(tb) => {
-                let nw = tb.value().trim().split_whitespace().count();
+                let nw = tb.value().split_whitespace().count();
                 if nw > 6 {
                     return true;
                 }
             }
             ContentElement::TextLine(tl) => {
-                let nw = tl.value().trim().split_whitespace().count();
+                let nw = tl.value().split_whitespace().count();
                 if nw > 6 {
                     return true;
                 }
             }
-            ContentElement::List(_) | ContentElement::Table(_) | ContentElement::TableBorder(_)
-            | ContentElement::Image(_) | ContentElement::Figure(_) => {
+            ContentElement::List(_)
+            | ContentElement::Table(_)
+            | ContentElement::TableBorder(_)
+            | ContentElement::Image(_)
+            | ContentElement::Figure(_) => {
                 return true;
             }
             _ => continue,
@@ -1598,9 +1659,10 @@ fn should_demote_heading_to_paragraph(text: &str, next: &str) -> bool {
 
 fn is_sentence_fragment_tail(word: &str) -> bool {
     matches!(
-        word.trim_matches(|c: char| !c.is_alphanumeric()).to_ascii_lowercase().as_str(),
-        "a"
-            | "an"
+        word.trim_matches(|c: char| !c.is_alphanumeric())
+            .to_ascii_lowercase()
+            .as_str(),
+        "a" | "an"
             | "and"
             | "as"
             | "at"
@@ -1684,7 +1746,11 @@ fn should_merge_adjacent_semantic_paragraphs(prev: &str, next: &str) -> bool {
 fn merge_paragraph_text(target: &mut String, next: &str) {
     let next_trimmed = next.trim();
     if target.ends_with('-')
-        && target.chars().rev().nth(1).is_some_and(|c| c.is_alphabetic())
+        && target
+            .chars()
+            .rev()
+            .nth(1)
+            .is_some_and(|c| c.is_alphabetic())
         && next_trimmed.chars().next().is_some_and(char::is_lowercase)
     {
         target.pop();
@@ -1699,9 +1765,7 @@ fn merge_paragraph_text(target: &mut String, next: &str) {
 
 fn is_standalone_page_number(text: &str) -> bool {
     let trimmed = text.trim();
-    !trimmed.is_empty()
-        && trimmed.len() <= 4
-        && trimmed.chars().all(|c| c.is_ascii_digit())
+    !trimmed.is_empty() && trimmed.len() <= 4 && trimmed.chars().all(|c| c.is_ascii_digit())
 }
 
 fn looks_like_margin_page_number(doc: &PdfDocument, element: &ContentElement, text: &str) -> bool {
@@ -1800,10 +1864,25 @@ fn should_demote_comma_heading(text: &str) -> bool {
 /// Demote headings containing mathematical/special symbols that never appear
 /// in real section headings (e.g. "HL ¼", "P ≪ P", "LH þ HL:").
 fn should_demote_math_heading(text: &str) -> bool {
-    text.chars().any(|c| matches!(c,
-        '¼' | '½' | '¾' | '≪' | '≫' | 'þ' | 'ð' |
-        '∑' | '∫' | '∂' | '∏' | '√' | '∞' | '≈' | '÷'
-    ))
+    text.chars().any(|c| {
+        matches!(
+            c,
+            '¼' | '½'
+                | '¾'
+                | '≪'
+                | '≫'
+                | 'þ'
+                | 'ð'
+                | '∑'
+                | '∫'
+                | '∂'
+                | '∏'
+                | '√'
+                | '∞'
+                | '≈'
+                | '÷'
+        )
+    })
 }
 
 /// Demote headings containing a percentage sign — these are typically data
@@ -1867,7 +1946,11 @@ fn find_merged_subsection_split(text: &str) -> Option<usize> {
                 }
             }
             // Check for letter.digit pattern (e.g., "B.1")
-            if bytes[i].is_ascii_uppercase() && i + 2 < bytes.len() && bytes[i + 1] == b'.' && bytes[i + 2].is_ascii_digit() {
+            if bytes[i].is_ascii_uppercase()
+                && i + 2 < bytes.len()
+                && bytes[i + 1] == b'.'
+                && bytes[i + 2].is_ascii_digit()
+            {
                 return Some(i);
             }
         }
@@ -1896,9 +1979,8 @@ fn should_skip_heading_text(text: &str) -> bool {
 
 fn repair_fragmented_words(text: &str) -> String {
     const STOPWORDS: &[&str] = &[
-        "a", "an", "and", "are", "as", "at", "be", "by", "can", "for", "from", "if", "in",
-        "into", "is", "it", "may", "must", "not", "of", "on", "or", "per", "that", "the",
-        "to", "with",
+        "a", "an", "and", "are", "as", "at", "be", "by", "can", "for", "from", "if", "in", "into",
+        "is", "it", "may", "must", "not", "of", "on", "or", "per", "that", "the", "to", "with",
     ];
 
     let mut parts: Vec<String> = text.split_whitespace().map(str::to_string).collect();
@@ -1970,18 +2052,18 @@ fn merge_continuation_rows(rows: &mut Vec<Vec<String>>) {
         return;
     }
     // The first row must have a non-empty first cell (the header anchor).
-    if rows[0].first().map_or(true, |c| c.trim().is_empty()) {
+    if rows[0].first().is_none_or(|c| c.trim().is_empty()) {
         return;
     }
 
     let mut merge_count = 0usize;
-    for i in 1..rows.len() {
-        let first_empty = rows[i].first().map_or(true, |c| c.trim().is_empty());
+    for (i, row_i) in rows.iter().enumerate().skip(1) {
+        let first_empty = row_i.first().is_none_or(|c| c.trim().is_empty());
         if !first_empty {
             break; // hit a data row
         }
         // All non-empty cells must be short (header-like fragments).
-        let all_short = rows[i]
+        let all_short = row_i
             .iter()
             .all(|c| c.trim().is_empty() || c.trim().len() <= 30);
         if !all_short {
@@ -1998,15 +2080,20 @@ fn merge_continuation_rows(rows: &mut Vec<Vec<String>>) {
 
     // Merge rows 1..=merge_count into row 0.
     for i in 1..=merge_count {
-        let ncols = rows[0].len().min(rows[i].len());
-        for j in 0..ncols {
-            let fragment = rows[i][j].trim().to_string();
+        let (head, tail) = rows.split_at_mut(i);
+        let ncols = head[0].len().min(tail[0].len());
+        for (target, src) in head[0]
+            .iter_mut()
+            .take(ncols)
+            .zip(tail[0].iter().take(ncols))
+        {
+            let fragment = src.trim().to_string();
             if !fragment.is_empty() {
-                let target = rows[0][j].trim().to_string();
-                rows[0][j] = if target.is_empty() {
+                let target_str = target.trim().to_string();
+                *target = if target_str.is_empty() {
                     fragment
                 } else {
-                    format!("{} {}", target, fragment)
+                    format!("{} {}", target_str, fragment)
                 };
             }
         }
@@ -2032,7 +2119,7 @@ fn collect_table_border_rows(table: &crate::models::table::TableBorder) -> Vec<V
                 row.cells
                     .iter()
                     .find(|c| c.col_number == col)
-                    .map(|c| cell_text_content(c))
+                    .map(cell_text_content)
                     .unwrap_or_default()
             })
             .collect();
@@ -2251,7 +2338,12 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
                 end = j;
                 j += 1;
             }
-            blocks.push(Block { start: i, sep, end, cols });
+            blocks.push(Block {
+                start: i,
+                sep,
+                end,
+                cols,
+            });
             i = end + 1;
         } else {
             i += 1;
@@ -2280,11 +2372,12 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
         let leader_idx = merge_leader[bi - 1].unwrap_or(bi - 1);
         let effective_prev_cols = group_cols[leader_idx];
         let gap_heading_only = if !gap_all_blank && effective_prev_cols >= 2 && curr.cols >= 2 {
-            let non_blank: Vec<usize> = gap_range.clone()
+            let non_blank: Vec<usize> = gap_range
+                .clone()
                 .filter(|li| !lines[*li].trim().is_empty())
                 .collect();
             // Only merge when gap has 1-2 heading lines
-            non_blank.len() >= 1
+            !non_blank.is_empty()
                 && non_blank.len() <= 2
                 && non_blank.iter().all(|li| {
                     let t = lines[*li].trim();
@@ -2296,25 +2389,28 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
         // Short displaced cell: a single short plain-text word between two
         // multi-column tables is almost certainly a cell value that the PDF
         // pipeline displaced out of the table grid.
-        let gap_short_fragment = if !gap_all_blank && !gap_heading_only
-            && effective_prev_cols >= 2 && curr.cols >= 2
+        let gap_short_fragment =
+            if !gap_all_blank && !gap_heading_only && effective_prev_cols >= 2 && curr.cols >= 2 {
+                let non_blank: Vec<usize> = gap_range
+                    .clone()
+                    .filter(|li| !lines[*li].trim().is_empty())
+                    .collect();
+                non_blank.len() == 1 && {
+                    let t = lines[non_blank[0]].trim();
+                    t.len() < 30
+                        && !t.starts_with('#')
+                        && !t.starts_with('-')
+                        && !t.starts_with('*')
+                        && !t.contains(':')
+                        && !t.contains("TABLE")
+                }
+            } else {
+                false
+            };
+        if (gap_all_blank || gap_heading_only || gap_short_fragment)
+            && prev.cols > 0
+            && curr.cols > 0
         {
-            let non_blank: Vec<usize> = gap_range.clone()
-                .filter(|li| !lines[*li].trim().is_empty())
-                .collect();
-            non_blank.len() == 1 && {
-                let t = lines[non_blank[0]].trim();
-                t.len() < 30
-                    && !t.starts_with('#')
-                    && !t.starts_with('-')
-                    && !t.starts_with('*')
-                    && !t.contains(':')
-                    && !t.contains("TABLE")
-            }
-        } else {
-            false
-        };
-        if (gap_all_blank || gap_heading_only || gap_short_fragment) && prev.cols > 0 && curr.cols > 0 {
             merge_leader[bi] = Some(leader_idx);
             // Update group max cols
             if curr.cols > group_cols[leader_idx] {
@@ -2355,9 +2451,7 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
     // Map each line to its block index (or the block it belongs to via gap conversion).
     let mut line_to_block: Vec<Option<usize>> = vec![None; lines.len()];
     for (bi, block) in blocks.iter().enumerate() {
-        for li in block.start..=block.end {
-            line_to_block[li] = Some(bi);
-        }
+        line_to_block[block.start..=block.end].fill(Some(bi));
     }
     // Assign gap lines to the preceding block for padding purposes.
     for (bi, leader) in merge_leader.iter().enumerate() {
@@ -2429,7 +2523,9 @@ mod tests {
     use crate::models::content::ContentElement;
     use crate::models::enums::{PdfLayer, TextFormat, TextType};
     use crate::models::semantic::{SemanticHeading, SemanticParagraph, SemanticTextNode};
-    use crate::models::table::{TableBorder, TableBorderCell, TableBorderRow, TableToken, TableTokenType};
+    use crate::models::table::{
+        TableBorder, TableBorderCell, TableBorderRow, TableToken, TableTokenType,
+    };
     use crate::models::text::{TextBlock, TextColumn, TextLine};
 
     #[test]
@@ -2452,7 +2548,10 @@ mod tests {
         let mut doc = PdfDocument::new("test.pdf".to_string());
         doc.title = Some("  ".to_string());
         let md = to_markdown(&doc).unwrap();
-        assert!(!md.contains("# "), "Empty/whitespace title should not produce a heading");
+        assert!(
+            !md.contains("# "),
+            "Empty/whitespace title should not produce a heading"
+        );
     }
 
     #[test]
@@ -2765,7 +2864,11 @@ mod tests {
     #[test]
     fn test_toc_semantic_paragraphs_render_without_blank_lines() {
         let mut doc = PdfDocument::new("toc-semantic.pdf".to_string());
-        let mut first = make_paragraph("Part V. Chapter Five - Comparing Associations Between Multiple Variables", 700.0, 712.0);
+        let mut first = make_paragraph(
+            "Part V. Chapter Five - Comparing Associations Between Multiple Variables",
+            700.0,
+            712.0,
+        );
         let mut second = make_paragraph("Section 5.1: The Linear Model 35", 684.0, 696.0);
         if let ContentElement::Paragraph(p) = &mut first {
             p.base.semantic_type = SemanticType::TableOfContent;
@@ -2785,14 +2888,43 @@ mod tests {
     #[test]
     fn test_compact_toc_document_renders_without_blank_lines() {
         let mut doc = PdfDocument::new("compact-toc.pdf".to_string());
-        doc.kids.push(make_paragraph("Part V. Chapter Five - Comparing Associations Between Multiple Variables", 700.0, 712.0));
-        doc.kids.push(make_paragraph("Section 5.1: The Linear Model 35", 684.0, 696.0));
-        doc.kids.push(make_paragraph("Part VI. Chapter Six - Comparing Three or More Group Means", 668.0, 680.0));
-        doc.kids.push(make_paragraph("Section 6.1: Between Versus Within Group Analyses 49", 652.0, 664.0));
-        doc.kids.push(make_paragraph("Part VII. Chapter Seven - Moderation and Mediation Analyses", 636.0, 648.0));
-        doc.kids.push(make_paragraph("Section 7.1: Mediation and Moderation Models 64", 620.0, 632.0));
-        doc.kids.push(make_paragraph("References 101", 604.0, 616.0));
-        doc.kids.push(make_paragraph("Section 8.1: Factor Analysis Definitions 75", 588.0, 600.0));
+        doc.kids.push(make_paragraph(
+            "Part V. Chapter Five - Comparing Associations Between Multiple Variables",
+            700.0,
+            712.0,
+        ));
+        doc.kids.push(make_paragraph(
+            "Section 5.1: The Linear Model 35",
+            684.0,
+            696.0,
+        ));
+        doc.kids.push(make_paragraph(
+            "Part VI. Chapter Six - Comparing Three or More Group Means",
+            668.0,
+            680.0,
+        ));
+        doc.kids.push(make_paragraph(
+            "Section 6.1: Between Versus Within Group Analyses 49",
+            652.0,
+            664.0,
+        ));
+        doc.kids.push(make_paragraph(
+            "Part VII. Chapter Seven - Moderation and Mediation Analyses",
+            636.0,
+            648.0,
+        ));
+        doc.kids.push(make_paragraph(
+            "Section 7.1: Mediation and Moderation Models 64",
+            620.0,
+            632.0,
+        ));
+        doc.kids
+            .push(make_paragraph("References 101", 604.0, 616.0));
+        doc.kids.push(make_paragraph(
+            "Section 8.1: Factor Analysis Definitions 75",
+            588.0,
+            600.0,
+        ));
 
         let md = to_markdown(&doc).unwrap();
         assert!(!md.contains("\n\nSection 5.1: The Linear Model 35"));
@@ -2840,9 +2972,7 @@ mod tests {
         doc.kids.push(make_paragraph("2021", 500.0, 512.0));
 
         let md = to_markdown(&doc).unwrap();
-        assert!(md.contains(
-            "Figure 4\nKomnas HAM's YouTube channel as of 1 December\n2021"
-        ));
+        assert!(md.contains("Figure 4\nKomnas HAM's YouTube channel as of 1 December\n2021"));
         assert!(!md.contains("\n\n2021"));
     }
 
@@ -2851,7 +2981,8 @@ mod tests {
         let mut doc = PdfDocument::new("chart.pdf".to_string());
         doc.kids.push(make_paragraph("Figure 1", 760.0, 772.0));
         doc.kids.push(make_paragraph("100", 520.0, 528.0));
-        doc.kids.push(make_paragraph("Body text continues here.", 400.0, 412.0));
+        doc.kids
+            .push(make_paragraph("Body text continues here.", 400.0, 412.0));
         doc.kids.push(make_paragraph("36", 20.0, 28.0));
 
         let md = to_markdown(&doc).unwrap();
@@ -2862,11 +2993,21 @@ mod tests {
     #[test]
     fn test_semantic_paragraphs_are_not_remerged_in_markdown() {
         let mut doc = PdfDocument::new("paragraphs.pdf".to_string());
-        doc.kids.push(make_paragraph("First semantic paragraph ends here.", 520.0, 532.0));
-        doc.kids.push(make_paragraph("Second semantic paragraph starts here.", 500.0, 512.0));
+        doc.kids.push(make_paragraph(
+            "First semantic paragraph ends here.",
+            520.0,
+            532.0,
+        ));
+        doc.kids.push(make_paragraph(
+            "Second semantic paragraph starts here.",
+            500.0,
+            512.0,
+        ));
 
         let md = to_markdown(&doc).unwrap();
-        assert!(md.contains("First semantic paragraph ends here.\n\nSecond semantic paragraph starts here."));
+        assert!(md.contains(
+            "First semantic paragraph ends here.\n\nSecond semantic paragraph starts here."
+        ));
     }
 
     #[test]
@@ -2891,12 +3032,10 @@ mod tests {
             let top = 656.0 - row_number as f64 * 18.0;
             let bottom = top - 16.0;
             let mut cells = Vec::new();
-            for (col_number, (text, left_x, right_x)) in [
-                (*left, 72.0, 220.0),
-                (*right, 220.0, 420.0),
-            ]
-            .into_iter()
-            .enumerate()
+            for (col_number, (text, left_x, right_x)) in
+                [(*left, 72.0, 220.0), (*right, 220.0, 420.0)]
+                    .into_iter()
+                    .enumerate()
             {
                 let content = if text.is_empty() {
                     Vec::new()
@@ -2949,7 +3088,13 @@ mod tests {
         }
 
         ContentElement::TableBorder(TableBorder {
-            bbox: BoundingBox::new(Some(1), 72.0, 656.0 - rows.len() as f64 * 18.0 - 16.0, 420.0, 656.0),
+            bbox: BoundingBox::new(
+                Some(1),
+                72.0,
+                656.0 - rows.len() as f64 * 18.0 - 16.0,
+                420.0,
+                656.0,
+            ),
             index: None,
             level: Some("1".to_string()),
             x_coordinates: vec![72.0, 220.0, 420.0],
@@ -2987,7 +3132,10 @@ mod tests {
         let mut doc = PdfDocument::new("flocculation-table.pdf".to_string());
         doc.number_of_pages = 1;
         doc.kids.push(make_two_column_table(&[
-            ("Added cation", "Relative Size & Settling Rates of Floccules"),
+            (
+                "Added cation",
+                "Relative Size & Settling Rates of Floccules",
+            ),
             ("K+", ""),
             ("Na+", ""),
             ("Ca2+", ""),
@@ -3014,10 +3162,22 @@ mod tests {
                       more text\n";
         let result = merge_adjacent_pipe_tables(input);
         // Heading should be converted to a pipe row
-        assert!(result.contains("| Heading Between |"), "Heading should be in pipe row: {}", result);
+        assert!(
+            result.contains("| Heading Between |"),
+            "Heading should be in pipe row: {}",
+            result
+        );
         // Should NOT have # heading marker
-        assert!(!result.contains("# Heading Between"), "Heading marker should be removed: {}", result);
+        assert!(
+            !result.contains("# Heading Between"),
+            "Heading marker should be removed: {}",
+            result
+        );
         // Row3 should still be present
-        assert!(result.contains("| Row3 |") || result.contains("Row3"), "Row3 should exist: {}", result);
+        assert!(
+            result.contains("| Row3 |") || result.contains("Row3"),
+            "Row3 should exist: {}",
+            result
+        );
     }
 }

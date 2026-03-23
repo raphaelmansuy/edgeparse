@@ -20,17 +20,17 @@ pub struct EncryptionInfo {
 impl EncryptionInfo {
     /// Check if printing is allowed (bit 3 of permissions).
     pub fn can_print(&self) -> bool {
-        self.permissions.map_or(true, |p| p & 0x4 != 0)
+        self.permissions.is_none_or(|p| p & 0x4 != 0)
     }
 
     /// Check if content copying is allowed (bit 5 of permissions).
     pub fn can_copy(&self) -> bool {
-        self.permissions.map_or(true, |p| p & 0x10 != 0)
+        self.permissions.is_none_or(|p| p & 0x10 != 0)
     }
 
     /// Check if modification is allowed (bit 4 of permissions).
     pub fn can_modify(&self) -> bool {
-        self.permissions.map_or(true, |p| p & 0x8 != 0)
+        self.permissions.is_none_or(|p| p & 0x8 != 0)
     }
 }
 
@@ -41,17 +41,14 @@ impl EncryptionInfo {
 pub fn detect_encryption(doc: &Document) -> EncryptionInfo {
     let trailer = &doc.trailer;
 
-    let encrypt_dict = trailer
-        .get(b"Encrypt")
-        .ok()
-        .and_then(|obj| match obj {
-            lopdf::Object::Dictionary(d) => Some(d.clone()),
-            lopdf::Object::Reference(id) => doc
-                .get_object(*id)
-                .ok()
-                .and_then(|o| o.as_dict().ok().cloned()),
-            _ => None,
-        });
+    let encrypt_dict = trailer.get(b"Encrypt").ok().and_then(|obj| match obj {
+        lopdf::Object::Dictionary(d) => Some(d.clone()),
+        lopdf::Object::Reference(id) => doc
+            .get_object(*id)
+            .ok()
+            .and_then(|o| o.as_dict().ok().cloned()),
+        _ => None,
+    });
 
     let Some(dict) = encrypt_dict else {
         return EncryptionInfo {
@@ -63,28 +60,34 @@ pub fn detect_encryption(doc: &Document) -> EncryptionInfo {
         };
     };
 
-    let version = dict
-        .get(b"V")
-        .ok()
-        .and_then(|o| if let lopdf::Object::Integer(i) = o { Some(*i) } else { None });
+    let version = dict.get(b"V").ok().and_then(|o| {
+        if let lopdf::Object::Integer(i) = o {
+            Some(*i)
+        } else {
+            None
+        }
+    });
 
-    let key_length = dict
-        .get(b"Length")
-        .ok()
-        .and_then(|o| if let lopdf::Object::Integer(i) = o { Some(*i) } else { None });
+    let key_length = dict.get(b"Length").ok().and_then(|o| {
+        if let lopdf::Object::Integer(i) = o {
+            Some(*i)
+        } else {
+            None
+        }
+    });
 
-    let filter = dict
-        .get(b"Filter")
-        .ok()
-        .and_then(|o| match o {
-            lopdf::Object::Name(n) => String::from_utf8(n.clone()).ok(),
-            _ => None,
-        });
+    let filter = dict.get(b"Filter").ok().and_then(|o| match o {
+        lopdf::Object::Name(n) => String::from_utf8(n.clone()).ok(),
+        _ => None,
+    });
 
-    let permissions = dict
-        .get(b"P")
-        .ok()
-        .and_then(|o| if let lopdf::Object::Integer(i) = o { Some(*i) } else { None });
+    let permissions = dict.get(b"P").ok().and_then(|o| {
+        if let lopdf::Object::Integer(i) = o {
+            Some(*i)
+        } else {
+            None
+        }
+    });
 
     EncryptionInfo {
         is_encrypted: true,

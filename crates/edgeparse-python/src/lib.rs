@@ -92,14 +92,16 @@ fn convert(
     let content = match output_format {
         OutputFormat::Json => output::legacy_json::to_legacy_json_string(&doc, stem)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
-        OutputFormat::Html => output::html::to_html(&doc)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
-        OutputFormat::Text => output::text::to_text(&doc)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
-        OutputFormat::Markdown | OutputFormat::MarkdownWithHtml | OutputFormat::MarkdownWithImages => {
-            output::markdown::to_markdown(&doc)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?
+        OutputFormat::Html => {
+            output::html::to_html(&doc).map_err(|e| PyRuntimeError::new_err(e.to_string()))?
         }
+        OutputFormat::Text => {
+            output::text::to_text(&doc).map_err(|e| PyRuntimeError::new_err(e.to_string()))?
+        }
+        OutputFormat::Markdown
+        | OutputFormat::MarkdownWithHtml
+        | OutputFormat::MarkdownWithImages => output::markdown::to_markdown(&doc)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
         OutputFormat::Pdf => {
             return Err(PyRuntimeError::new_err("PDF output not yet implemented"));
         }
@@ -136,13 +138,7 @@ fn convert_file(
     password: Option<&str>,
 ) -> PyResult<String> {
     let content = convert(
-        input_path,
-        format,
-        pages,
-        password,
-        "xycut",
-        "default",
-        "off",
+        input_path, format, pages, password, "xycut", "default", "off",
     )?;
 
     let out_dir = Path::new(output_dir);

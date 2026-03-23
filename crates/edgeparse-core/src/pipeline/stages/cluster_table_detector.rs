@@ -143,7 +143,7 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
     let row_candidates = group_chunks_into_row_candidates(&all_chunks);
 
     // Detect tables from chunk alignment first.
-    let mut tables = if row_candidates.len() >= 1 + MIN_DATA_ROWS_STRONG_LAYOUT {
+    let mut tables = if row_candidates.len() > MIN_DATA_ROWS_STRONG_LAYOUT {
         find_cluster_tables(&row_candidates)
     } else {
         Vec::new()
@@ -157,12 +157,18 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
         .iter()
         .flat_map(|ct| ct.consumed_block_indices.iter().copied())
         .collect();
-    tables.extend(find_parallel_flow_key_value_tables(&elements, &occupied_indices));
+    tables.extend(find_parallel_flow_key_value_tables(
+        &elements,
+        &occupied_indices,
+    ));
     let occupied_indices: HashSet<usize> = tables
         .iter()
         .flat_map(|ct| ct.consumed_block_indices.iter().copied())
         .collect();
-    tables.extend(find_caption_compact_two_column_tables(&elements, &occupied_indices));
+    tables.extend(find_caption_compact_two_column_tables(
+        &elements,
+        &occupied_indices,
+    ));
 
     if tables.is_empty() {
         return elements;
@@ -170,10 +176,22 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
 
     // Page-coverage guard: reject cluster tables that cover too much of the page.
     // Compute page extents from all elements on this page.
-    let page_min_x = elements.iter().map(|e| e.bbox().left_x).fold(f64::MAX, f64::min);
-    let page_max_x = elements.iter().map(|e| e.bbox().right_x).fold(f64::MIN, f64::max);
-    let page_min_y = elements.iter().map(|e| e.bbox().bottom_y).fold(f64::MAX, f64::min);
-    let page_max_y = elements.iter().map(|e| e.bbox().top_y).fold(f64::MIN, f64::max);
+    let page_min_x = elements
+        .iter()
+        .map(|e| e.bbox().left_x)
+        .fold(f64::MAX, f64::min);
+    let page_max_x = elements
+        .iter()
+        .map(|e| e.bbox().right_x)
+        .fold(f64::MIN, f64::max);
+    let page_min_y = elements
+        .iter()
+        .map(|e| e.bbox().bottom_y)
+        .fold(f64::MAX, f64::min);
+    let page_max_y = elements
+        .iter()
+        .map(|e| e.bbox().top_y)
+        .fold(f64::MIN, f64::max);
     let page_area = (page_max_x - page_min_x).max(1.0) * (page_max_y - page_min_y).max(1.0);
 
     let tables: Vec<ClusterTable> = tables
@@ -473,13 +491,7 @@ fn find_flow_key_value_tables(
         }
 
         let mut rows = vec![first_row];
-        let mut j = rows[0]
-            .consumed_indices
-            .iter()
-            .copied()
-            .max()
-            .unwrap_or(i)
-            + 1;
+        let mut j = rows[0].consumed_indices.iter().copied().max().unwrap_or(i) + 1;
 
         while j < elements.len() {
             if occupied_indices.contains(&j) {
@@ -644,7 +656,9 @@ fn find_caption_compact_two_column_tables(
             continue;
         }
 
-        let Some(table) = build_caption_compact_two_column_table(elements, caption_idx, occupied_indices) else {
+        let Some(table) =
+            build_caption_compact_two_column_table(elements, caption_idx, occupied_indices)
+        else {
             continue;
         };
         tables.push(table);
@@ -661,11 +675,10 @@ fn build_caption_compact_two_column_table(
     let caption_bbox = elements.get(caption_idx)?.bbox();
     let mut candidates = Vec::new();
 
-    for idx in (caption_idx + 1)..elements.len() {
+    for (idx, elem) in elements.iter().enumerate().skip(caption_idx + 1) {
         if occupied_indices.contains(&idx) {
             break;
         }
-        let elem = &elements[idx];
         let bbox = elem.bbox();
         if caption_bbox.bottom_y - bbox.top_y > 160.0 {
             break;
@@ -683,54 +696,63 @@ fn build_caption_compact_two_column_table(
         return None;
     }
 
-    let (header_left_idx, header_left_text, header_left_bbox, header_right_idx, header_right_text, header_right_bbox, mut data_start) =
-        if let Some((left, right)) = split_compact_header_row(&candidates[0].1, candidates[0].2.width()) {
-            (
-                candidates[0].0,
-                left.to_string(),
-                BoundingBox::new(
-                    candidates[0].2.page_number,
-                    candidates[0].2.left_x,
-                    candidates[0].2.bottom_y,
-                    candidates[0].2.left_x + candidates[0].2.width() * 0.28,
-                    candidates[0].2.top_y,
-                ),
-                candidates[0].0,
-                right.to_string(),
-                BoundingBox::new(
-                    candidates[0].2.page_number,
-                    candidates[0].2.left_x + candidates[0].2.width() * 0.30,
-                    candidates[0].2.bottom_y,
-                    candidates[0].2.right_x,
-                    candidates[0].2.top_y,
-                ),
-                1usize,
-            )
-        } else {
-            if candidates.len() < 3 {
-                return None;
-            }
-            let (header_left_idx, header_left_text, header_left_bbox) = &candidates[0];
-            let (header_right_idx, header_right_text, header_right_bbox) = &candidates[1];
-            if !is_compact_header_text(header_left_text) || !is_compact_header_text(header_right_text) {
-                return None;
-            }
-            if (header_left_bbox.bottom_y - header_right_bbox.bottom_y).abs() > 12.0 {
-                return None;
-            }
-            if header_right_bbox.left_x <= header_left_bbox.right_x + 8.0 {
-                return None;
-            }
-            (
-                *header_left_idx,
-                header_left_text.clone(),
-                header_left_bbox.clone(),
-                *header_right_idx,
-                header_right_text.clone(),
-                header_right_bbox.clone(),
-                2usize,
-            )
-        };
+    let (
+        header_left_idx,
+        header_left_text,
+        header_left_bbox,
+        header_right_idx,
+        header_right_text,
+        header_right_bbox,
+        mut data_start,
+    ) = if let Some((left, right)) =
+        split_compact_header_row(&candidates[0].1, candidates[0].2.width())
+    {
+        (
+            candidates[0].0,
+            left.to_string(),
+            BoundingBox::new(
+                candidates[0].2.page_number,
+                candidates[0].2.left_x,
+                candidates[0].2.bottom_y,
+                candidates[0].2.left_x + candidates[0].2.width() * 0.28,
+                candidates[0].2.top_y,
+            ),
+            candidates[0].0,
+            right.to_string(),
+            BoundingBox::new(
+                candidates[0].2.page_number,
+                candidates[0].2.left_x + candidates[0].2.width() * 0.30,
+                candidates[0].2.bottom_y,
+                candidates[0].2.right_x,
+                candidates[0].2.top_y,
+            ),
+            1usize,
+        )
+    } else {
+        if candidates.len() < 3 {
+            return None;
+        }
+        let (header_left_idx, header_left_text, header_left_bbox) = &candidates[0];
+        let (header_right_idx, header_right_text, header_right_bbox) = &candidates[1];
+        if !is_compact_header_text(header_left_text) || !is_compact_header_text(header_right_text) {
+            return None;
+        }
+        if (header_left_bbox.bottom_y - header_right_bbox.bottom_y).abs() > 12.0 {
+            return None;
+        }
+        if header_right_bbox.left_x <= header_left_bbox.right_x + 8.0 {
+            return None;
+        }
+        (
+            *header_left_idx,
+            header_left_text.clone(),
+            header_left_bbox.clone(),
+            *header_right_idx,
+            header_right_text.clone(),
+            header_right_bbox.clone(),
+            2usize,
+        )
+    };
 
     let mut unit_text = None;
     if let Some((_, text, bbox)) = candidates.get(data_start) {
@@ -762,7 +784,9 @@ fn build_caption_compact_two_column_table(
         return None;
     }
 
-    let page_number = header_left_bbox.page_number.or(header_right_bbox.page_number);
+    let page_number = header_left_bbox
+        .page_number
+        .or(header_right_bbox.page_number);
     let col_split = (header_left_bbox.right_x + header_right_bbox.left_x) / 2.0;
     let left_x = header_left_bbox.left_x.min(data_bbox.left_x);
     let right_x = header_right_bbox.right_x.max(data_bbox.right_x);
@@ -782,11 +806,15 @@ fn build_caption_compact_two_column_table(
     for (ri, (left_text, right_text)) in rows.iter().enumerate() {
         let row_top = y_coords[ri];
         let row_bottom = y_coords[ri + 1];
-        let left_bbox = BoundingBox::new(page_number, x_coords[0], row_bottom, x_coords[1], row_top);
-        let right_bbox = BoundingBox::new(page_number, x_coords[1], row_bottom, x_coords[2], row_top);
-        let left_tokens = (!left_text.trim().is_empty())
-            .then(|| vec![make_text_token(left_text, &left_bbox)])
-            .unwrap_or_default();
+        let left_bbox =
+            BoundingBox::new(page_number, x_coords[0], row_bottom, x_coords[1], row_top);
+        let right_bbox =
+            BoundingBox::new(page_number, x_coords[1], row_bottom, x_coords[2], row_top);
+        let left_tokens = if !left_text.trim().is_empty() {
+            vec![make_text_token(left_text, &left_bbox)]
+        } else {
+            Vec::new()
+        };
         let left_contents = left_tokens
             .iter()
             .map(|token| ContentElement::TextChunk(token.base.clone()))
@@ -909,7 +937,8 @@ fn make_flow_row_candidate(
         let next = &elements[next_idx];
         let next_bbox = next.bbox();
         let vertical_gap = left_bbox.bottom_y - next_bbox.top_y;
-        let overlap = left_bbox.top_y.min(next_bbox.top_y) - left_bbox.bottom_y.max(next_bbox.bottom_y);
+        let overlap =
+            left_bbox.top_y.min(next_bbox.top_y) - left_bbox.bottom_y.max(next_bbox.bottom_y);
         let is_rightish = next_bbox.left_x >= left_bbox.right_x + 20.0;
         let is_near = overlap >= -12.0 || vertical_gap.abs() <= 28.0;
         if is_rightish && is_near {
@@ -918,7 +947,8 @@ fn make_flow_row_candidate(
                     text,
                     bbox: next_bbox.clone(),
                 };
-                let score = vertical_gap.abs() + (next_bbox.left_x - left_bbox.right_x).abs() * 0.05;
+                let score =
+                    vertical_gap.abs() + (next_bbox.left_x - left_bbox.right_x).abs() * 0.05;
                 match &best_right {
                     Some((best_score, _, _)) if *best_score <= score => {}
                     _ => best_right = Some((score, next_idx, candidate)),
@@ -968,12 +998,11 @@ fn collect_indented_flow_value(
     let mut anchor_left = None::<f64>;
     let mut prev_bottom = label_bbox.bottom_y;
 
-    for next_idx in (idx + 1)..elements.len().min(idx + 8) {
+    for (next_idx, next) in elements.iter().enumerate().skip(idx + 1).take(7) {
         if occupied_indices.contains(&next_idx) {
             break;
         }
 
-        let next = &elements[next_idx];
         let next_bbox = next.bbox();
         let Some(text) = element_text(next) else {
             if !texts.is_empty() {
@@ -987,7 +1016,7 @@ fn collect_indented_flow_value(
         }
 
         let vertical_gap = prev_bottom - next_bbox.top_y;
-        if vertical_gap > 120.0 || vertical_gap < -18.0 {
+        if !(-18.0..=120.0).contains(&vertical_gap) {
             if !texts.is_empty() {
                 break;
             }
@@ -1051,8 +1080,14 @@ fn build_flow_key_value_table(rows: &[FlowRow]) -> Option<ClusterTable> {
 
     let left_xs: Vec<f64> = rows.iter().map(|r| r.left.bbox.left_x).collect();
     let left_rights: Vec<f64> = rows.iter().map(|r| r.left.bbox.right_x).collect();
-    let right_lefts: Vec<f64> = rows.iter().filter_map(|r| r.right.as_ref().map(|c| c.bbox.left_x)).collect();
-    let right_rights: Vec<f64> = rows.iter().filter_map(|r| r.right.as_ref().map(|c| c.bbox.right_x)).collect();
+    let right_lefts: Vec<f64> = rows
+        .iter()
+        .filter_map(|r| r.right.as_ref().map(|c| c.bbox.left_x))
+        .collect();
+    let right_rights: Vec<f64> = rows
+        .iter()
+        .filter_map(|r| r.right.as_ref().map(|c| c.bbox.right_x))
+        .collect();
 
     if right_lefts.len() < 3 {
         return None;
@@ -1067,41 +1102,79 @@ fn build_flow_key_value_table(rows: &[FlowRow]) -> Option<ClusterTable> {
         return None;
     }
 
-    if rows.iter().filter(|row| (row.left.bbox.left_x - left_anchor).abs() <= 24.0).count() * 10 < rows.len() * 7 {
+    if rows
+        .iter()
+        .filter(|row| (row.left.bbox.left_x - left_anchor).abs() <= 24.0)
+        .count()
+        * 10
+        < rows.len() * 7
+    {
         return None;
     }
-    if rows.iter().filter(|row| {
-        row.right
-            .as_ref()
-            .is_none_or(|cell| (cell.bbox.left_x - right_anchor).abs() <= 40.0)
-    }).count() * 10 < rows.len() * 7 {
+    if rows
+        .iter()
+        .filter(|row| {
+            row.right
+                .as_ref()
+                .is_none_or(|cell| (cell.bbox.left_x - right_anchor).abs() <= 40.0)
+        })
+        .count()
+        * 10
+        < rows.len() * 7
+    {
         return None;
     }
 
-    let min_y = rows.iter().map(|r| r.left.bbox.bottom_y.min(r.right.as_ref().map_or(r.left.bbox.bottom_y, |c| c.bbox.bottom_y))).fold(f64::MAX, f64::min);
-    let max_y = rows.iter().map(|r| r.left.bbox.top_y.max(r.right.as_ref().map_or(r.left.bbox.top_y, |c| c.bbox.top_y))).fold(f64::MIN, f64::max);
-    let page_number = rows
+    let min_y = rows
         .iter()
-        .find_map(|r| r.left.bbox.page_number.or(r.right.as_ref().and_then(|c| c.bbox.page_number)));
+        .map(|r| {
+            r.left.bbox.bottom_y.min(
+                r.right
+                    .as_ref()
+                    .map_or(r.left.bbox.bottom_y, |c| c.bbox.bottom_y),
+            )
+        })
+        .fold(f64::MAX, f64::min);
+    let max_y = rows
+        .iter()
+        .map(|r| {
+            r.left
+                .bbox
+                .top_y
+                .max(r.right.as_ref().map_or(r.left.bbox.top_y, |c| c.bbox.top_y))
+        })
+        .fold(f64::MIN, f64::max);
+    let page_number = rows.iter().find_map(|r| {
+        r.left
+            .bbox
+            .page_number
+            .or(r.right.as_ref().and_then(|c| c.bbox.page_number))
+    });
 
     let mut y_coords = Vec::with_capacity(rows.len() + 1);
     y_coords.push(max_y);
     for pair in rows.windows(2) {
-        let upper = pair[0]
-            .left
-            .bbox
-            .bottom_y
-            .min(pair[0].right.as_ref().map_or(pair[0].left.bbox.bottom_y, |c| c.bbox.bottom_y));
-        let lower = pair[1]
-            .left
-            .bbox
-            .top_y
-            .max(pair[1].right.as_ref().map_or(pair[1].left.bbox.top_y, |c| c.bbox.top_y));
+        let upper = pair[0].left.bbox.bottom_y.min(
+            pair[0]
+                .right
+                .as_ref()
+                .map_or(pair[0].left.bbox.bottom_y, |c| c.bbox.bottom_y),
+        );
+        let lower = pair[1].left.bbox.top_y.max(
+            pair[1]
+                .right
+                .as_ref()
+                .map_or(pair[1].left.bbox.top_y, |c| c.bbox.top_y),
+        );
         y_coords.push((upper + lower) / 2.0);
     }
     y_coords.push(min_y);
 
-    let x_coords = vec![left_anchor, (left_boundary + right_anchor) / 2.0, right_boundary];
+    let x_coords = vec![
+        left_anchor,
+        (left_boundary + right_anchor) / 2.0,
+        right_boundary,
+    ];
     let mut border_rows = Vec::with_capacity(rows.len());
     for (ri, row) in rows.iter().enumerate() {
         let row_top = y_coords[ri];
@@ -1204,16 +1277,14 @@ fn is_flow_label_text(text: &str) -> bool {
         return false;
     }
 
-    words
-        .iter()
-        .all(|word| {
-            let lower = word.to_ascii_lowercase();
-            matches!(lower.as_str(), "and" | "of" | "to" | "in" | "&")
-                || word
-                    .chars()
-                    .next()
-                    .is_some_and(|c| c.is_uppercase() || c.is_ascii_digit() || c == '#')
-        })
+    words.iter().all(|word| {
+        let lower = word.to_ascii_lowercase();
+        matches!(lower.as_str(), "and" | "of" | "to" | "in" | "&")
+            || word
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_uppercase() || c.is_ascii_digit() || c == '#')
+    })
 }
 
 fn split_merged_key_value_text(text: &str, width: f64) -> Option<(&str, &str)> {
@@ -1273,7 +1344,10 @@ fn is_compact_header_text(text: &str) -> bool {
         .find(|c| c.is_alphanumeric())
         .is_some_and(|c| c.is_uppercase() || c.is_ascii_digit());
 
-    starts_like_header && numeric_words <= 2 && trimmed.chars().count() <= 64 && !trimmed.contains(':')
+    starts_like_header
+        && numeric_words <= 2
+        && trimmed.chars().count() <= 64
+        && !trimmed.contains(':')
 }
 
 fn split_compact_header_row(text: &str, width: f64) -> Option<(&str, &str)> {
@@ -1316,8 +1390,7 @@ fn split_compact_header_row(text: &str, width: f64) -> Option<(&str, &str)> {
 fn looks_like_sentence_start(word: &str) -> bool {
     matches!(
         word,
-        "To"
-            | "Provides"
+        "To" | "Provides"
             | "Provide"
             | "Relative"
             | "Select"
@@ -1367,7 +1440,11 @@ fn split_label_only_series(text: &str) -> Option<Vec<String>> {
     let labels: Vec<String> = text
         .split_whitespace()
         .filter(|token| !token.is_empty())
-        .map(|token| token.trim_matches(|c: char| c == ',' || c == ';').to_string())
+        .map(|token| {
+            token
+                .trim_matches(|c: char| c == ',' || c == ';')
+                .to_string()
+        })
         .collect();
 
     if labels.len() < 3 || labels.len() > 12 {
@@ -1407,7 +1484,8 @@ fn element_text(elem: &ContentElement) -> Option<String> {
 }
 
 fn list_item_text(item: &crate::models::list::ListItem) -> String {
-    let from_body = item.body
+    let from_body = item
+        .body
         .content
         .iter()
         .flat_map(|row| row.iter())
@@ -1508,7 +1586,10 @@ fn looks_like_key_value_row(segments: &[CellSegment]) -> bool {
         return false;
     }
 
-    left_text.chars().next().is_some_and(|c| c.is_uppercase() || c.is_ascii_digit())
+    left_text
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_uppercase() || c.is_ascii_digit())
 }
 
 /// Main table-finding loop.
@@ -1608,7 +1689,10 @@ fn find_cluster_tables(row_candidates: &[RowCandidate]) -> Vec<ClusterTable> {
             // Post-validation 1: total word count.  Real tables are concise;
             // two-column body text that slips past the per-cell filter has
             // many more words in aggregate.
-            let total_words: usize = ct.table_border.rows.iter()
+            let total_words: usize = ct
+                .table_border
+                .rows
+                .iter()
                 .flat_map(|r| r.cells.iter())
                 .flat_map(|c| c.content.iter())
                 .map(|tok| tok.base.value.split_whitespace().count())
@@ -1625,7 +1709,10 @@ fn find_cluster_tables(row_candidates: &[RowCandidate]) -> Vec<ClusterTable> {
             if ct.table_border.num_columns < MIN_COLUMNS_PROSE_GUARD
                 && !is_key_value_table(&ct.table_border)
             {
-                let cell_texts: Vec<&str> = ct.table_border.rows.iter()
+                let cell_texts: Vec<&str> = ct
+                    .table_border
+                    .rows
+                    .iter()
                     .flat_map(|r| r.cells.iter())
                     .flat_map(|c| c.content.iter())
                     .map(|tok| tok.base.value.as_str())
@@ -1650,7 +1737,11 @@ fn find_cluster_tables(row_candidates: &[RowCandidate]) -> Vec<ClusterTable> {
     tables
 }
 
-fn collect_line_chunks(all_chunks: &mut Vec<ChunkRef>, line: &crate::models::text::TextLine, block_index: usize) {
+fn collect_line_chunks(
+    all_chunks: &mut Vec<ChunkRef>,
+    line: &crate::models::text::TextLine,
+    block_index: usize,
+) {
     let line_baseline = line.base_line;
     let line_font_size = line.font_size.max(1.0);
     for chunk in &line.text_chunks {
@@ -1748,7 +1839,9 @@ fn is_key_value_cell_pair(left: &str, right: &str) -> bool {
         return false;
     }
 
-    left.chars().next().is_some_and(|c| c.is_uppercase() || c.is_ascii_digit())
+    left.chars()
+        .next()
+        .is_some_and(|c| c.is_uppercase() || c.is_ascii_digit())
 }
 
 /// Count how many data-row segments align to any header column bound.
@@ -1790,7 +1883,11 @@ fn is_wrapped_wide_continuation_row(
         None => return false,
     };
     let tol = COL_ALIGN_TOLERANCE * row.font_size.max(1.0);
-    if row.segments.iter().any(|seg| segment_matches_column(seg, first_col, tol)) {
+    if row
+        .segments
+        .iter()
+        .any(|seg| segment_matches_column(seg, first_col, tol))
+    {
         return false;
     }
 
@@ -2022,7 +2119,14 @@ mod tests {
     use crate::models::text::{TextBlock, TextLine};
 
     /// Create a TextChunk at given x-range and baseline.
-    fn make_chunk(page: u32, left: f64, right: f64, baseline: f64, fs: f64, text: &str) -> TextChunk {
+    fn make_chunk(
+        page: u32,
+        left: f64,
+        right: f64,
+        baseline: f64,
+        fs: f64,
+        text: &str,
+    ) -> TextChunk {
         TextChunk {
             value: text.to_string(),
             bbox: BoundingBox::new(Some(page), left, baseline, right, baseline + fs),
@@ -2100,21 +2204,51 @@ mod tests {
         // Gap between col 1 right (200) and col 2 left (350) = 150pt / fs=10 = 15.0 → split.
         let page = 1u32;
         let fs = 10.0;
-        let cols: &[(f64, f64, &str)] = &[(50.0, 70.0, "H1"), (150.0, 200.0, "H2"), (350.0, 400.0, "H3")];
+        let cols: &[(f64, f64, &str)] = &[
+            (50.0, 70.0, "H1"),
+            (150.0, 200.0, "H2"),
+            (350.0, 400.0, "H3"),
+        ];
 
         // Header row at baseline 300.
         let header_line = make_line(page, 300.0, fs, cols);
         // Data row 1 at baseline 288.
-        let data1 = make_line(page, 288.0, fs, &[(52.0, 68.0, "A1"), (152.0, 198.0, "A2"), (352.0, 398.0, "A3")]);
+        let data1 = make_line(
+            page,
+            288.0,
+            fs,
+            &[
+                (52.0, 68.0, "A1"),
+                (152.0, 198.0, "A2"),
+                (352.0, 398.0, "A3"),
+            ],
+        );
         // Data row 2 at baseline 276.
-        let data2 = make_line(page, 276.0, fs, &[(51.0, 69.0, "B1"), (151.0, 199.0, "B2"), (351.0, 399.0, "B3")]);
+        let data2 = make_line(
+            page,
+            276.0,
+            fs,
+            &[
+                (51.0, 69.0, "B1"),
+                (151.0, 199.0, "B2"),
+                (351.0, 399.0, "B3"),
+            ],
+        );
 
         let elements = vec![
-            make_context_block(page, 340.0, "Context above the table to simulate a real page width"),
+            make_context_block(
+                page,
+                340.0,
+                "Context above the table to simulate a real page width",
+            ),
             make_block_with_line(header_line),
             make_block_with_line(data1),
             make_block_with_line(data2),
-            make_context_block(page, 240.0, "Context below the table to simulate a real page width"),
+            make_context_block(
+                page,
+                240.0,
+                "Context below the table to simulate a real page width",
+            ),
         ];
 
         let result = detect_cluster_tables(elements);
@@ -2147,18 +2281,29 @@ mod tests {
         let line3 = make_line(page, 276.0, fs, &[(50.0, 300.0, "Text C")]);
 
         let elements = vec![
-            make_context_block(page, 340.0, "Context above the table to simulate a real page width"),
+            make_context_block(
+                page,
+                340.0,
+                "Context above the table to simulate a real page width",
+            ),
             make_block_with_line(line1),
             make_block_with_line(line2),
             make_block_with_line(line3),
-            make_context_block(page, 240.0, "Context below the table to simulate a real page width"),
+            make_context_block(
+                page,
+                240.0,
+                "Context below the table to simulate a real page width",
+            ),
         ];
         let result = detect_cluster_tables(elements);
         let table_count = result
             .iter()
             .filter(|e| matches!(e, ContentElement::TableBorder(_)))
             .count();
-        assert_eq!(table_count, 0, "Single-column lines should not form a table");
+        assert_eq!(
+            table_count, 0,
+            "Single-column lines should not form a table"
+        );
     }
 
     #[test]
@@ -2183,9 +2328,25 @@ mod tests {
         let d22 = make_block_with_line(make_line(page, 276.0, fs, &[(350.0, 400.0, "B3")]));
 
         let elements = vec![
-            make_context_block(page, 340.0, "Context above the table to simulate a real page width"),
-            h0, h1, h2, d10, d11, d12, d20, d21, d22,
-            make_context_block(page, 240.0, "Context below the table to simulate a real page width"),
+            make_context_block(
+                page,
+                340.0,
+                "Context above the table to simulate a real page width",
+            ),
+            h0,
+            h1,
+            h2,
+            d10,
+            d11,
+            d12,
+            d20,
+            d21,
+            d22,
+            make_context_block(
+                page,
+                240.0,
+                "Context below the table to simulate a real page width",
+            ),
         ];
         let result = detect_cluster_tables(elements);
 
@@ -2193,7 +2354,10 @@ mod tests {
             .iter()
             .filter(|e| matches!(e, ContentElement::TableBorder(_)))
             .count();
-        assert_eq!(table_count, 1, "Expected 1 table from narrow separate blocks");
+        assert_eq!(
+            table_count, 1,
+            "Expected 1 table from narrow separate blocks"
+        );
 
         if let Some(ContentElement::TableBorder(tb)) = result
             .iter()
@@ -2229,16 +2393,32 @@ mod tests {
             &[
                 (50.0, 95.0, "1. Project"),
                 (150.0, 225.0, "Creation"),
-                (280.0, 430.0, "Select document type and configure deployment"),
-                (470.0, 610.0, "The UI improves workflow efficiency for operators"),
+                (
+                    280.0,
+                    430.0,
+                    "Select document type and configure deployment",
+                ),
+                (
+                    470.0,
+                    610.0,
+                    "The UI improves workflow efficiency for operators",
+                ),
             ],
         );
 
         let result = detect_cluster_tables(vec![
-            make_context_block(page, 340.0, "Context above the table to simulate a real page width"),
+            make_context_block(
+                page,
+                340.0,
+                "Context above the table to simulate a real page width",
+            ),
             make_block_with_line(header),
             make_block_with_line(row),
-            make_context_block(page, 240.0, "Context below the table to simulate a real page width"),
+            make_context_block(
+                page,
+                240.0,
+                "Context below the table to simulate a real page width",
+            ),
         ]);
 
         let table_count = result
@@ -2271,23 +2451,42 @@ mod tests {
             &[
                 (50.0, 95.0, "1. Project"),
                 (150.0, 225.0, "Creation"),
-                (280.0, 430.0, "Select document type and configure deployment"),
-                (470.0, 610.0, "The UI improves workflow efficiency for operators"),
+                (
+                    280.0,
+                    430.0,
+                    "Select document type and configure deployment",
+                ),
+                (
+                    470.0,
+                    610.0,
+                    "The UI improves workflow efficiency for operators",
+                ),
             ],
         );
 
         let result = detect_cluster_tables(vec![
-            make_context_block(page, 340.0, "Context above the table to simulate a real page width"),
+            make_context_block(
+                page,
+                340.0,
+                "Context above the table to simulate a real page width",
+            ),
             ContentElement::TextLine(header),
             ContentElement::TextLine(row),
-            make_context_block(page, 240.0, "Context below the table to simulate a real page width"),
+            make_context_block(
+                page,
+                240.0,
+                "Context below the table to simulate a real page width",
+            ),
         ]);
 
         let table_count = result
             .iter()
             .filter(|e| matches!(e, ContentElement::TableBorder(_)))
             .count();
-        assert_eq!(table_count, 1, "Expected wide 4-column table from standalone text lines");
+        assert_eq!(
+            table_count, 1,
+            "Expected wide 4-column table from standalone text lines"
+        );
     }
 
     #[test]
@@ -2296,7 +2495,11 @@ mod tests {
         let fs = 10.0;
 
         let result = detect_cluster_tables(vec![
-            make_context_block(page, 360.0, "Context above the table to simulate a real page width"),
+            make_context_block(
+                page,
+                360.0,
+                "Context above the table to simulate a real page width",
+            ),
             make_block_with_line(make_line(
                 page,
                 320.0,
@@ -2358,7 +2561,11 @@ mod tests {
                     (470.0, 610.0, "with clear project-level indicators"),
                 ],
             )),
-            make_context_block(page, 220.0, "Context below the table to simulate a real page width"),
+            make_context_block(
+                page,
+                220.0,
+                "Context below the table to simulate a real page width",
+            ),
         ]);
 
         let table_count = result
@@ -2388,7 +2595,11 @@ mod tests {
             fs,
             &[
                 (50.0, 135.0, "Competence Statement"),
-                (190.0, 520.0, "To know the basics of the 3 Rs and their implementation"),
+                (
+                    190.0,
+                    520.0,
+                    "To know the basics of the 3 Rs and their implementation",
+                ),
             ],
         );
         let row3 = make_line(
@@ -2397,16 +2608,28 @@ mod tests {
             fs,
             &[
                 (50.0, 95.0, "Knowledge"),
-                (190.0, 520.0, "Understand reducing reusing recycling and waste management"),
+                (
+                    190.0,
+                    520.0,
+                    "Understand reducing reusing recycling and waste management",
+                ),
             ],
         );
 
         let result = detect_cluster_tables(vec![
-            make_context_block(page, 340.0, "Context above the table to simulate a real page width"),
+            make_context_block(
+                page,
+                340.0,
+                "Context above the table to simulate a real page width",
+            ),
             make_block_with_line(row1),
             make_block_with_line(row2),
             make_block_with_line(row3),
-            make_context_block(page, 240.0, "Context below the table to simulate a real page width"),
+            make_context_block(
+                page,
+                240.0,
+                "Context below the table to simulate a real page width",
+            ),
         ]);
 
         let table_count = result
@@ -2422,19 +2645,87 @@ mod tests {
         let fs = 10.0;
 
         let elements = vec![
-            make_context_block(page, 340.0, "Context above the table to simulate a real page width"),
-            make_block_with_line(make_line(page, 310.0, fs, &[(50.0, 125.0, "Competence Area")])),
+            make_context_block(
+                page,
+                340.0,
+                "Context above the table to simulate a real page width",
+            ),
+            make_block_with_line(make_line(
+                page,
+                310.0,
+                fs,
+                &[(50.0, 125.0, "Competence Area")],
+            )),
             make_block_with_line(make_line(page, 310.0, fs, &[(210.0, 370.0, "#1 THE 3 RS")])),
-            make_block_with_line(make_line(page, 292.0, fs, &[(50.0, 150.0, "Competence Statement")])),
-            make_block_with_line(make_line(page, 292.0, fs, &[(210.0, 520.0, "To know the basics of the 3 Rs and their implementation")])),
+            make_block_with_line(make_line(
+                page,
+                292.0,
+                fs,
+                &[(50.0, 150.0, "Competence Statement")],
+            )),
+            make_block_with_line(make_line(
+                page,
+                292.0,
+                fs,
+                &[(
+                    210.0,
+                    520.0,
+                    "To know the basics of the 3 Rs and their implementation",
+                )],
+            )),
             make_block_with_line(make_line(page, 270.0, fs, &[(50.0, 95.0, "Knowledge")])),
-            make_block_with_line(make_line(page, 270.0, fs, &[(210.0, 520.0, "To understand the meaning of reducing reusing and recycling")])),
-            make_block_with_line(make_line(page, 258.0, fs, &[(210.0, 500.0, "To understand the importance of the 3 Rs as waste management")])),
+            make_block_with_line(make_line(
+                page,
+                270.0,
+                fs,
+                &[(
+                    210.0,
+                    520.0,
+                    "To understand the meaning of reducing reusing and recycling",
+                )],
+            )),
+            make_block_with_line(make_line(
+                page,
+                258.0,
+                fs,
+                &[(
+                    210.0,
+                    500.0,
+                    "To understand the importance of the 3 Rs as waste management",
+                )],
+            )),
             make_block_with_line(make_line(page, 236.0, fs, &[(50.0, 82.0, "Skills")])),
-            make_block_with_line(make_line(page, 236.0, fs, &[(210.0, 500.0, "To implement different ways of waste management into daily life")])),
-            make_block_with_line(make_line(page, 214.0, fs, &[(50.0, 170.0, "Attitudes and Values")])),
-            make_block_with_line(make_line(page, 214.0, fs, &[(210.0, 510.0, "To educate others on the importance of sustainable waste management")])),
-            make_context_block(page, 180.0, "Context below the table to simulate a real page width"),
+            make_block_with_line(make_line(
+                page,
+                236.0,
+                fs,
+                &[(
+                    210.0,
+                    500.0,
+                    "To implement different ways of waste management into daily life",
+                )],
+            )),
+            make_block_with_line(make_line(
+                page,
+                214.0,
+                fs,
+                &[(50.0, 170.0, "Attitudes and Values")],
+            )),
+            make_block_with_line(make_line(
+                page,
+                214.0,
+                fs,
+                &[(
+                    210.0,
+                    510.0,
+                    "To educate others on the importance of sustainable waste management",
+                )],
+            )),
+            make_context_block(
+                page,
+                180.0,
+                "Context below the table to simulate a real page width",
+            ),
         ];
 
         let result = detect_cluster_tables(elements);
@@ -2460,19 +2751,87 @@ mod tests {
         let fs = 10.0;
 
         let elements = vec![
-            make_context_block(page, 340.0, "Context above the table to simulate a real page width"),
-            make_block_with_line(make_line(page, 310.0, fs, &[(50.0, 125.0, "Competence Area")])),
-            make_block_with_line(make_line(page, 292.0, fs, &[(50.0, 150.0, "Competence Statement")])),
+            make_context_block(
+                page,
+                340.0,
+                "Context above the table to simulate a real page width",
+            ),
+            make_block_with_line(make_line(
+                page,
+                310.0,
+                fs,
+                &[(50.0, 125.0, "Competence Area")],
+            )),
+            make_block_with_line(make_line(
+                page,
+                292.0,
+                fs,
+                &[(50.0, 150.0, "Competence Statement")],
+            )),
             make_block_with_line(make_line(page, 270.0, fs, &[(50.0, 95.0, "Knowledge")])),
             make_block_with_line(make_line(page, 236.0, fs, &[(50.0, 82.0, "Skills")])),
-            make_block_with_line(make_line(page, 214.0, fs, &[(50.0, 170.0, "Attitudes and Values")])),
+            make_block_with_line(make_line(
+                page,
+                214.0,
+                fs,
+                &[(50.0, 170.0, "Attitudes and Values")],
+            )),
             make_block_with_line(make_line(page, 310.0, fs, &[(210.0, 370.0, "#1 THE 3 RS")])),
-            make_block_with_line(make_line(page, 292.0, fs, &[(210.0, 520.0, "To know the basics of the 3 Rs and their implementation")])),
-            make_block_with_line(make_line(page, 270.0, fs, &[(210.0, 520.0, "To understand the meaning of reducing reusing and recycling")])),
-            make_block_with_line(make_line(page, 258.0, fs, &[(210.0, 500.0, "To understand the importance of the 3 Rs as waste management")])),
-            make_block_with_line(make_line(page, 236.0, fs, &[(210.0, 500.0, "To implement different ways of waste management into daily life")])),
-            make_block_with_line(make_line(page, 214.0, fs, &[(210.0, 510.0, "To educate others on the importance of sustainable waste management")])),
-            make_context_block(page, 180.0, "Context below the table to simulate a real page width"),
+            make_block_with_line(make_line(
+                page,
+                292.0,
+                fs,
+                &[(
+                    210.0,
+                    520.0,
+                    "To know the basics of the 3 Rs and their implementation",
+                )],
+            )),
+            make_block_with_line(make_line(
+                page,
+                270.0,
+                fs,
+                &[(
+                    210.0,
+                    520.0,
+                    "To understand the meaning of reducing reusing and recycling",
+                )],
+            )),
+            make_block_with_line(make_line(
+                page,
+                258.0,
+                fs,
+                &[(
+                    210.0,
+                    500.0,
+                    "To understand the importance of the 3 Rs as waste management",
+                )],
+            )),
+            make_block_with_line(make_line(
+                page,
+                236.0,
+                fs,
+                &[(
+                    210.0,
+                    500.0,
+                    "To implement different ways of waste management into daily life",
+                )],
+            )),
+            make_block_with_line(make_line(
+                page,
+                214.0,
+                fs,
+                &[(
+                    210.0,
+                    510.0,
+                    "To educate others on the importance of sustainable waste management",
+                )],
+            )),
+            make_context_block(
+                page,
+                180.0,
+                "Context below the table to simulate a real page width",
+            ),
         ];
 
         let result = detect_cluster_tables(elements);
@@ -2489,15 +2848,33 @@ mod tests {
         let fs = 10.0;
 
         let elements = vec![
-            make_context_block(page, 420.0, "Context above the table to simulate a real page width"),
+            make_context_block(
+                page,
+                420.0,
+                "Context above the table to simulate a real page width",
+            ),
             make_block_with_line(make_line(
                 page,
                 400.0,
                 fs,
-                &[(50.0, 360.0, "Table 13.4. Typical CEC of various soil colloids")],
+                &[(
+                    50.0,
+                    360.0,
+                    "Table 13.4. Typical CEC of various soil colloids",
+                )],
             )),
-            make_block_with_line(make_line(page, 380.0, fs, &[(60.0, 155.0, "Mineral or colloid type")])),
-            make_block_with_line(make_line(page, 380.0, fs, &[(170.0, 245.0, "CEC of pure colloid")])),
+            make_block_with_line(make_line(
+                page,
+                380.0,
+                fs,
+                &[(60.0, 155.0, "Mineral or colloid type")],
+            )),
+            make_block_with_line(make_line(
+                page,
+                380.0,
+                fs,
+                &[(170.0, 245.0, "CEC of pure colloid")],
+            )),
             make_block_with_line(make_line(page, 364.0, fs, &[(170.0, 210.0, "cmolc/kg")])),
             make_block_with_line(make_line(
                 page,
@@ -2509,7 +2886,11 @@ mod tests {
                     "kaolinite 10 illite 30 montmorillonite/smectite 100 vermiculite 150 humus 200",
                 )],
             )),
-            make_context_block(page, 300.0, "Context below the table to simulate a real page width"),
+            make_context_block(
+                page,
+                300.0,
+                "Context below the table to simulate a real page width",
+            ),
         ];
 
         let result = detect_cluster_tables(elements);
@@ -2532,21 +2913,42 @@ mod tests {
         let fs = 10.0;
 
         let elements = vec![
-            make_context_block(page, 700.0, "Context above the table to simulate a real page width"),
+            make_context_block(
+                page,
+                700.0,
+                "Context above the table to simulate a real page width",
+            ),
             make_block_with_line(make_line(
                 page,
                 680.0,
                 fs,
-                &[(50.0, 420.0, "Table 13.2. Effect of cations on flocculation of a clay suspension")],
+                &[(
+                    50.0,
+                    420.0,
+                    "Table 13.2. Effect of cations on flocculation of a clay suspension",
+                )],
             )),
             make_block_with_line(make_line(
                 page,
                 648.0,
                 fs,
-                &[(60.0, 285.0, "Added cation Relative Size & Settling Rates of Floccules")],
+                &[(
+                    60.0,
+                    285.0,
+                    "Added cation Relative Size & Settling Rates of Floccules",
+                )],
             )),
-            make_block_with_line(make_line(page, 632.0, fs, &[(60.0, 90.0, "K+ Na+ Ca2+ Al3+ Check")])),
-            make_context_block(page, 580.0, "Context below the table to simulate a real page width"),
+            make_block_with_line(make_line(
+                page,
+                632.0,
+                fs,
+                &[(60.0, 90.0, "K+ Na+ Ca2+ Al3+ Check")],
+            )),
+            make_context_block(
+                page,
+                580.0,
+                "Context below the table to simulate a real page width",
+            ),
         ];
 
         let result = detect_cluster_tables(elements);
@@ -2573,8 +2975,16 @@ mod tests {
             300.0,
             fs,
             &[
-                (50.0, 220.0, "This paragraph explains the experimental setup"),
-                (300.0, 520.0, "This paragraph continues the discussion in a second column"),
+                (
+                    50.0,
+                    220.0,
+                    "This paragraph explains the experimental setup",
+                ),
+                (
+                    300.0,
+                    520.0,
+                    "This paragraph continues the discussion in a second column",
+                ),
             ],
         );
         let row2 = make_line(
@@ -2582,8 +2992,16 @@ mod tests {
             286.0,
             fs,
             &[
-                (50.0, 225.0, "Another paragraph with several prose words in the left column"),
-                (300.0, 520.0, "Another prose paragraph on the right that should stay text"),
+                (
+                    50.0,
+                    225.0,
+                    "Another paragraph with several prose words in the left column",
+                ),
+                (
+                    300.0,
+                    520.0,
+                    "Another prose paragraph on the right that should stay text",
+                ),
             ],
         );
         let row3 = make_line(
@@ -2591,17 +3009,33 @@ mod tests {
             272.0,
             fs,
             &[
-                (50.0, 220.0, "Further discussion continues in narrative form"),
-                (300.0, 520.0, "The layout resembles two-column prose rather than a table"),
+                (
+                    50.0,
+                    220.0,
+                    "Further discussion continues in narrative form",
+                ),
+                (
+                    300.0,
+                    520.0,
+                    "The layout resembles two-column prose rather than a table",
+                ),
             ],
         );
 
         let result = detect_cluster_tables(vec![
-            make_context_block(page, 340.0, "Context above the table to simulate a real page width"),
+            make_context_block(
+                page,
+                340.0,
+                "Context above the table to simulate a real page width",
+            ),
             make_block_with_line(row1),
             make_block_with_line(row2),
             make_block_with_line(row3),
-            make_context_block(page, 240.0, "Context below the table to simulate a real page width"),
+            make_context_block(
+                page,
+                240.0,
+                "Context below the table to simulate a real page width",
+            ),
         ]);
 
         let table_count = result
@@ -2630,8 +3064,8 @@ mod tests {
         use crate::pipeline::stages::text_block_grouper;
         use crate::pipeline::stages::text_line_grouper;
 
-        let pdf_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000200.pdf");
+        let pdf_path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000200.pdf");
         let config = ProcessingConfig::default();
         let raw_doc = load_pdf(&pdf_path, None).unwrap();
         let page_info_list = page_info::extract_page_info(&raw_doc.document);
@@ -2642,9 +3076,24 @@ mod tests {
             .into_iter()
             .map(ContentElement::TextChunk)
             .collect();
-        elements.extend(page_chunks.image_chunks.into_iter().map(ContentElement::Image));
-        elements.extend(page_chunks.line_chunks.into_iter().map(ContentElement::Line));
-        elements.extend(page_chunks.line_art_chunks.into_iter().map(ContentElement::LineArt));
+        elements.extend(
+            page_chunks
+                .image_chunks
+                .into_iter()
+                .map(ContentElement::Image),
+        );
+        elements.extend(
+            page_chunks
+                .line_chunks
+                .into_iter()
+                .map(ContentElement::Line),
+        );
+        elements.extend(
+            page_chunks
+                .line_art_chunks
+                .into_iter()
+                .map(ContentElement::LineArt),
+        );
 
         elements = content_filter::filter_content(
             elements,
@@ -2706,7 +3155,11 @@ mod tests {
                 .iter()
                 .map(|seg| format!("[{:.0}-{:.0}] {}", seg.left_x, seg.right_x, seg.text))
                 .collect();
-            eprintln!("row {ri:02} baseline {:.1} :: {}", row.baseline, texts.join(" || "));
+            eprintln!(
+                "row {ri:02} baseline {:.1} :: {}",
+                row.baseline,
+                texts.join(" || ")
+            );
         }
 
         let result = detect_cluster_tables(elements);
@@ -2720,11 +3173,7 @@ mod tests {
                     tb.bbox.height()
                 );
                 for row in &tb.rows {
-                    let cells: Vec<_> = row
-                        .cells
-                        .iter()
-                        .map(cell_text)
-                        .collect();
+                    let cells: Vec<_> = row.cells.iter().map(cell_text).collect();
                     eprintln!("row {} => {:?}", row.row_number, cells);
                 }
             }
@@ -2758,8 +3207,8 @@ mod tests {
         use crate::pipeline::stages::text_block_grouper;
         use crate::pipeline::stages::text_line_grouper;
 
-        let pdf_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000199.pdf");
+        let pdf_path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000199.pdf");
         let config = ProcessingConfig::default();
         let raw_doc = load_pdf(&pdf_path, None).unwrap();
         let page_info_list = page_info::extract_page_info(&raw_doc.document);
@@ -2770,9 +3219,24 @@ mod tests {
             .into_iter()
             .map(ContentElement::TextChunk)
             .collect();
-        elements.extend(page_chunks.image_chunks.into_iter().map(ContentElement::Image));
-        elements.extend(page_chunks.line_chunks.into_iter().map(ContentElement::Line));
-        elements.extend(page_chunks.line_art_chunks.into_iter().map(ContentElement::LineArt));
+        elements.extend(
+            page_chunks
+                .image_chunks
+                .into_iter()
+                .map(ContentElement::Image),
+        );
+        elements.extend(
+            page_chunks
+                .line_chunks
+                .into_iter()
+                .map(ContentElement::Line),
+        );
+        elements.extend(
+            page_chunks
+                .line_art_chunks
+                .into_iter()
+                .map(ContentElement::LineArt),
+        );
 
         elements = content_filter::filter_content(
             elements,
@@ -2835,8 +3299,8 @@ mod tests {
 
         use crate::api::config::ProcessingConfig;
 
-        let pdf_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000200.pdf");
+        let pdf_path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000200.pdf");
         let doc = crate::convert(&pdf_path, &ProcessingConfig::default()).unwrap();
         eprintln!("final kids {}", doc.kids.len());
         for elem in &doc.kids {
@@ -2865,5 +3329,4 @@ mod tests {
         eprintln!("markdown has pipe table {}", md.contains("| --- |"));
         eprintln!("{md}");
     }
-
 }

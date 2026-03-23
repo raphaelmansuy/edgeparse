@@ -24,9 +24,13 @@ pub enum LayoutType {
 /// Detected page margins.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PageMargins {
+    /// Top margin distance from the page edge.
     pub top: f64,
+    /// Bottom margin distance from the page edge.
     pub bottom: f64,
+    /// Left margin distance from the page edge.
     pub left: f64,
+    /// Right margin distance from the page edge.
     pub right: f64,
 }
 
@@ -264,9 +268,7 @@ mod tests {
 
     #[test]
     fn test_detect_margins() {
-        let elements = vec![
-            make_text_at(72.0, 72.0, 468.0, 648.0),
-        ];
+        let elements = vec![make_text_at(72.0, 72.0, 468.0, 648.0)];
         let margins = detect_margins(&elements, 612.0, 792.0);
         assert!((margins.left - 72.0).abs() < 0.1);
         assert!((margins.right - 72.0).abs() < 0.1);
@@ -276,9 +278,7 @@ mod tests {
 
     #[test]
     fn test_compute_density() {
-        let elements = vec![
-            make_text_at(0.0, 0.0, 100.0, 50.0),
-        ];
+        let elements = vec![make_text_at(0.0, 0.0, 100.0, 50.0)];
         let density = compute_density(&elements, 200.0, 100.0);
         assert!((density.density - 0.25).abs() < 0.01); // 5000 / 20000
         assert_eq!(density.element_count, 1);

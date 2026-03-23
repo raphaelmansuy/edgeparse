@@ -9,7 +9,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::models::bbox::BoundingBox;
 use crate::models::chunks::{ImageChunk, TextChunk};
 use crate::models::enums::{PdfLayer, TextFormat, TextType};
-use crate::models::table::{TableBorder, TableBorderCell, TableBorderRow, TableToken, TableTokenType};
+use crate::models::table::{
+    TableBorder, TableBorderCell, TableBorderRow, TableToken, TableTokenType,
+};
 
 const MIN_IMAGE_WIDTH_RATIO: f64 = 0.45;
 const MIN_IMAGE_AREA_RATIO: f64 = 0.045;
@@ -66,13 +68,8 @@ pub fn recover_raster_table_text_chunks(
         Err(_) => return Vec::new(),
     };
 
-    let result = recover_from_page_images(
-        input_path,
-        &temp_dir,
-        page_number,
-        candidates,
-        text_chunks,
-    );
+    let result =
+        recover_from_page_images(input_path, &temp_dir, page_number, candidates, text_chunks);
 
     let _ = fs::remove_dir_all(&temp_dir);
     result
@@ -285,7 +282,10 @@ fn parse_tesseract_tsv(tsv: &str) -> Vec<OcrWord> {
         let top = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
         let width = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
         let height = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        let confidence = cols.next().and_then(|s| s.parse::<f64>().ok()).unwrap_or(-1.0);
+        let confidence = cols
+            .next()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(-1.0);
         let text = cols.next().unwrap_or("").trim().to_string();
         if confidence < MIN_OCR_WORD_CONFIDENCE
             || text.is_empty()
@@ -352,8 +352,8 @@ fn looks_like_table_ocr(words: &[OcrWord]) -> bool {
                 .iter_mut()
                 .find(|cluster| (cluster.center - center).abs() <= tolerance)
             {
-                cluster.center = (cluster.center * cluster.count as f64 + center)
-                    / (cluster.count as f64 + 1.0);
+                cluster.center =
+                    (cluster.center * cluster.count as f64 + center) / (cluster.count as f64 + 1.0);
                 cluster.count += 1;
                 cluster.lines.insert(word.line_key);
             } else {
@@ -376,7 +376,10 @@ fn looks_like_table_ocr(words: &[OcrWord]) -> bool {
         return false;
     }
 
-    let repeated_centers: Vec<f64> = repeated_clusters.iter().map(|cluster| cluster.center).collect();
+    let repeated_centers: Vec<f64> = repeated_clusters
+        .iter()
+        .map(|cluster| cluster.center)
+        .collect();
     let structured_lines = qualifying_lines
         .iter()
         .filter(|line| {
@@ -389,11 +392,14 @@ fn looks_like_table_ocr(words: &[OcrWord]) -> bool {
                     }
                 }
             }
-            seen.len() >= 3 || (seen.len() >= 2 && line.iter().filter(|w| is_numeric_like(&w.text)).count() >= 2)
+            seen.len() >= 3
+                || (seen.len() >= 2
+                    && line.iter().filter(|w| is_numeric_like(&w.text)).count() >= 2)
         })
         .count();
 
-    structured_lines >= 3 || (structured_lines >= 2 && numeric_like_count >= 6 && repeated_clusters.len() >= 4)
+    structured_lines >= 3
+        || (structured_lines >= 2 && numeric_like_count >= 6 && repeated_clusters.len() >= 4)
 }
 
 fn looks_like_numeric_table_ocr(words: &[OcrWord]) -> bool {
@@ -406,10 +412,18 @@ fn looks_like_numeric_table_ocr(words: &[OcrWord]) -> bool {
         by_line.entry(word.line_key).or_default().push(word);
     }
 
-    let numeric_like_count = words.iter().filter(|word| is_numeric_like(&word.text)).count();
+    let numeric_like_count = words
+        .iter()
+        .filter(|word| is_numeric_like(&word.text))
+        .count();
     let numeric_lines = by_line
         .values()
-        .filter(|line| line.iter().filter(|word| is_numeric_like(&word.text)).count() >= 2)
+        .filter(|line| {
+            line.iter()
+                .filter(|word| is_numeric_like(&word.text))
+                .count()
+                >= 2
+        })
         .count();
 
     numeric_like_count >= 12 && numeric_lines >= 3
@@ -448,8 +462,8 @@ fn build_numeric_table_border(words: &[OcrWord], image: &ImageChunk) -> Option<T
                 .iter_mut()
                 .find(|cluster| (cluster.center - center).abs() <= tolerance)
             {
-                cluster.center = (cluster.center * cluster.count as f64 + center)
-                    / (cluster.count as f64 + 1.0);
+                cluster.center =
+                    (cluster.center * cluster.count as f64 + center) / (cluster.count as f64 + 1.0);
                 cluster.count += 1;
                 cluster.lines.insert(word.line_key);
             } else {
@@ -508,7 +522,8 @@ fn build_numeric_table_border(words: &[OcrWord], image: &ImageChunk) -> Option<T
             .map(|word| word.top.saturating_add(word.height))
             .max()
             .unwrap_or(0);
-        let top_y = image.bbox.top_y - image.bbox.height() * (f64::from(top_px) / f64::from(image_height));
+        let top_y =
+            image.bbox.top_y - image.bbox.height() * (f64::from(top_px) / f64::from(image_height));
         let bottom_y = image.bbox.top_y
             - image.bbox.height() * (f64::from(bottom_px) / f64::from(image_height));
         let cell_texts = cells
@@ -521,15 +536,24 @@ fn build_numeric_table_border(words: &[OcrWord], image: &ImageChunk) -> Option<T
                     .join(" ")
             })
             .collect();
-        built_rows.push(OcrRowBuild { top_y, bottom_y, cell_texts });
+        built_rows.push(OcrRowBuild {
+            top_y,
+            bottom_y,
+            cell_texts,
+        });
     }
 
     if built_rows.len() < 2 {
         return None;
     }
 
-    built_rows.sort_by(|a, b| b.top_y.partial_cmp(&a.top_y).unwrap_or(std::cmp::Ordering::Equal));
-    let x_coordinates = build_boundaries_from_centers(&centers, image.bbox.left_x, image.bbox.right_x);
+    built_rows.sort_by(|a, b| {
+        b.top_y
+            .partial_cmp(&a.top_y)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let x_coordinates =
+        build_boundaries_from_centers(&centers, image.bbox.left_x, image.bbox.right_x);
     let row_bounds: Vec<(f64, f64)> = built_rows
         .iter()
         .map(|row| (row.top_y, row.bottom_y))
@@ -557,7 +581,11 @@ fn build_numeric_table_border(words: &[OcrWord], image: &ImageChunk) -> Option<T
                 x_coordinates[col_idx + 1],
                 y_coordinates[row_idx],
             );
-            let text = row_build.cell_texts.get(col_idx).cloned().unwrap_or_default();
+            let text = row_build
+                .cell_texts
+                .get(col_idx)
+                .cloned()
+                .unwrap_or_default();
             let mut content = Vec::new();
             if !text.trim().is_empty() {
                 content.push(TableToken {
@@ -634,7 +662,6 @@ fn build_boundaries_from_centers(centers: &[f64], left_edge: f64, right_edge: f6
     boundaries
 }
 
-
 fn build_row_boundaries(rows: &[(f64, f64)]) -> Vec<f64> {
     let mut boundaries = Vec::with_capacity(rows.len() + 1);
     boundaries.push(rows[0].0);
@@ -674,7 +701,8 @@ fn words_to_text_chunks(
         let left_ratio = f64::from(word.left) / f64::from(image_size.0);
         let right_ratio = f64::from(word.left.saturating_add(word.width)) / f64::from(image_size.0);
         let top_ratio = f64::from(word.top) / f64::from(image_size.1);
-        let bottom_ratio = f64::from(word.top.saturating_add(word.height)) / f64::from(image_size.1);
+        let bottom_ratio =
+            f64::from(word.top.saturating_add(word.height)) / f64::from(image_size.1);
 
         let left_x = image.bbox.left_x + image.bbox.width() * left_ratio;
         let right_x = image.bbox.left_x + image.bbox.width() * right_ratio;

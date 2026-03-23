@@ -46,16 +46,14 @@ pub fn extract_text_chunks(
     // Parse content stream operations
     let content = Content::decode(&content_data).map_err(|e| EdgePdfError::PipelineError {
         stage: 1,
-        message: format!("Failed to decode content stream for page {}: {}", page_number, e),
+        message: format!(
+            "Failed to decode content stream for page {}: {}",
+            page_number, e
+        ),
     })?;
 
     // Process operations
-    let chunks = process_operations(
-        &content.operations,
-        &font_cache,
-        page_number,
-        &media_box,
-    );
+    let chunks = process_operations(&content.operations, &font_cache, page_number, &media_box);
 
     Ok(chunks)
 }
@@ -76,12 +74,13 @@ pub(crate) fn get_page_content(
         let mut data = Vec::new();
         for item in arr {
             let obj = match item {
-                Object::Reference(id) => doc
-                    .get_object(*id)
-                    .map_err(|e| EdgePdfError::PipelineError {
-                        stage: 1,
-                        message: format!("Failed to resolve content array item: {}", e),
-                    })?,
+                Object::Reference(id) => {
+                    doc.get_object(*id)
+                        .map_err(|e| EdgePdfError::PipelineError {
+                            stage: 1,
+                            message: format!("Failed to resolve content array item: {}", e),
+                        })?
+                }
                 other => other,
             };
             if let Object::Stream(ref stream) = obj {
@@ -96,10 +95,12 @@ pub(crate) fn get_page_content(
 
     match contents {
         Object::Reference(id) => {
-            let obj = doc.get_object(id).map_err(|e| EdgePdfError::PipelineError {
-                stage: 1,
-                message: format!("Failed to get content object: {}", e),
-            })?;
+            let obj = doc
+                .get_object(id)
+                .map_err(|e| EdgePdfError::PipelineError {
+                    stage: 1,
+                    message: format!("Failed to get content object: {}", e),
+                })?;
             match obj {
                 // Most common: Contents → single stream
                 Object::Stream(ref stream) => get_stream_data(stream),
@@ -272,9 +273,9 @@ fn process_operations(
                         .filter_map(|o| obj_to_f64(o.clone()))
                         .collect();
                     if vals.len() == 6 {
-                        state.current.set_text_matrix(
-                            vals[0], vals[1], vals[2], vals[3], vals[4], vals[5],
-                        );
+                        state
+                            .current
+                            .set_text_matrix(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
                     }
                 }
             }
@@ -466,7 +467,9 @@ fn process_operations(
                 }
             }
             "sc" | "scn" => {
-                let components: Vec<f64> = op.operands.iter()
+                let components: Vec<f64> = op
+                    .operands
+                    .iter()
                     .filter_map(|o| obj_to_f64(o.clone()))
                     .collect();
                 if !components.is_empty() {
@@ -474,7 +477,9 @@ fn process_operations(
                 }
             }
             "SC" | "SCN" => {
-                let components: Vec<f64> = op.operands.iter()
+                let components: Vec<f64> = op
+                    .operands
+                    .iter()
                     .filter_map(|o| obj_to_f64(o.clone()))
                     .collect();
                 if !components.is_empty() {
@@ -694,11 +699,8 @@ fn extract_mcid_from_bdc(operands: &[Object]) -> Option<i64> {
     }
     match &operands[1] {
         Object::Dictionary(dict) => {
-            if let Ok(mcid_obj) = dict.get(b"MCID") {
-                match mcid_obj {
-                    Object::Integer(n) => return Some(*n),
-                    _ => {}
-                }
+            if let Ok(Object::Integer(n)) = dict.get(b"MCID") {
+                return Some(*n);
             }
             None
         }
@@ -710,7 +712,7 @@ fn extract_mcid_from_bdc(operands: &[Object]) -> Option<i64> {
 fn obj_to_f64(obj: Object) -> Option<f64> {
     match obj {
         Object::Integer(i) => Some(i as f64),
-        Object::Real(f) => Some(f as f64),
+        Object::Real(f) => Some(f),
         _ => None,
     }
 }
@@ -736,10 +738,7 @@ fn color_space_components(name: &str) -> u8 {
 /// Resolve a PDF object via reference.
 fn resolve_obj<'a>(doc: &'a Document, obj: &'a Object) -> lopdf::Object {
     match obj {
-        Object::Reference(id) => doc
-            .get_object(*id)
-            .cloned()
-            .unwrap_or(Object::Null),
+        Object::Reference(id) => doc.get_object(*id).cloned().unwrap_or(Object::Null),
         other => other.clone(),
     }
 }
@@ -777,8 +776,10 @@ mod tests {
             ],
         };
 
-        let content_id =
-            doc.add_object(lopdf::Stream::new(dictionary! {}, content.encode().unwrap()));
+        let content_id = doc.add_object(lopdf::Stream::new(
+            dictionary! {},
+            content.encode().unwrap(),
+        ));
 
         let page_id = doc.add_object(dictionary! {
             "Type" => "Page",

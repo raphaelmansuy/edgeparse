@@ -106,8 +106,8 @@ pub fn group_text_blocks(elements: Vec<ContentElement>) -> Vec<ContentElement> {
 
 /// Bullet characters recognised as list labels.
 const LIST_BULLET_CHARS: &[char] = &[
-    '•', '◦', '▪', '▸', '▹', '►', '▻', '●', '○', '■', '□', '◆', '◇',
-    '→', '➤', '✓', '✔', '★', '☆', '➜', '➢', '⁃', '‣', '∙', '⦿', '⦾',
+    '•', '◦', '▪', '▸', '▹', '►', '▻', '●', '○', '■', '□', '◆', '◇', '→', '➤', '✓', '✔', '★', '☆',
+    '➜', '➢', '⁃', '‣', '∙', '⦿', '⦾',
 ];
 
 /// Check whether a TextLine's text starts with a recognizable list label pattern.
@@ -137,7 +137,10 @@ fn starts_with_list_label(line: &TextLine) -> bool {
     // Dash/en-dash/em-dash followed by space
     if (first == '-' || first == '\u{2013}' || first == '\u{2014}')
         && trimmed.len() > 1
-        && trimmed.chars().nth(1).is_some_and(|c| c == ' ' || c == '\t')
+        && trimmed
+            .chars()
+            .nth(1)
+            .is_some_and(|c| c == ' ' || c == '\t')
     {
         // Dash followed by primarily-numeric content is table data, not a list
         let after_space = trimmed.get(2..).unwrap_or("").trim();
@@ -198,7 +201,11 @@ fn starts_with_list_label(line: &TextLine) -> bool {
             if !between.is_empty() && between.chars().all(|c| c.is_ascii_digit()) {
                 let after_label = &after_bracket[end + 1..];
                 let after_ws = after_label.trim_start();
-                if after_ws.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+                if after_ws
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_uppercase())
+                {
                     return true;
                 }
             }
@@ -243,10 +250,9 @@ fn find_matching_block(
         if last.bbox.page_number != line.bbox.page_number {
             continue;
         }
-        if let (Some(block_col), Some(line_col)) = (
-            common_block_column_level(block),
-            line.level.as_deref(),
-        ) {
+        if let (Some(block_col), Some(line_col)) =
+            (common_block_column_level(block), line.level.as_deref())
+        {
             if block_col != line_col {
                 continue;
             }
@@ -459,7 +465,8 @@ fn is_probable_running_header_to_body_transition(
 
     let header_density = text_density(header);
     let body_density = text_density(line);
-    let left_aligned = (header.bbox.left_x - line.bbox.left_x).abs() <= header.font_size.max(1.0) * 1.5;
+    let left_aligned =
+        (header.bbox.left_x - line.bbox.left_x).abs() <= header.font_size.max(1.0) * 1.5;
     let body_is_substantially_wider =
         line.bbox.width() >= header.bbox.width() * 1.15 || body_chars >= header_chars * 2;
 
@@ -512,10 +519,7 @@ fn close_distant_blocks(
 }
 
 /// Flush all active blocks into the result.
-fn flush_all_blocks(
-    active_blocks: &mut Vec<Vec<TextLine>>,
-    result: &mut Vec<ContentElement>,
-) {
+fn flush_all_blocks(active_blocks: &mut Vec<Vec<TextLine>>, result: &mut Vec<ContentElement>) {
     for block in active_blocks.drain(..) {
         result.push(ContentElement::TextBlock(build_text_block(block)));
     }
@@ -654,7 +658,7 @@ fn is_subscript_or_superscript(block: &[TextLine], line: &TextLine) -> bool {
     // Lower bound 0.52 catches sub-subscripts (e.g., 5.98 pt / 10.91 pt ≈ 0.548)
     // while excluding heading→body transitions (e.g., 12 pt / 24 pt = 0.50 < 0.52).
     let ratio = line.font_size / max_block_font;
-    if ratio >= 0.90 || ratio < 0.52 {
+    if !(0.52..0.90).contains(&ratio) {
         return false;
     }
 
@@ -689,8 +693,7 @@ fn is_subscript_or_superscript(block: &[TextLine], line: &TextLine) -> bool {
         .fold(f64::NEG_INFINITY, f64::max);
 
     // (a) The line overlaps the block's x-span (sigma-type limits).
-    let horiz_overlap =
-        line.bbox.right_x.min(block_right) - line.bbox.left_x.max(block_left);
+    let horiz_overlap = line.bbox.right_x.min(block_right) - line.bbox.left_x.max(block_left);
 
     // (b) The line is adjacent to the block's right edge (inline subscript
     //     like α_{t,k}: subscript starts right after α with ≤ 0 pt overlap).
@@ -822,11 +825,7 @@ fn build_text_block(lines: Vec<TextLine>) -> TextBlock {
         .reduce(|a, b| a.union(&b))
         .unwrap();
 
-    let font_size = lines
-        .iter()
-        .map(|l| l.font_size)
-        .sum::<f64>()
-        / lines.len() as f64;
+    let font_size = lines.iter().map(|l| l.font_size).sum::<f64>() / lines.len() as f64;
 
     let base_line = lines.last().map(|l| l.base_line).unwrap_or(0.0);
     let is_hidden = lines.iter().all(|l| l.is_hidden_text);
@@ -848,7 +847,7 @@ fn build_text_block(lines: Vec<TextLine>) -> TextBlock {
     }
 }
 
-fn common_block_column_level<'a>(lines: &'a [TextLine]) -> Option<&'a str> {
+fn common_block_column_level(lines: &[TextLine]) -> Option<&str> {
     let mut iter = lines.iter().filter_map(|line| line.level.as_deref());
     let first = iter.next()?;
     if iter.all(|level| level == first) {
@@ -1123,9 +1122,17 @@ mod tests {
         ];
         let result = group_text_blocks(input);
         // Subscript should merge into parent's block → 1 block with 2 lines
-        assert_eq!(result.len(), 1, "inline subscript must merge into parent block");
+        assert_eq!(
+            result.len(),
+            1,
+            "inline subscript must merge into parent block"
+        );
         if let ContentElement::TextBlock(ref block) = result[0] {
-            assert_eq!(block.text_lines.len(), 2, "should contain both main and subscript lines");
+            assert_eq!(
+                block.text_lines.len(),
+                2,
+                "should contain both main and subscript lines"
+            );
         } else {
             panic!("Expected TextBlock");
         }
@@ -1220,7 +1227,11 @@ mod tests {
             ContentElement::TextLine(lower_limit),
         ];
         let result = group_text_blocks(input);
-        assert_eq!(result.len(), 1, "sigma lower limit must merge into upper-limit block");
+        assert_eq!(
+            result.len(),
+            1,
+            "sigma lower limit must merge into upper-limit block"
+        );
         if let ContentElement::TextBlock(ref block) = result[0] {
             assert_eq!(block.text_lines.len(), 2);
         } else {
@@ -1274,9 +1285,9 @@ mod tests {
     fn test_alignment_detection_center() {
         // Lines centered around same midpoint (center_x = 200)
         let lines = vec![
-            make_line("Line one", 100.0, 700.0, 200.0, 12.0),       // center=200
-            make_line("Short", 125.0, 686.0, 150.0, 12.0),           // center=200
-            make_line("Tiny", 140.0, 672.0, 120.0, 12.0),             // center=200
+            make_line("Line one", 100.0, 700.0, 200.0, 12.0), // center=200
+            make_line("Short", 125.0, 686.0, 150.0, 12.0),    // center=200
+            make_line("Tiny", 140.0, 672.0, 120.0, 12.0),     // center=200
         ];
         let bbox = lines
             .iter()
@@ -1308,16 +1319,36 @@ mod tests {
         let result = group_text_blocks(input);
 
         // Should produce 2 blocks: one for left column, one for right column
-        assert_eq!(result.len(), 2, "Expected 2 blocks for two-column layout, got {}", result.len());
+        assert_eq!(
+            result.len(),
+            2,
+            "Expected 2 blocks for two-column layout, got {}",
+            result.len()
+        );
 
-        let blocks: Vec<&TextBlock> = result.iter().filter_map(|e| {
-            if let ContentElement::TextBlock(ref b) = e { Some(b) } else { None }
-        }).collect();
+        let blocks: Vec<&TextBlock> = result
+            .iter()
+            .filter_map(|e| {
+                if let ContentElement::TextBlock(ref b) = e {
+                    Some(b)
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         assert_eq!(blocks.len(), 2);
         // Each block should have 3 lines
-        assert_eq!(blocks[0].text_lines.len(), 3, "Left block should have 3 lines");
-        assert_eq!(blocks[1].text_lines.len(), 3, "Right block should have 3 lines");
+        assert_eq!(
+            blocks[0].text_lines.len(),
+            3,
+            "Left block should have 3 lines"
+        );
+        assert_eq!(
+            blocks[1].text_lines.len(),
+            3,
+            "Right block should have 3 lines"
+        );
 
         // Verify column separation: blocks should not overlap horizontally
         let block0_right = blocks[0].bbox.right_x;
@@ -1325,7 +1356,8 @@ mod tests {
         assert!(
             block0_right < block1_left || blocks[1].bbox.right_x < blocks[0].bbox.left_x,
             "Blocks should not overlap horizontally: block0 right={} block1 left={}",
-            block0_right, block1_left
+            block0_right,
+            block1_left
         );
     }
 
@@ -1346,7 +1378,11 @@ mod tests {
         ];
         let result = group_text_blocks(input);
 
-        assert_eq!(result.len(), 2, "wide and column lines must form separate blocks");
+        assert_eq!(
+            result.len(),
+            2,
+            "wide and column lines must form separate blocks"
+        );
 
         let blocks: Vec<&TextBlock> = result
             .iter()
@@ -1388,10 +1424,34 @@ mod tests {
     #[test]
     fn test_short_last_line_with_lowercase_follow_on_stays_in_same_block() {
         let input = vec![
-            ContentElement::TextLine(make_line("What you are forming is a null distribution of the expected difference between", 72.0, 700.0, 326.0, 11.0)),
-            ContentElement::TextLine(make_line("model parameters that would occur just by chance. You can then compare the", 72.0, 686.0, 326.0, 11.0)),
-            ContentElement::TextLine(make_line("difference you actually obtained against this null distribution to generate", 72.0, 672.0, 326.0, 11.0)),
-            ContentElement::TextLine(make_line("a p value for your difference", 72.0, 658.0, 180.0, 11.0)),
+            ContentElement::TextLine(make_line(
+                "What you are forming is a null distribution of the expected difference between",
+                72.0,
+                700.0,
+                326.0,
+                11.0,
+            )),
+            ContentElement::TextLine(make_line(
+                "model parameters that would occur just by chance. You can then compare the",
+                72.0,
+                686.0,
+                326.0,
+                11.0,
+            )),
+            ContentElement::TextLine(make_line(
+                "difference you actually obtained against this null distribution to generate",
+                72.0,
+                672.0,
+                326.0,
+                11.0,
+            )),
+            ContentElement::TextLine(make_line(
+                "a p value for your difference",
+                72.0,
+                658.0,
+                180.0,
+                11.0,
+            )),
             ContentElement::TextLine(make_line("of interest.", 72.0, 644.0, 60.0, 11.0)),
         ];
 

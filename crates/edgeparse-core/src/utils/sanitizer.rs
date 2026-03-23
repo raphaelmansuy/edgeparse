@@ -21,16 +21,13 @@ static PHONE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}").unwrap()
 });
 
-static IP_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b").unwrap()
-});
+static IP_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b").unwrap());
 
 static CREDIT_CARD_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b").unwrap());
 
-static URL_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"https?://[^\s<>"']+"#).unwrap()
-});
+static URL_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"https?://[^\s<>"']+"#).unwrap());
 
 /// Default sanitization rules for PII masking.
 pub fn default_rules() -> Vec<SanitizationRule> {
@@ -67,7 +64,10 @@ pub fn default_rules() -> Vec<SanitizationRule> {
 pub fn sanitize_text(text: &str, rules: &[SanitizationRule]) -> String {
     let mut result = text.to_string();
     for rule in rules {
-        result = rule.pattern.replace_all(&result, rule.replacement).to_string();
+        result = rule
+            .pattern
+            .replace_all(&result, rule.replacement)
+            .to_string();
     }
     result
 }

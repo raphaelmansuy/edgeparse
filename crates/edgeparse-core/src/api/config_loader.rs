@@ -39,7 +39,10 @@ pub fn config_to_json(config: &ProcessingConfig) -> Result<String, EdgePdfError>
 ///
 /// This works by serializing both to JSON, merging the JSON objects, and
 /// deserializing back. Fields in `overlay` that are `null` are skipped.
-pub fn merge_configs(base: &ProcessingConfig, overlay_json: &str) -> Result<ProcessingConfig, EdgePdfError> {
+pub fn merge_configs(
+    base: &ProcessingConfig,
+    overlay_json: &str,
+) -> Result<ProcessingConfig, EdgePdfError> {
     let base_json = serde_json::to_value(base)
         .map_err(|e| EdgePdfError::OutputError(format!("config serialization error: {}", e)))?;
     let overlay_val: serde_json::Value = serde_json::from_str(overlay_json)

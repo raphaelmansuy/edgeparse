@@ -147,7 +147,7 @@ fn get_rect(dict: &lopdf::Dictionary) -> Option<[f64; 4]> {
     let mut result = [0.0f64; 4];
     for (i, obj) in arr.iter().enumerate().take(4) {
         result[i] = match obj {
-            Object::Real(f) => f64::from(*f),
+            Object::Real(f) => *f,
             Object::Integer(i) => *i as f64,
             _ => return None,
         };

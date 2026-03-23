@@ -20,10 +20,10 @@ pub fn build_document(state: &PipelineState, file_name: &str) -> PdfDocument {
 
     for page in &state.pages {
         for element in page {
-            if !state.config.include_header_footer {
-                if matches!(element, ContentElement::HeaderFooter(_)) {
-                    continue;
-                }
+            if !state.config.include_header_footer
+                && matches!(element, ContentElement::HeaderFooter(_))
+            {
+                continue;
             }
             doc.kids.push(element.clone());
         }

@@ -608,7 +608,7 @@ dependencies = [
 
 [[package]]
 name = "edgeparse-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -622,7 +622,7 @@ dependencies = [
 
 [[package]]
 name = "edgeparse-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "edgeparse-node"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "edgeparse-core",
  "napi",
@@ -658,7 +658,7 @@ dependencies = [
 
 [[package]]
 name = "edgeparse-python"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "edgeparse-core",
  "pyo3",

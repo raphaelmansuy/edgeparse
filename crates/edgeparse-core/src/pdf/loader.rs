@@ -92,12 +92,10 @@ fn extract_metadata(doc: &Document) -> PdfMetadata {
 
 /// Extract a string field from a PDF dictionary.
 fn extract_string_field(dict: &lopdf::Dictionary, key: &[u8]) -> Option<String> {
-    dict.get(key)
-        .ok()
-        .and_then(|obj| match obj {
-            lopdf::Object::String(bytes, _) => String::from_utf8(bytes.clone()).ok(),
-            _ => None,
-        })
+    dict.get(key).ok().and_then(|obj| match obj {
+        lopdf::Object::String(bytes, _) => String::from_utf8(bytes.clone()).ok(),
+        _ => None,
+    })
 }
 
 #[cfg(test)]

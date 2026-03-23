@@ -9,9 +9,8 @@
 
 use std::cell::Cell;
 
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 
-use crate::EdgePdfError;
 use crate::models::bbox::BoundingBox;
 use crate::models::chunks::ImageChunk;
 use crate::models::content::ContentElement;
@@ -23,13 +22,14 @@ use crate::models::semantic::{
     SemanticNumberHeading, SemanticParagraph, SemanticTable, SemanticTextNode,
 };
 use crate::models::table::{TableBorder, TableBorderCell, TableBorderRow, TableToken};
+use crate::EdgePdfError;
 
 // ---------------------------------------------------------------------------
 // Thread-local ID counter
 // ---------------------------------------------------------------------------
 
 thread_local! {
-    static NEXT_ID: Cell<u64> = Cell::new(1);
+    static NEXT_ID: Cell<u64> = const { Cell::new(1) };
 }
 
 fn next_id() -> u64 {
@@ -76,10 +76,7 @@ fn legacy_float_str(v: f64) -> String {
 fn text_color_string(color: &Option<Vec<f64>>) -> String {
     match color {
         Some(components) if !components.is_empty() => {
-            let parts: Vec<String> = components
-                .iter()
-                .map(|v| legacy_float_str(*v))
-                .collect();
+            let parts: Vec<String> = components.iter().map(|v| legacy_float_str(*v)).collect();
             format!("[{}]", parts.join(", "))
         }
         _ => String::new(),
@@ -144,7 +141,7 @@ fn text_node_style(node: &SemanticTextNode) -> (String, f64, String) {
             .unwrap_or("")
             .to_string(),
         font_size.unwrap_or(0.0),
-        text_color_string(&text_color),
+        text_color_string(text_color),
     )
 }
 
@@ -152,11 +149,7 @@ fn text_node_style(node: &SemanticTextNode) -> (String, f64, String) {
 /// First tries semantic contents (preferred), then falls back to raw body tokens.
 fn list_item_text(item: &ListItem) -> String {
     if !item.contents.is_empty() {
-        let parts: Vec<String> = item
-            .contents
-            .iter()
-            .filter_map(element_text_str)
-            .collect();
+        let parts: Vec<String> = item.contents.iter().filter_map(element_text_str).collect();
         if !parts.is_empty() {
             return parts.join(" ").trim().to_string();
         }
@@ -187,15 +180,27 @@ fn element_text_str(el: &ContentElement) -> Option<String> {
         // Raw text elements from list_detector and early pipeline stages
         ContentElement::TextLine(l) => {
             let s = l.value().trim().to_string();
-            if s.is_empty() { None } else { Some(s) }
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
         }
         ContentElement::TextBlock(b) => {
             let s = b.value().trim().to_string();
-            if s.is_empty() { None } else { Some(s) }
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
         }
         ContentElement::TextChunk(c) => {
             let s = c.value.trim().to_string();
-            if s.is_empty() { None } else { Some(s) }
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
         }
         _ => None,
     }
@@ -210,12 +215,7 @@ fn list_item_style(item: &ListItem) -> (String, f64, String) {
         }
     }
     // Try body tokens first chunk
-    let first_chunk = item
-        .body
-        .content
-        .iter()
-        .flat_map(|row| row.iter())
-        .next();
+    let first_chunk = item.body.content.iter().flat_map(|row| row.iter()).next();
     if let Some(token) = first_chunk {
         let color_str = format_font_color(&token.base.font_color);
         return (
@@ -245,7 +245,9 @@ fn element_style(el: &ContentElement) -> Option<(String, f64, String)> {
             }
         }
         ContentElement::TextBlock(b) => {
-            if let Some(chunk) = b.text_lines.iter()
+            if let Some(chunk) = b
+                .text_lines
+                .iter()
                 .flat_map(|l| l.text_chunks.iter())
                 .find(|c| !c.value.trim().is_empty())
             {
@@ -497,10 +499,7 @@ fn list_to_legacy(list: &PDFList, stem: &str, img_idx: &mut u64) -> Value {
     obj.insert("level".into(), json!(level));
     obj.insert("page number".into(), json!(page_num(&list.bbox)));
     obj.insert("bounding box".into(), bbox_array(&list.bbox));
-    obj.insert(
-        "numbering style".into(),
-        json!(numbering),
-    );
+    obj.insert("numbering style".into(), json!(numbering));
     obj.insert("number of list items".into(), json!(num_items));
     obj.insert("next list id".into(), json!(next_list_id_val));
     obj.insert("previous list id".into(), json!(prev_list_id_val));
@@ -672,8 +671,12 @@ fn elements_to_legacy(el: &ContentElement, stem: &str, img_idx: &mut u64) -> Vec
         ContentElement::Figure(fig) => figure_to_legacy(fig, stem, img_idx),
         ContentElement::Image(img) => vec![image_to_legacy(img, stem, img_idx)],
         ContentElement::List(l) => vec![list_to_legacy(l, stem, img_idx)],
-        ContentElement::Table(st) => semantic_table_to_legacy(st, stem, img_idx).into_iter().collect(),
-        ContentElement::TableBorder(tb) => table_border_to_legacy(tb, stem, img_idx).into_iter().collect(),
+        ContentElement::Table(st) => semantic_table_to_legacy(st, stem, img_idx)
+            .into_iter()
+            .collect(),
+        ContentElement::TableBorder(tb) => table_border_to_legacy(tb, stem, img_idx)
+            .into_iter()
+            .collect(),
         // Skip raw low-level elements not exposed in legacy output
         ContentElement::TextChunk(_)
         | ContentElement::TextLine(_)
@@ -705,10 +708,7 @@ pub fn to_legacy_json_value(doc: &PdfDocument, stem: &str) -> Value {
 
     let mut obj = Map::new();
     obj.insert("file name".into(), json!(doc.file_name));
-    obj.insert(
-        "number of pages".into(),
-        json!(doc.number_of_pages),
-    );
+    obj.insert("number of pages".into(), json!(doc.number_of_pages));
     obj.insert(
         "author".into(),
         doc.author.as_deref().map_or(Value::Null, |s| json!(s)),
@@ -719,11 +719,15 @@ pub fn to_legacy_json_value(doc: &PdfDocument, stem: &str) -> Value {
     );
     obj.insert(
         "creation date".into(),
-        doc.creation_date.as_deref().map_or(Value::Null, |s| json!(s)),
+        doc.creation_date
+            .as_deref()
+            .map_or(Value::Null, |s| json!(s)),
     );
     obj.insert(
         "modification date".into(),
-        doc.modification_date.as_deref().map_or(Value::Null, |s| json!(s)),
+        doc.modification_date
+            .as_deref()
+            .map_or(Value::Null, |s| json!(s)),
     );
     obj.insert("kids".into(), json!(kids));
 
@@ -748,18 +752,18 @@ pub fn to_legacy_json_string(doc: &PdfDocument, stem: &str) -> Result<String, Ed
 mod tests {
     use super::*;
     use crate::models::bbox::BoundingBox;
+    use crate::models::enums::SemanticType;
     use crate::models::semantic::{SemanticParagraph, SemanticTextNode};
     use crate::models::text::TextColumn;
-    use crate::models::enums::SemanticType;
 
     fn make_bbox(page: u32, left: f64, bottom: f64, right: f64, top: f64) -> BoundingBox {
         BoundingBox::new(Some(page), left, bottom, right, top)
     }
 
     fn make_text_node(bbox: BoundingBox, text: &str) -> SemanticTextNode {
-        use crate::models::text::{TextBlock, TextLine};
         use crate::models::chunks::TextChunk;
         use crate::models::enums::{PdfLayer, TextFormat, TextType};
+        use crate::models::text::{TextBlock, TextLine};
         let chunk = TextChunk {
             value: text.to_string(),
             bbox: bbox.clone(),
@@ -869,8 +873,14 @@ mod tests {
 
     #[test]
     fn test_text_color_grayscale() {
-        assert_eq!(text_color_string(&Some(vec![0.0, 0.0, 0.0])), "[0.0, 0.0, 0.0]");
-        assert_eq!(text_color_string(&Some(vec![1.0, 1.0, 1.0])), "[1.0, 1.0, 1.0]");
+        assert_eq!(
+            text_color_string(&Some(vec![0.0, 0.0, 0.0])),
+            "[0.0, 0.0, 0.0]"
+        );
+        assert_eq!(
+            text_color_string(&Some(vec![1.0, 1.0, 1.0])),
+            "[1.0, 1.0, 1.0]"
+        );
         assert_eq!(text_color_string(&None), "");
     }
 

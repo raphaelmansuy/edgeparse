@@ -88,10 +88,10 @@ pub fn convert(input_path: String, options: Option<ConvertOptions>) -> napi::Res
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?,
         OutputFormat::Text => output::text::to_text(&doc)
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?,
-        OutputFormat::Markdown | OutputFormat::MarkdownWithHtml | OutputFormat::MarkdownWithImages => {
-            output::markdown::to_markdown(&doc)
-                .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?
-        }
+        OutputFormat::Markdown
+        | OutputFormat::MarkdownWithHtml
+        | OutputFormat::MarkdownWithImages => output::markdown::to_markdown(&doc)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?,
         OutputFormat::Pdf => {
             return Err(napi::Error::new(
                 napi::Status::GenericFailure,

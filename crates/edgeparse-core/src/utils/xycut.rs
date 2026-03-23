@@ -41,12 +41,18 @@ fn xycut_recursive(elements: &mut [ContentElement], _region: &BoundingBox) {
     let v_gap = find_vertical_gap_size(elements);
 
     if std::env::var("XYCUT_DEBUG").is_ok() {
-        eprintln!("[XYCUT] n={} h_gap={:?} v_gap={:?}", elements.len(),
-            h_gap.map(|(y,g)| format!("y={:.1} gap={:.1}", y, g)),
-            v_gap.map(|(x,g)| format!("x={:.1} gap={:.1}", x, g)));
+        eprintln!(
+            "[XYCUT] n={} h_gap={:?} v_gap={:?}",
+            elements.len(),
+            h_gap.map(|(y, g)| format!("y={:.1} gap={:.1}", y, g)),
+            v_gap.map(|(x, g)| format!("x={:.1} gap={:.1}", x, g))
+        );
         for e in elements.iter() {
             let b = e.bbox();
-            eprintln!("  el: l={:.1} r={:.1} top={:.1} bot={:.1}", b.left_x, b.right_x, b.top_y, b.bottom_y);
+            eprintln!(
+                "  el: l={:.1} r={:.1} top={:.1} bot={:.1}",
+                b.left_x, b.right_x, b.top_y, b.bottom_y
+            );
         }
     }
 
@@ -120,7 +126,7 @@ fn xycut_recursive(elements: &mut [ContentElement], _region: &BoundingBox) {
     const BUCKET_PT: f64 = 4.0;
     elements.sort_by_key(|e| {
         let y_bucket = -((e.bbox().top_y / BUCKET_PT).round() as i64); // descending
-        let x_key = (e.bbox().left_x * 10.0).round() as i64;           // ascending
+        let x_key = (e.bbox().left_x * 10.0).round() as i64; // ascending
         (y_bucket, x_key)
     });
 }
@@ -301,7 +307,11 @@ fn find_vertical_gap_size(elements: &[ContentElement]) -> Option<(f64, f64)> {
                 let b = e.bbox();
                 let eff_left = b.left_x + BBOX_SHRINK;
                 let eff_right = b.right_x - BBOX_SHRINK;
-                if eff_right > eff_left { Some((eff_left, eff_right)) } else { None }
+                if eff_right > eff_left {
+                    Some((eff_left, eff_right))
+                } else {
+                    None
+                }
             })
             .collect();
     }
@@ -415,13 +425,19 @@ fn find_vertical_gap_size(elements: &[ContentElement]) -> Option<(f64, f64)> {
 }
 
 /// Partition elements by Y coordinate (above/below split).
-fn partition_by_y(elements: &mut [ContentElement], split_y: f64) -> (&mut [ContentElement], &mut [ContentElement]) {
+fn partition_by_y(
+    elements: &mut [ContentElement],
+    split_y: f64,
+) -> (&mut [ContentElement], &mut [ContentElement]) {
     let pivot = itertools_partition(elements, |e| e.bbox().center_y() >= split_y);
     elements.split_at_mut(pivot)
 }
 
 /// Partition elements by X coordinate (left/right of split).
-fn partition_by_x(elements: &mut [ContentElement], split_x: f64) -> (&mut [ContentElement], &mut [ContentElement]) {
+fn partition_by_x(
+    elements: &mut [ContentElement],
+    split_x: f64,
+) -> (&mut [ContentElement], &mut [ContentElement]) {
     let pivot = itertools_partition(elements, |e| e.bbox().center_x() < split_x);
     elements.split_at_mut(pivot)
 }
@@ -458,7 +474,10 @@ mod tests {
     #[test]
     fn test_xycut_sort_single() {
         let mut elements = vec![make_element(0.0, 0.0, 100.0, 50.0)];
-        xycut_sort(&mut elements, &BoundingBox::new(Some(1), 0.0, 0.0, 595.0, 842.0));
+        xycut_sort(
+            &mut elements,
+            &BoundingBox::new(Some(1), 0.0, 0.0, 595.0, 842.0),
+        );
         assert_eq!(elements.len(), 1);
     }
 
@@ -492,12 +511,30 @@ mod tests {
 
         // Left column (x<=250) should come before right column (x>=300)
         // Left col: top, mid, bot, then Right col: top, mid, bot
-        assert!(elements[0].bbox().left_x < 260.0, "First element should be left column");
-        assert!(elements[1].bbox().left_x < 260.0, "Second element should be left column");
-        assert!(elements[2].bbox().left_x < 260.0, "Third element should be left column");
-        assert!(elements[3].bbox().left_x > 260.0, "Fourth element should be right column");
-        assert!(elements[4].bbox().left_x > 260.0, "Fifth element should be right column");
-        assert!(elements[5].bbox().left_x > 260.0, "Sixth element should be right column");
+        assert!(
+            elements[0].bbox().left_x < 260.0,
+            "First element should be left column"
+        );
+        assert!(
+            elements[1].bbox().left_x < 260.0,
+            "Second element should be left column"
+        );
+        assert!(
+            elements[2].bbox().left_x < 260.0,
+            "Third element should be left column"
+        );
+        assert!(
+            elements[3].bbox().left_x > 260.0,
+            "Fourth element should be right column"
+        );
+        assert!(
+            elements[4].bbox().left_x > 260.0,
+            "Fifth element should be right column"
+        );
+        assert!(
+            elements[5].bbox().left_x > 260.0,
+            "Sixth element should be right column"
+        );
 
         // Within left column: top-to-bottom
         assert!(elements[0].bbox().top_y > elements[1].bbox().top_y);
@@ -511,21 +548,30 @@ mod tests {
     fn test_xycut_sort_header_then_two_columns() {
         // Header spanning full width, then two columns
         let mut elements = vec![
-            make_element(50.0, 700.0, 500.0, 750.0),  // header (full width)
+            make_element(50.0, 700.0, 500.0, 750.0), // header (full width)
             make_element(300.0, 500.0, 500.0, 550.0), // right col, top
-            make_element(50.0, 500.0, 250.0, 550.0),  // left col, top
+            make_element(50.0, 500.0, 250.0, 550.0), // left col, top
             make_element(300.0, 400.0, 500.0, 450.0), // right col, bot
-            make_element(50.0, 400.0, 250.0, 450.0),  // left col, bot
+            make_element(50.0, 400.0, 250.0, 450.0), // left col, bot
         ];
         let page = BoundingBox::new(Some(1), 0.0, 0.0, 595.0, 842.0);
         xycut_sort(&mut elements, &page);
 
         // Header first (y=750 is highest)
-        assert!(elements[0].bbox().top_y >= 750.0, "Header should come first");
+        assert!(
+            elements[0].bbox().top_y >= 750.0,
+            "Header should come first"
+        );
         // Then left column, then right column
-        assert!(elements[1].bbox().left_x < 260.0, "Left col should come after header");
+        assert!(
+            elements[1].bbox().left_x < 260.0,
+            "Left col should come after header"
+        );
         assert!(elements[2].bbox().left_x < 260.0);
-        assert!(elements[3].bbox().left_x > 260.0, "Right col should come last");
+        assert!(
+            elements[3].bbox().left_x > 260.0,
+            "Right col should come last"
+        );
         assert!(elements[4].bbox().left_x > 260.0);
     }
 
@@ -554,8 +600,8 @@ mod tests {
     #[test]
     fn test_xycut_prefers_columns_for_staggered_two_column_layout() {
         let mut elements = vec![
-            make_element(50.0, 680.0, 250.0, 740.0),  // left col, top figure
-            make_element(50.0, 420.0, 250.0, 660.0),  // left col, body
+            make_element(50.0, 680.0, 250.0, 740.0), // left col, top figure
+            make_element(50.0, 420.0, 250.0, 660.0), // left col, body
             make_element(320.0, 600.0, 520.0, 760.0), // right col, top figure
             make_element(320.0, 360.0, 520.0, 580.0), // right col, body
         ];

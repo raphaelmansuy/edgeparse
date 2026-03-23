@@ -32,10 +32,7 @@ const FOOTER_ZONE_FRACTION: f64 = 1.0 / 3.0;
 ///
 /// Returns the modified page contents with header/footer elements wrapped
 /// in `SemanticHeaderOrFooter` containers.
-pub fn detect_headers_footers(
-    pages: &mut [Vec<ContentElement>],
-    page_height: f64,
-) {
+pub fn detect_headers_footers(pages: &mut [Vec<ContentElement>], page_height: f64) {
     detect_single_page_margin_headers(pages, page_height);
 
     if pages.len() < MIN_PAGES_FOR_HEADER_FOOTER {
@@ -80,8 +77,7 @@ pub fn detect_headers_footers(
 
         // Extract header elements (from top)
         if h_count > 0 && h_count <= pages[page_idx].len() {
-            let header_elements: Vec<ContentElement> =
-                pages[page_idx].drain(..h_count).collect();
+            let header_elements: Vec<ContentElement> = pages[page_idx].drain(..h_count).collect();
             let header_bbox = compute_union_bbox(&header_elements);
             pages[page_idx].insert(
                 0,
@@ -101,19 +97,13 @@ pub fn detect_headers_footers(
 /// cross-page matcher runs. Benchmark pages are often single-page crops, so
 /// repeated-header logic cannot fire even when the page number / running title
 /// is visually obvious.
-fn detect_single_page_margin_headers(
-    pages: &mut [Vec<ContentElement>],
-    page_height: f64,
-) {
+fn detect_single_page_margin_headers(pages: &mut [Vec<ContentElement>], page_height: f64) {
     for page in pages {
         promote_single_page_margin_headers(page, page_height);
     }
 }
 
-fn promote_single_page_margin_headers(
-    page: &mut Vec<ContentElement>,
-    page_height: f64,
-) {
+fn promote_single_page_margin_headers(page: &mut Vec<ContentElement>, page_height: f64) {
     if page.is_empty() {
         return;
     }
@@ -205,7 +195,8 @@ fn is_single_page_margin_header_candidate(
             .chars()
             .filter(|ch| ch.is_alphabetic())
             .all(|ch| ch.is_uppercase());
-    let text_density = text.chars().filter(|ch| !ch.is_whitespace()).count() as f64 / bbox.width().max(1.0);
+    let text_density =
+        text.chars().filter(|ch| !ch.is_whitespace()).count() as f64 / bbox.width().max(1.0);
     let compact_or_sparse = bbox.width() <= body_width * 0.72 || text_density <= 0.06;
 
     compact_or_sparse && (digit_count > 0 || (all_caps && (near_left_edge || near_right_edge)))
@@ -368,8 +359,8 @@ fn elements_match(a: &ContentElement, b: &ContentElement) -> bool {
 /// matching elements of very different sizes.
 fn bbox_similar(a: &BoundingBox, b: &BoundingBox) -> bool {
     // Check horizontal overlap or proximity (within tolerance)
-    let x_overlap = a.left_x <= b.right_x + BBOX_X_TOLERANCE
-        && b.left_x <= a.right_x + BBOX_X_TOLERANCE;
+    let x_overlap =
+        a.left_x <= b.right_x + BBOX_X_TOLERANCE && b.left_x <= a.right_x + BBOX_X_TOLERANCE;
 
     if !x_overlap {
         return false;
@@ -499,7 +490,14 @@ mod tests {
     use crate::models::chunks::TextChunk;
     use crate::models::enums::{PdfLayer, TextFormat, TextType};
 
-    fn make_text_chunk(text: &str, page: u32, left_x: f64, bottom_y: f64, right_x: f64, top_y: f64) -> ContentElement {
+    fn make_text_chunk(
+        text: &str,
+        page: u32,
+        left_x: f64,
+        bottom_y: f64,
+        right_x: f64,
+        top_y: f64,
+    ) -> ContentElement {
         ContentElement::TextChunk(TextChunk {
             value: text.to_string(),
             bbox: BoundingBox::new(Some(page), left_x, bottom_y, right_x, top_y),
@@ -663,12 +661,8 @@ mod tests {
     fn test_middle_content_not_detected() {
         // Same text at middle of page should NOT be detected as header/footer
         let mut pages = vec![
-            vec![
-                make_text_chunk("Same text", 1, 72.0, 400.0, 300.0, 412.0),
-            ],
-            vec![
-                make_text_chunk("Same text", 2, 72.0, 400.0, 300.0, 412.0),
-            ],
+            vec![make_text_chunk("Same text", 1, 72.0, 400.0, 300.0, 412.0)],
+            vec![make_text_chunk("Same text", 2, 72.0, 400.0, 300.0, 412.0)],
         ];
         detect_headers_footers(&mut pages, 842.0);
         // No headers or footers should be detected (content is in middle zone)

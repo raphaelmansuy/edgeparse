@@ -24,10 +24,7 @@ pub fn par_map_pages<F>(pages: &mut Vec<PageContent>, op: F)
 where
     F: Fn(Vec<ContentElement>) -> Vec<ContentElement> + Sync + Send,
 {
-    let results: Vec<PageContent> = std::mem::take(pages)
-        .into_par_iter()
-        .map(|page| op(page))
-        .collect();
+    let results: Vec<PageContent> = std::mem::take(pages).into_par_iter().map(op).collect();
     *pages = results;
 }
 

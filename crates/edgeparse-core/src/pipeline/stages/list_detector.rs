@@ -19,8 +19,8 @@ const MIN_LIST_ITEMS: usize = 2;
 
 /// Bullet characters recognised as unordered list labels.
 const BULLET_CHARS: &[char] = &[
-    '•', '◦', '▪', '▸', '▹', '►', '▻', '●', '○', '■', '□', '◆', '◇',
-    '→', '➤', '✓', '✔', '★', '☆', '➜', '➢', '⁃', '‣', '∙', '⦿', '⦾',
+    '•', '◦', '▪', '▸', '▹', '►', '▻', '●', '○', '■', '□', '◆', '◇', '→', '➤', '✓', '✔', '★', '☆',
+    '➜', '➢', '⁃', '‣', '∙', '⦿', '⦾',
 ];
 
 /// Detect lists in a page of content elements.
@@ -61,7 +61,9 @@ pub fn detect_lists(elements: Vec<ContentElement>) -> Vec<ContentElement> {
                     }
                 }
                 // Check if this is a body continuation line (indented, no label)
-                if labels[list_end].is_none() && is_body_continuation(&elements, &items_info, list_end) {
+                if labels[list_end].is_none()
+                    && is_body_continuation(&elements, &items_info, list_end)
+                {
                     list_end += 1;
                     continue;
                 }
@@ -156,9 +158,7 @@ fn detect_label(elem: &ContentElement) -> Option<DetectedLabel> {
     // bibliography entries from being merged into one block.
 
     // Extract the label prefix before the first space
-    let label_end = text
-        .find([' ', '\t'])
-        .unwrap_or(text.len());
+    let label_end = text.find([' ', '\t']).unwrap_or(text.len());
     let candidate = &text[..label_end];
 
     // Try patterns: "N.", "N)", "(N)", where N is number
@@ -356,7 +356,11 @@ fn is_body_continuation(
     // same page, vertically close, no strict indentation required.
     if last_label.category == LabelCategory::BracketNumber {
         // Use the previous element (not necessarily the label) for vertical gap
-        let prev_elem = if idx > 0 { &elements[idx - 1] } else { last_elem };
+        let prev_elem = if idx > 0 {
+            &elements[idx - 1]
+        } else {
+            last_elem
+        };
         let prev_bbox = prev_elem.bbox();
         if prev_bbox.page_number != cand_bbox.page_number {
             return false;
@@ -500,15 +504,12 @@ const BOLD_WEIGHT_THRESHOLD: f64 = 600.0;
 fn element_font_weight(elem: &ContentElement) -> f64 {
     match elem {
         ContentElement::TextChunk(t) => t.font_weight,
-        ContentElement::TextLine(l) => {
-            l.text_chunks.first().map_or(400.0, |tc| tc.font_weight)
-        }
-        ContentElement::TextBlock(b) => {
-            b.text_lines
-                .first()
-                .and_then(|tl| tl.text_chunks.first())
-                .map_or(400.0, |tc| tc.font_weight)
-        }
+        ContentElement::TextLine(l) => l.text_chunks.first().map_or(400.0, |tc| tc.font_weight),
+        ContentElement::TextBlock(b) => b
+            .text_lines
+            .first()
+            .and_then(|tl| tl.text_chunks.first())
+            .map_or(400.0, |tc| tc.font_weight),
         _ => 400.0,
     }
 }
@@ -520,7 +521,14 @@ mod tests {
     use crate::models::chunks::TextChunk;
     use crate::models::enums::{PdfLayer, TextFormat, TextType};
 
-    fn make_text_line(text: &str, page: u32, left_x: f64, bottom_y: f64, right_x: f64, top_y: f64) -> ContentElement {
+    fn make_text_line(
+        text: &str,
+        page: u32,
+        left_x: f64,
+        bottom_y: f64,
+        right_x: f64,
+        top_y: f64,
+    ) -> ContentElement {
         use crate::models::text::TextLine;
         ContentElement::TextLine(TextLine {
             bbox: BoundingBox::new(Some(page), left_x, bottom_y, right_x, top_y),

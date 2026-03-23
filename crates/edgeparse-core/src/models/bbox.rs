@@ -46,13 +46,7 @@ impl PartialEq for BoundingBox {
 
 impl BoundingBox {
     /// Create a new BoundingBox.
-    pub fn new(
-        page: Option<u32>,
-        left_x: f64,
-        bottom_y: f64,
-        right_x: f64,
-        top_y: f64,
-    ) -> Self {
+    pub fn new(page: Option<u32>, left_x: f64, bottom_y: f64, right_x: f64, top_y: f64) -> Self {
         Self {
             page_number: page,
             last_page_number: page,

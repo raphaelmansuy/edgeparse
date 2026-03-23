@@ -84,7 +84,7 @@ pub fn detect_watermarks(pages: &[Vec<ContentElement>]) -> Vec<Vec<usize>> {
 }
 
 /// Remove watermark elements from pages in-place.
-pub fn remove_watermarks(pages: &mut Vec<Vec<ContentElement>>) {
+pub fn remove_watermarks(pages: &mut [Vec<ContentElement>]) {
     let watermark_indices = detect_watermarks(pages);
 
     for (page, indices) in pages.iter_mut().zip(watermark_indices.iter()) {
@@ -162,10 +162,22 @@ mod tests {
     #[test]
     fn test_detect_draft_watermark() {
         let pages = vec![
-            vec![make_text("DRAFT", 200.0, 400.0), make_text("Hello", 50.0, 700.0)],
-            vec![make_text("DRAFT", 200.0, 400.0), make_text("World", 50.0, 700.0)],
-            vec![make_text("DRAFT", 200.0, 400.0), make_text("Page3", 50.0, 700.0)],
-            vec![make_text("DRAFT", 200.0, 400.0), make_text("Page4", 50.0, 700.0)],
+            vec![
+                make_text("DRAFT", 200.0, 400.0),
+                make_text("Hello", 50.0, 700.0),
+            ],
+            vec![
+                make_text("DRAFT", 200.0, 400.0),
+                make_text("World", 50.0, 700.0),
+            ],
+            vec![
+                make_text("DRAFT", 200.0, 400.0),
+                make_text("Page3", 50.0, 700.0),
+            ],
+            vec![
+                make_text("DRAFT", 200.0, 400.0),
+                make_text("Page4", 50.0, 700.0),
+            ],
         ];
         let wm = detect_watermarks(&pages);
         // "DRAFT" appears on all 4 pages at same position → watermark
@@ -189,9 +201,18 @@ mod tests {
     #[test]
     fn test_remove_watermarks() {
         let mut pages = vec![
-            vec![make_text("DRAFT", 200.0, 400.0), make_text("Hello", 50.0, 700.0)],
-            vec![make_text("DRAFT", 200.0, 400.0), make_text("World", 50.0, 700.0)],
-            vec![make_text("DRAFT", 200.0, 400.0), make_text("Content", 50.0, 700.0)],
+            vec![
+                make_text("DRAFT", 200.0, 400.0),
+                make_text("Hello", 50.0, 700.0),
+            ],
+            vec![
+                make_text("DRAFT", 200.0, 400.0),
+                make_text("World", 50.0, 700.0),
+            ],
+            vec![
+                make_text("DRAFT", 200.0, 400.0),
+                make_text("Content", 50.0, 700.0),
+            ],
         ];
         remove_watermarks(&mut pages);
         // DRAFT should be removed from each page

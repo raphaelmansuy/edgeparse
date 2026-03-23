@@ -94,17 +94,17 @@ check: ## Fast compile-check (no binary produced)
 ## Code quality
 # ══════════════════════════════════════════════════════════════════════════════
 
-fmt: ## Auto-format all Rust source files
-	$(call log,cargo fmt)
-	@cargo fmt
+fmt: ## Auto-format publishable crates (edgeparse-core, edgeparse-cli)
+	$(call log,cargo fmt -p edgeparse-core -p edgeparse-cli)
+	@cargo fmt -p edgeparse-core -p edgeparse-cli
 
-fmt-check: ## Verify formatting without changes (CI gate)
-	$(call log,cargo fmt --check)
-	@cargo fmt --check
+fmt-check: ## Verify formatting without changes — publishable crates (CI gate)
+	$(call log,cargo fmt -p edgeparse-core -p edgeparse-cli -- --check)
+	@cargo fmt -p edgeparse-core -p edgeparse-cli -- --check
 
-lint: ## Run Clippy — all warnings promoted to errors
-	$(call log,cargo clippy -- -D warnings)
-	@cargo clippy -- -D warnings
+lint: ## Run Clippy on publishable crates — warnings promoted to errors
+	$(call log,cargo clippy -p edgeparse-core -p edgeparse-cli -- -D warnings)
+	@cargo clippy -p edgeparse-core -p edgeparse-cli -- -D warnings
 
 test: ## Run all unit and integration tests
 	$(call log,cargo test)

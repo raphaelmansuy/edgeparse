@@ -37,38 +37,38 @@ static AGL_MAP: LazyLock<HashMap<&'static str, String>> = LazyLock::new(|| {
 static TEX_GLYPH_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     let mut m = HashMap::new();
     // CMSY (Computer Modern Symbol) extras
-    m.insert("asteriskmath", "\u{2217}");     // ∗
-    m.insert("diamondmath", "\u{22C4}");      // ⋄
-    m.insert("minusplus", "\u{2213}");        // ∓
-    m.insert("circleminus", "\u{2296}");      // ⊖
-    m.insert("circledivide", "\u{2298}");     // ⊘
-    m.insert("circledot", "\u{2299}");        // ⊙
-    m.insert("circlecopyrt", "\u{00A9}");     // ©
-    m.insert("equivasymptotic", "\u{224D}");  // ≍
-    m.insert("precedesequal", "\u{227C}");    // ≼
-    m.insert("followsequal", "\u{227D}");     // ≽
-    m.insert("similarequal", "\u{2243}");     // ≃
-    m.insert("lessmuch", "\u{226A}");         // ≪
-    m.insert("greatermuch", "\u{226B}");      // ≫
-    m.insert("follows", "\u{227B}");          // ≻
-    m.insert("arrownortheast", "\u{2197}");   // ↗
-    m.insert("arrowsoutheast", "\u{2198}");   // ↘
-    m.insert("arrownorthwest", "\u{2196}");   // ↖
-    m.insert("arrowsouthwest", "\u{2199}");   // ↙
-    m.insert("negationslash", "\u{0338}");    // combining long solidus
-    m.insert("owner", "\u{220B}");            // ∋
-    m.insert("triangleinv", "\u{25BD}");      // ▽
-    m.insert("latticetop", "\u{22A4}");       // ⊤
-    // CMMI (Computer Modern Math Italic) extras
-    m.insert("tie", "\u{2040}");              // ⁀  (character tie)
-    m.insert("dotlessj", "\u{0237}");         // ȷ
-    m.insert("vector", "\u{20D7}");           // combining right arrow above
-    // CMEX (Computer Modern Extension) and CMR extras
-    m.insert("bardbl", "\u{2016}");           // ‖
-    m.insert("mapsto", "\u{21A6}");           // ↦
-    m.insert("lscript", "\u{2113}");          // ℓ
-    m.insert("weierstrass", "\u{2118}");      // ℘
-    m.insert("visiblespace", "\u{2423}");     // ␣
+    m.insert("asteriskmath", "\u{2217}"); // ∗
+    m.insert("diamondmath", "\u{22C4}"); // ⋄
+    m.insert("minusplus", "\u{2213}"); // ∓
+    m.insert("circleminus", "\u{2296}"); // ⊖
+    m.insert("circledivide", "\u{2298}"); // ⊘
+    m.insert("circledot", "\u{2299}"); // ⊙
+    m.insert("circlecopyrt", "\u{00A9}"); // ©
+    m.insert("equivasymptotic", "\u{224D}"); // ≍
+    m.insert("precedesequal", "\u{227C}"); // ≼
+    m.insert("followsequal", "\u{227D}"); // ≽
+    m.insert("similarequal", "\u{2243}"); // ≃
+    m.insert("lessmuch", "\u{226A}"); // ≪
+    m.insert("greatermuch", "\u{226B}"); // ≫
+    m.insert("follows", "\u{227B}"); // ≻
+    m.insert("arrownortheast", "\u{2197}"); // ↗
+    m.insert("arrowsoutheast", "\u{2198}"); // ↘
+    m.insert("arrownorthwest", "\u{2196}"); // ↖
+    m.insert("arrowsouthwest", "\u{2199}"); // ↙
+    m.insert("negationslash", "\u{0338}"); // combining long solidus
+    m.insert("owner", "\u{220B}"); // ∋
+    m.insert("triangleinv", "\u{25BD}"); // ▽
+    m.insert("latticetop", "\u{22A4}"); // ⊤
+                                        // CMMI (Computer Modern Math Italic) extras
+    m.insert("tie", "\u{2040}"); // ⁀  (character tie)
+    m.insert("dotlessj", "\u{0237}"); // ȷ
+    m.insert("vector", "\u{20D7}"); // combining right arrow above
+                                    // CMEX (Computer Modern Extension) and CMR extras
+    m.insert("bardbl", "\u{2016}"); // ‖
+    m.insert("mapsto", "\u{21A6}"); // ↦
+    m.insert("lscript", "\u{2113}"); // ℓ
+    m.insert("weierstrass", "\u{2118}"); // ℘
+    m.insert("visiblespace", "\u{2423}"); // ␣
     m
 });
 
@@ -199,10 +199,7 @@ impl FontCache {
 }
 
 /// Resolve fonts from a page's /Resources /Font dictionary.
-pub fn resolve_page_fonts(
-    doc: &lopdf::Document,
-    page_id: lopdf::ObjectId,
-) -> FontCache {
+pub fn resolve_page_fonts(doc: &lopdf::Document, page_id: lopdf::ObjectId) -> FontCache {
     let mut cache = FontCache::default();
 
     // Get page dictionary
@@ -375,9 +372,8 @@ pub(crate) fn resolve_font_dict(
     // Many PDFs have "Bold" in the font name but StemV in the 100-140 range
     // which our heuristic maps to 500 (Medium).  The font name is more reliable.
     let name_lower = base_font.to_lowercase();
-    let is_name_bold = name_lower.contains("bold")
-        || name_lower.contains("black")
-        || name_lower.contains("heavy");
+    let is_name_bold =
+        name_lower.contains("bold") || name_lower.contains("black") || name_lower.contains("heavy");
     if is_name_bold && weight < 700.0 {
         weight = 700.0;
     }
@@ -431,7 +427,11 @@ fn resolve_widths(doc: &lopdf::Document, dict: &lopdf::Dictionary) -> HashMap<u3
 /// Two forms:
 /// - `cid [w1, w2, w3, ...]` — consecutive CIDs starting at cid
 /// - `cid_start cid_end w` — range of CIDs all with same width
-fn resolve_cid_widths(doc: &lopdf::Document, dict: &lopdf::Dictionary, widths: &mut HashMap<u32, f64>) {
+fn resolve_cid_widths(
+    doc: &lopdf::Document,
+    dict: &lopdf::Dictionary,
+    widths: &mut HashMap<u32, f64>,
+) {
     let w_obj = match dict.get(b"W") {
         Ok(o) => resolve_object(doc, o),
         Err(_) => return,
@@ -543,9 +543,10 @@ fn resolve_encoding_differences(
             lopdf::Object::Name(ref name_bytes) => {
                 let glyph_name = String::from_utf8_lossy(name_bytes).to_string();
                 // Only add if not already mapped by ToUnicode (ToUnicode takes priority)
-                if !to_unicode.contains_key(&current_code) {
+                if let std::collections::hash_map::Entry::Vacant(e) = to_unicode.entry(current_code)
+                {
                     if let Some(unicode) = glyph_name_to_unicode(&glyph_name) {
-                        to_unicode.insert(current_code, unicode);
+                        e.insert(unicode);
                     }
                 }
                 current_code += 1;
@@ -615,9 +616,9 @@ fn resolve_type1_font_program_encoding(
             continue;
         }
         // Only add if not already mapped by ToUnicode or Encoding/Differences
-        if !to_unicode.contains_key(&code) {
+        if let std::collections::hash_map::Entry::Vacant(e) = to_unicode.entry(code) {
             if let Some(unicode) = glyph_name_to_unicode(glyph) {
-                to_unicode.insert(code, unicode);
+                e.insert(unicode);
             }
         }
     }
@@ -777,7 +778,9 @@ fn parse_cmap(data: &[u8], mapping: &mut HashMap<u32, String>) {
             // Format: <XXXX> <YYYY>
             let parts: Vec<&str> = trimmed.split('>').collect();
             if parts.len() >= 2 {
-                if let (Some(src), Some(dst)) = (parse_hex_value(parts[0]), parse_hex_unicode(parts[1])) {
+                if let (Some(src), Some(dst)) =
+                    (parse_hex_value(parts[0]), parse_hex_unicode(parts[1]))
+                {
                     mapping.insert(src, dst);
                 }
             }
@@ -816,7 +819,11 @@ fn parse_cmap(data: &[u8], mapping: &mut HashMap<u32, String>) {
                             .split('>')
                             .filter_map(|s| {
                                 let s = s.trim().trim_start_matches('<');
-                                if s.is_empty() { None } else { parse_hex_unicode_str(s) }
+                                if s.is_empty() {
+                                    None
+                                } else {
+                                    parse_hex_unicode_str(s)
+                                }
                             })
                             .collect();
                         for (i, val) in values.iter().enumerate() {
@@ -832,9 +839,11 @@ fn parse_cmap(data: &[u8], mapping: &mut HashMap<u32, String>) {
                 // Standard format: <XXXX> <YYYY> <ZZZZ>
                 let parts: Vec<&str> = trimmed.split('>').collect();
                 if parts.len() >= 3 {
-                    if let (Some(start), Some(end), Some(dst_start)) =
-                        (parse_hex_value(parts[0]), parse_hex_value(parts[1]), parse_hex_value(parts[2]))
-                    {
+                    if let (Some(start), Some(end), Some(dst_start)) = (
+                        parse_hex_value(parts[0]),
+                        parse_hex_value(parts[1]),
+                        parse_hex_value(parts[2]),
+                    ) {
                         for code in start..=end {
                             let unicode_point = dst_start + (code - start);
                             if let Some(c) = char::from_u32(unicode_point) {
@@ -859,7 +868,11 @@ fn parse_hex_value(s: &str) -> Option<u32> {
 
 /// Parse a hex Unicode value from a CMap entry like " <0041".
 fn parse_hex_unicode(s: &str) -> Option<String> {
-    let cleaned = s.trim().trim_start_matches('<').trim_end_matches('>').trim();
+    let cleaned = s
+        .trim()
+        .trim_start_matches('<')
+        .trim_end_matches('>')
+        .trim();
     parse_hex_unicode_str(cleaned)
 }
 
@@ -939,7 +952,8 @@ fn resolve_font_descriptor(
                 let bbox_obj = resolve_object(doc, bbox_ref);
                 if let Ok(bbox_arr) = bbox_obj.as_array() {
                     if bbox_arr.len() >= 4 {
-                        let vals: Vec<f64> = bbox_arr.iter()
+                        let vals: Vec<f64> = bbox_arr
+                            .iter()
                             .filter_map(|o| obj_to_f64(resolve_object(doc, o)))
                             .collect();
                         if vals.len() >= 4 {
@@ -975,10 +989,7 @@ fn resolve_font_descriptor(
 /// Resolve a PDF object reference.
 fn resolve_object<'a>(doc: &'a lopdf::Document, obj: &'a lopdf::Object) -> lopdf::Object {
     match obj {
-        lopdf::Object::Reference(id) => doc
-            .get_object(*id)
-            .cloned()
-            .unwrap_or(lopdf::Object::Null),
+        lopdf::Object::Reference(id) => doc.get_object(*id).cloned().unwrap_or(lopdf::Object::Null),
         other => other.clone(),
     }
 }
@@ -987,7 +998,7 @@ fn resolve_object<'a>(doc: &'a lopdf::Document, obj: &'a lopdf::Object) -> lopdf
 fn obj_to_f64(obj: lopdf::Object) -> Option<f64> {
     match obj {
         lopdf::Object::Integer(i) => Some(i as f64),
-        lopdf::Object::Real(f) => Some(f as f64),
+        lopdf::Object::Real(f) => Some(f),
         _ => None,
     }
 }
@@ -1172,7 +1183,9 @@ fn decode_macroman(code: u32) -> String {
         0xFE => '\u{02DB}', // ˛
         0xFF => '\u{02C7}', // ˇ
         _ => {
-            return char::from_u32(code).map(|c| c.to_string()).unwrap_or_default();
+            return char::from_u32(code)
+                .map(|c| c.to_string())
+                .unwrap_or_default();
         }
     };
     mapped.to_string()
@@ -1217,10 +1230,14 @@ fn decode_winansi(code: u32) -> String {
         0x9F => '\u{0178}', // Latin capital letter Y with diaeresis
         // 0xA0-0xFF: direct Unicode mapping (Latin-1 Supplement)
         c @ 0xA0..=0xFF => {
-            return char::from_u32(c).map(|ch| ch.to_string()).unwrap_or_default();
+            return char::from_u32(c)
+                .map(|ch| ch.to_string())
+                .unwrap_or_default();
         }
         _ => {
-            return char::from_u32(code).map(|c| c.to_string()).unwrap_or_default();
+            return char::from_u32(code)
+                .map(|c| c.to_string())
+                .unwrap_or_default();
         }
     };
     mapped.to_string()
@@ -1280,7 +1297,10 @@ mod tests {
         assert_eq!(glyph_name_to_unicode("percent"), Some("%".to_string()));
         assert_eq!(glyph_name_to_unicode("ampersand"), Some("&".to_string()));
         assert_eq!(glyph_name_to_unicode("parenleft"), Some("(".to_string()));
-        assert_eq!(glyph_name_to_unicode("endash"), Some("\u{2013}".to_string()));
+        assert_eq!(
+            glyph_name_to_unicode("endash"),
+            Some("\u{2013}".to_string())
+        );
         assert_eq!(glyph_name_to_unicode("A"), Some("A".to_string()));
         assert_eq!(glyph_name_to_unicode("uni0041"), Some("A".to_string()));
     }
@@ -1293,13 +1313,31 @@ mod tests {
     #[test]
     fn test_glyph_name_to_unicode_agl_extended() {
         // Characters only available via the full AGL, not the old hand-coded list
-        assert_eq!(glyph_name_to_unicode("Dcroat"), Some("\u{0110}".to_string()));
-        assert_eq!(glyph_name_to_unicode("dcroat"), Some("\u{0111}".to_string()));
-        assert_eq!(glyph_name_to_unicode("Emacron"), Some("\u{0112}".to_string()));
-        assert_eq!(glyph_name_to_unicode("afii10017"), Some("\u{0410}".to_string())); // Cyrillic А
-        assert_eq!(glyph_name_to_unicode("afii57636"), Some("\u{20AA}".to_string())); // New Sheqel sign
-        // Multi-codepoint entry (Hebrew dalet + hataf patah)
-        assert_eq!(glyph_name_to_unicode("dalethatafpatah"), Some("\u{05D3}\u{05B2}".to_string()));
+        assert_eq!(
+            glyph_name_to_unicode("Dcroat"),
+            Some("\u{0110}".to_string())
+        );
+        assert_eq!(
+            glyph_name_to_unicode("dcroat"),
+            Some("\u{0111}".to_string())
+        );
+        assert_eq!(
+            glyph_name_to_unicode("Emacron"),
+            Some("\u{0112}".to_string())
+        );
+        assert_eq!(
+            glyph_name_to_unicode("afii10017"),
+            Some("\u{0410}".to_string())
+        ); // Cyrillic А
+        assert_eq!(
+            glyph_name_to_unicode("afii57636"),
+            Some("\u{20AA}".to_string())
+        ); // New Sheqel sign
+           // Multi-codepoint entry (Hebrew dalet + hataf patah)
+        assert_eq!(
+            glyph_name_to_unicode("dalethatafpatah"),
+            Some("\u{05D3}\u{05B2}".to_string())
+        );
     }
 
     #[test]
@@ -1310,7 +1348,10 @@ mod tests {
         // uniXXXXYYYY (sequence of BMP codepoints)
         assert_eq!(glyph_name_to_unicode("uni00410042"), Some("AB".to_string()));
         // uXXXXXX format (supplementary)
-        assert_eq!(glyph_name_to_unicode("u1F600"), Some("\u{1F600}".to_string()));
+        assert_eq!(
+            glyph_name_to_unicode("u1F600"),
+            Some("\u{1F600}".to_string())
+        );
     }
 
     #[test]
@@ -1350,20 +1391,62 @@ mod tests {
     #[test]
     fn test_tex_glyph_names() {
         // CMSY font glyph names (TeX-specific, not in AGL)
-        assert_eq!(glyph_name_to_unicode("asteriskmath"), Some("\u{2217}".to_string())); // ∗
-        assert_eq!(glyph_name_to_unicode("diamondmath"), Some("\u{22C4}".to_string()));  // ⋄
-        assert_eq!(glyph_name_to_unicode("minusplus"), Some("\u{2213}".to_string()));    // ∓
-        assert_eq!(glyph_name_to_unicode("circleminus"), Some("\u{2296}".to_string()));  // ⊖
-        assert_eq!(glyph_name_to_unicode("circledot"), Some("\u{2299}".to_string()));    // ⊙
-        assert_eq!(glyph_name_to_unicode("follows"), Some("\u{227B}".to_string()));      // ≻
-        assert_eq!(glyph_name_to_unicode("lessmuch"), Some("\u{226A}".to_string()));     // ≪
-        assert_eq!(glyph_name_to_unicode("greatermuch"), Some("\u{226B}".to_string()));  // ≫
-        assert_eq!(glyph_name_to_unicode("latticetop"), Some("\u{22A4}".to_string()));   // ⊤
-        assert_eq!(glyph_name_to_unicode("mapsto"), Some("\u{21A6}".to_string()));       // ↦
-        // These should still resolve via AGL
-        assert_eq!(glyph_name_to_unicode("dagger"), Some("\u{2020}".to_string()));       // †
-        assert_eq!(glyph_name_to_unicode("daggerdbl"), Some("\u{2021}".to_string()));    // ‡
-        assert_eq!(glyph_name_to_unicode("braceleft"), Some("\u{007B}".to_string()));    // {
-        assert_eq!(glyph_name_to_unicode("braceright"), Some("\u{007D}".to_string()));   // }
+        assert_eq!(
+            glyph_name_to_unicode("asteriskmath"),
+            Some("\u{2217}".to_string())
+        ); // ∗
+        assert_eq!(
+            glyph_name_to_unicode("diamondmath"),
+            Some("\u{22C4}".to_string())
+        ); // ⋄
+        assert_eq!(
+            glyph_name_to_unicode("minusplus"),
+            Some("\u{2213}".to_string())
+        ); // ∓
+        assert_eq!(
+            glyph_name_to_unicode("circleminus"),
+            Some("\u{2296}".to_string())
+        ); // ⊖
+        assert_eq!(
+            glyph_name_to_unicode("circledot"),
+            Some("\u{2299}".to_string())
+        ); // ⊙
+        assert_eq!(
+            glyph_name_to_unicode("follows"),
+            Some("\u{227B}".to_string())
+        ); // ≻
+        assert_eq!(
+            glyph_name_to_unicode("lessmuch"),
+            Some("\u{226A}".to_string())
+        ); // ≪
+        assert_eq!(
+            glyph_name_to_unicode("greatermuch"),
+            Some("\u{226B}".to_string())
+        ); // ≫
+        assert_eq!(
+            glyph_name_to_unicode("latticetop"),
+            Some("\u{22A4}".to_string())
+        ); // ⊤
+        assert_eq!(
+            glyph_name_to_unicode("mapsto"),
+            Some("\u{21A6}".to_string())
+        ); // ↦
+           // These should still resolve via AGL
+        assert_eq!(
+            glyph_name_to_unicode("dagger"),
+            Some("\u{2020}".to_string())
+        ); // †
+        assert_eq!(
+            glyph_name_to_unicode("daggerdbl"),
+            Some("\u{2021}".to_string())
+        ); // ‡
+        assert_eq!(
+            glyph_name_to_unicode("braceleft"),
+            Some("\u{007B}".to_string())
+        ); // {
+        assert_eq!(
+            glyph_name_to_unicode("braceright"),
+            Some("\u{007D}".to_string())
+        ); // }
     }
 }

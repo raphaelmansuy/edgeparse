@@ -7,7 +7,10 @@ use crate::EdgePdfError;
 ///
 /// # Errors
 /// Returns `EdgePdfError::OutputError` if serialization fails.
-pub fn write_json<W: std::io::Write>(doc: &PdfDocument, writer: &mut W) -> Result<(), EdgePdfError> {
+pub fn write_json<W: std::io::Write>(
+    doc: &PdfDocument,
+    writer: &mut W,
+) -> Result<(), EdgePdfError> {
     serde_json::to_writer_pretty(writer, doc)
         .map_err(|e| EdgePdfError::OutputError(format!("JSON serialization failed: {}", e)))
 }

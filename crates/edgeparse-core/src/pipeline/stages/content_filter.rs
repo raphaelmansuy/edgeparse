@@ -28,11 +28,7 @@ pub fn filter_content(
 }
 
 /// Decide whether to keep a content element.
-fn should_keep(
-    element: &ContentElement,
-    filter: &FilterConfig,
-    page_bbox: &BoundingBox,
-) -> bool {
+fn should_keep(element: &ContentElement, filter: &FilterConfig, page_bbox: &BoundingBox) -> bool {
     match element {
         ContentElement::TextChunk(tc) => {
             // Filter hidden text (low contrast)

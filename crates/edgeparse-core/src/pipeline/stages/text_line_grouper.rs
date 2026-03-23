@@ -70,7 +70,10 @@ fn column_index(chunk: &TextChunk, layout: Option<&ColumnLayout>) -> usize {
     match layout {
         Some(l) if !l.boundaries.is_empty() => {
             let cx = chunk.bbox.center_x();
-            l.boundaries.iter().position(|&b| cx < b).unwrap_or(l.boundaries.len())
+            l.boundaries
+                .iter()
+                .position(|&b| cx < b)
+                .unwrap_or(l.boundaries.len())
         }
         _ => 0,
     }
@@ -220,8 +223,7 @@ pub fn group_text_lines(
         // Column boundary check: if multi-column layout is detected, never merge
         // chunks that are in different columns (prevents two-column interleaving).
         let same_column = if has_column_boundaries {
-            column_index(&chunk, column_layout)
-                == column_index(last, column_layout)
+            column_index(&chunk, column_layout) == column_index(last, column_layout)
         } else {
             // Fallback: use inline heuristic for large horizontal gaps.
             // If h_gap > 2×font_size AND the chunk is not a tiny super/subscript,
@@ -284,7 +286,10 @@ pub fn group_text_lines(
 /// When `column_layout` has detected column boundaries, text lines from
 /// different columns are never merged, preventing two-column body text from
 /// being re-interleaved by this post-grouping pass.
-fn merge_adjacent_lines(mut lines: Vec<TextLine>, column_layout: Option<&ColumnLayout>) -> Vec<TextLine> {
+fn merge_adjacent_lines(
+    mut lines: Vec<TextLine>,
+    column_layout: Option<&ColumnLayout>,
+) -> Vec<TextLine> {
     if lines.len() < 2 {
         return lines;
     }
@@ -352,8 +357,9 @@ fn merge_adjacent_lines(mut lines: Vec<TextLine>, column_layout: Option<&ColumnL
         let next_chars = next.value().chars().count();
         let is_short_label = cur_chars <= 4 || next_chars <= 4;
         let both_short = cur_chars + next_chars <= 15;
-        let font_ratio = (current.font_size.min(next.font_size) / current.font_size.max(next.font_size).max(1.0))
-            .max(0.0);
+        let font_ratio = (current.font_size.min(next.font_size)
+            / current.font_size.max(next.font_size).max(1.0))
+        .max(0.0);
         let allow_short_fragment_exception = font_ratio >= 0.75;
         let wide_parallel_lines = !has_column_boundaries
             && h_gap > ref_size * 1.2
@@ -410,7 +416,10 @@ fn merge_adjacent_lines(mut lines: Vec<TextLine>, column_layout: Option<&ColumnL
             current.font_size = current.font_size.max(next.font_size);
             current.base_line = current.bbox.bottom_y;
             current.level = common_column_level(
-                current.text_chunks.iter().map(|chunk| chunk.level.as_deref()),
+                current
+                    .text_chunks
+                    .iter()
+                    .map(|chunk| chunk.level.as_deref()),
             );
         } else {
             merged.push(current);
@@ -549,8 +558,8 @@ mod tests {
         // "Luo" at baseline y=700 (12pt font)
         // "†"   raised by 4pt → y=704 (8pt font), directly to the right of "Luo"
         let elements = vec![
-            make_tc("Luo",  72.0, 700.0, 24.0, 12.0),
-            make_tc("†",   100.0, 704.0,  6.0,  8.0),
+            make_tc("Luo", 72.0, 700.0, 24.0, 12.0),
+            make_tc("†", 100.0, 704.0, 6.0, 8.0),
         ];
         let result = group_text_lines(elements, None);
         // Should produce one TextLine containing both chunks
@@ -567,7 +576,7 @@ mod tests {
         // Use realistic multi-word column content (> 15 chars combined) so
         // the short-fragment running-header exception doesn't trigger.
         let elements = vec![
-            make_tc("left column text data",  72.0, 700.0, 120.0, 10.0),
+            make_tc("left column text data", 72.0, 700.0, 120.0, 10.0),
             make_tc("right column text data", 340.0, 700.0, 120.0, 10.0),
         ];
         let result = group_text_lines(elements, None);
@@ -581,7 +590,11 @@ mod tests {
             make_tc("of", 340.0, 700.0, 8.0, 10.0),
         ];
         let result = group_text_lines(elements, None);
-        assert_eq!(result.len(), 2, "short fragments must not bridge cross-column gaps");
+        assert_eq!(
+            result.len(),
+            2,
+            "short fragments must not bridge cross-column gaps"
+        );
     }
 
     #[test]
@@ -626,7 +639,11 @@ mod tests {
         }]);
 
         let merged = merge_adjacent_lines(vec![left, right], None);
-        assert_eq!(merged.len(), 2, "post-merge should not reconnect wide parallel columns");
+        assert_eq!(
+            merged.len(),
+            2,
+            "post-merge should not reconnect wide parallel columns"
+        );
     }
 
     #[test]
@@ -636,7 +653,11 @@ mod tests {
             make_tc("Yarrow", 340.0, 790.0, 42.0, 9.0),
         ];
         let result = group_text_lines(elements, None);
-        assert_eq!(result.len(), 1, "same-size running header fragments should merge");
+        assert_eq!(
+            result.len(),
+            1,
+            "same-size running header fragments should merge"
+        );
     }
 
     #[test]
@@ -652,6 +673,10 @@ mod tests {
             make_tc("6", 348.0, 193.0, 4.0, 5.0),
         ];
         let result = group_text_lines(elements, None);
-        assert_eq!(result.len(), 2, "tiny page number should stay separate from TOC text");
+        assert_eq!(
+            result.len(),
+            2,
+            "tiny page number should stay separate from TOC text"
+        );
     }
 }

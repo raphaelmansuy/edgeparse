@@ -46,11 +46,9 @@ pub fn assign_content_to_tables(elements: Vec<ContentElement>) -> Vec<ContentEle
         let mut assigned = false;
         for table in &mut tables {
             let overlap = table.bbox.intersection_percent(elem_bbox);
-            if overlap >= MIN_TABLE_INTERSECTION {
-                if assign_to_cell(table, &elem) {
-                    assigned = true;
-                    break;
-                }
+            if overlap >= MIN_TABLE_INTERSECTION && assign_to_cell(table, &elem) {
+                assigned = true;
+                break;
             }
         }
 
@@ -152,7 +150,13 @@ mod tests {
     use crate::models::enums::TextType;
     use crate::models::table::{TableBorder, TableBorderCell, TableBorderRow};
 
-    fn make_text_chunk(value: &str, left: f64, bottom: f64, right: f64, top: f64) -> ContentElement {
+    fn make_text_chunk(
+        value: &str,
+        left: f64,
+        bottom: f64,
+        right: f64,
+        top: f64,
+    ) -> ContentElement {
         ContentElement::TextChunk(TextChunk {
             value: value.to_string(),
             bbox: BoundingBox::new(Some(1), left, bottom, right, top),
@@ -184,7 +188,13 @@ mod tests {
             let mut cells = Vec::new();
             for c in 0..2 {
                 cells.push(TableBorderCell {
-                    bbox: BoundingBox::new(Some(1), x_coords[c], y_coords[r + 1], x_coords[c + 1], y_coords[r]),
+                    bbox: BoundingBox::new(
+                        Some(1),
+                        x_coords[c],
+                        y_coords[r + 1],
+                        x_coords[c + 1],
+                        y_coords[r],
+                    ),
                     index: None,
                     level: None,
                     row_number: r,
@@ -244,7 +254,13 @@ mod tests {
             let mut cells = Vec::new();
             for c in 0..num_cols {
                 cells.push(TableBorderCell {
-                    bbox: BoundingBox::new(Some(1), x_coords[c], y_coords[r + 1], x_coords[c + 1], y_coords[r]),
+                    bbox: BoundingBox::new(
+                        Some(1),
+                        x_coords[c],
+                        y_coords[r + 1],
+                        x_coords[c + 1],
+                        y_coords[r],
+                    ),
                     index: None,
                     level: None,
                     row_number: r,
@@ -293,7 +309,10 @@ mod tests {
         let elements = vec![text, table];
         let result = assign_content_to_tables(elements);
 
-        let tables: Vec<_> = result.iter().filter(|e| matches!(e, ContentElement::TableBorder(_))).collect();
+        let tables: Vec<_> = result
+            .iter()
+            .filter(|e| matches!(e, ContentElement::TableBorder(_)))
+            .collect();
         assert_eq!(tables.len(), 1);
         if let ContentElement::TableBorder(t) = &tables[0] {
             assert_eq!(t.rows[0].cells[0].content.len(), 1);
@@ -311,7 +330,10 @@ mod tests {
         let result = assign_content_to_tables(elements);
 
         // Text should remain in output
-        let texts: Vec<_> = result.iter().filter(|e| matches!(e, ContentElement::TextChunk(_))).collect();
+        let texts: Vec<_> = result
+            .iter()
+            .filter(|e| matches!(e, ContentElement::TextChunk(_)))
+            .collect();
         assert_eq!(texts.len(), 1);
     }
 
@@ -324,7 +346,10 @@ mod tests {
         let elements = vec![text, table];
         let result = assign_content_to_tables(elements);
 
-        let tables: Vec<_> = result.iter().filter(|e| matches!(e, ContentElement::TableBorder(_))).collect();
+        let tables: Vec<_> = result
+            .iter()
+            .filter(|e| matches!(e, ContentElement::TableBorder(_)))
+            .collect();
         if let ContentElement::TableBorder(t) = &tables[0] {
             // Cell (0,0) should be empty
             assert!(t.rows[0].cells[0].content.is_empty());

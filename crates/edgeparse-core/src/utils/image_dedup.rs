@@ -135,7 +135,7 @@ mod tests {
         ];
         let deduped = deduplicate(&images);
         assert_eq!(deduped.len(), 2); // 2 unique images
-        // "logo" has 3 occurrences, should be first (sorted by count desc)
+                                      // "logo" has 3 occurrences, should be first (sorted by count desc)
         assert_eq!(deduped[0].occurrence_count, 3);
         assert_eq!(deduped[0].page_numbers.len(), 3);
         assert_eq!(deduped[1].occurrence_count, 1);

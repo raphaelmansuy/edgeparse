@@ -48,15 +48,16 @@ pub fn promote_boxed_headings(elements: Vec<ContentElement>) -> Vec<ContentEleme
 
                         // Count tokens and total text length
                         let token_count = cell.content.len();
-                        let total_text: String = cell.content.iter()
+                        let total_text: String = cell
+                            .content
+                            .iter()
                             .map(|t| t.base.value.as_str())
                             .collect::<Vec<_>>()
                             .join(" ");
                         let text_len = total_text.trim().len();
 
                         // Check for image content (skip promotion if there's an image)
-                        let has_image = cell.content.iter()
-                            .any(|t| t.base.value == "[image]");
+                        let has_image = cell.content.iter().any(|t| t.base.value == "[image]");
 
                         if !has_image
                             && token_count <= MAX_TOKEN_COUNT
@@ -90,8 +91,10 @@ mod tests {
     use super::*;
     use crate::models::bbox::BoundingBox;
     use crate::models::chunks::TextChunk;
-    use crate::models::enums::{TextFormat, TextType, PdfLayer};
-    use crate::models::table::{TableBorder, TableBorderCell, TableBorderRow, TableToken, TableTokenType};
+    use crate::models::enums::{PdfLayer, TextFormat, TextType};
+    use crate::models::table::{
+        TableBorder, TableBorderCell, TableBorderRow, TableToken, TableTokenType,
+    };
 
     fn make_token(text: &str) -> TableToken {
         TableToken {

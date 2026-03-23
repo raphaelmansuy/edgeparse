@@ -135,8 +135,8 @@ fn detect_page_columns(page: &[ContentElement]) -> ColumnLayout {
         }
         let left_bin = ((eff_left - x_origin).floor().max(0.0) as usize).min(n_bins - 1);
         let right_bin = ((eff_right - x_origin).ceil().max(0.0) as usize).min(n_bins);
-        for bin in left_bin..right_bin {
-            bin_baselines[bin].insert(y_key);
+        for cell in &mut bin_baselines[left_bin..right_bin] {
+            cell.insert(y_key);
         }
     }
 
@@ -168,7 +168,10 @@ fn detect_page_columns(page: &[ContentElement]) -> ColumnLayout {
     let max_cov = coverage_counts.iter().copied().max().unwrap_or(0);
     if max_cov == 0 {
         if std::env::var("COLUMN_DEBUG").is_ok() {
-            eprintln!("[COLUMN] zero coverage max_cov=0 non_spanning={}", non_spanning.len());
+            eprintln!(
+                "[COLUMN] zero coverage max_cov=0 non_spanning={}",
+                non_spanning.len()
+            );
         }
         return ColumnLayout {
             num_columns: 1,
@@ -204,7 +207,9 @@ fn detect_page_columns(page: &[ContentElement]) -> ColumnLayout {
                     // Verify left side has high coverage too (look back up to 10 bins)
                     let left_ok = if start > 0 {
                         let check_start = start.saturating_sub(10);
-                        coverage_counts[check_start..start].iter().any(|&c| c > half_cov)
+                        coverage_counts[check_start..start]
+                            .iter()
+                            .any(|&c| c > half_cov)
                     } else {
                         false
                     };
@@ -237,10 +242,7 @@ fn detect_page_columns(page: &[ContentElement]) -> ColumnLayout {
     if std::env::var("COLUMN_DEBUG").is_ok() {
         eprintln!(
             "[COLUMN] total_baselines={} max_cov={} gap_threshold={} boundaries={:?}",
-            total_baselines,
-            max_cov,
-            gap_threshold,
-            boundaries
+            total_baselines, max_cov, gap_threshold, boundaries
         );
     }
 
@@ -332,7 +334,9 @@ fn fallback_center_gap_boundary(
         .fold(f64::INFINITY, f64::min);
 
     let overlap = (left_top.min(right_top) - left_bottom.max(right_bottom)).max(0.0);
-    let min_height = (left_top - left_bottom).min(right_top - right_bottom).max(1.0);
+    let min_height = (left_top - left_bottom)
+        .min(right_top - right_bottom)
+        .max(1.0);
     if overlap / min_height < 0.25 {
         return None;
     }
@@ -400,7 +404,10 @@ fn clear_column_level(elem: &mut ContentElement) {
 }
 
 fn clear_if_column_level(level: &mut Option<String>) {
-    if level.as_deref().is_some_and(|value| value.starts_with("col:")) {
+    if level
+        .as_deref()
+        .is_some_and(|value| value.starts_with("col:"))
+    {
         *level = None;
     }
 }

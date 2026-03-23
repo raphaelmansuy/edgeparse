@@ -117,11 +117,11 @@ fn page_min_y(page: &[ContentElement]) -> f64 {
 mod tests {
     use super::*;
     use crate::models::bbox::BoundingBox;
+    use crate::models::chunks::TextChunk;
     use crate::models::enums::SemanticType;
+    use crate::models::enums::{PdfLayer, TextFormat, TextType};
     use crate::models::semantic::SemanticParagraph;
     use crate::models::text::{TextBlock, TextColumn, TextLine};
-    use crate::models::chunks::TextChunk;
-    use crate::models::enums::{PdfLayer, TextFormat, TextType};
 
     fn make_para(text: &str, font_size: f64, bottom_y: f64, top_y: f64) -> ContentElement {
         let chunk = TextChunk {

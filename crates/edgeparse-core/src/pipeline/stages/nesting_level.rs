@@ -52,12 +52,14 @@ impl LevelEntry {
             ContentElement::TableBorder(_) | ContentElement::Table(_) => {
                 (EntryKind::Table, DEFAULT_FONT_SIZE)
             }
-            ContentElement::Heading(h) => {
-                (EntryKind::Heading, h.base.base.font_size.unwrap_or(DEFAULT_FONT_SIZE))
-            }
-            ContentElement::Paragraph(p) => {
-                (EntryKind::Paragraph, p.base.font_size.unwrap_or(DEFAULT_FONT_SIZE))
-            }
+            ContentElement::Heading(h) => (
+                EntryKind::Heading,
+                h.base.base.font_size.unwrap_or(DEFAULT_FONT_SIZE),
+            ),
+            ContentElement::Paragraph(p) => (
+                EntryKind::Paragraph,
+                p.base.font_size.unwrap_or(DEFAULT_FONT_SIZE),
+            ),
             _ => (EntryKind::Other, DEFAULT_FONT_SIZE),
         };
         Self {

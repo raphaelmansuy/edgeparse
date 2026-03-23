@@ -88,11 +88,10 @@ fn extract_rect(doc: &Document, dict: &lopdf::Dictionary, key: &[u8]) -> Option<
 fn parse_rect_array(doc: &Document, obj: &Object) -> Option<BoundingBox> {
     let arr = match obj {
         Object::Array(a) => a.clone(),
-        Object::Reference(id) => {
-            doc.get_object(*id)
-                .ok()
-                .and_then(|o| o.as_array().ok().cloned())?
-        }
+        Object::Reference(id) => doc
+            .get_object(*id)
+            .ok()
+            .and_then(|o| o.as_array().ok().cloned())?,
         _ => return None,
     };
 
@@ -100,10 +99,7 @@ fn parse_rect_array(doc: &Document, obj: &Object) -> Option<BoundingBox> {
         return None;
     }
 
-    let vals: Vec<f64> = arr
-        .iter()
-        .filter_map(|o| resolve_number(doc, o))
-        .collect();
+    let vals: Vec<f64> = arr.iter().filter_map(|o| resolve_number(doc, o)).collect();
 
     if vals.len() < 4 {
         return None;
@@ -114,11 +110,12 @@ fn parse_rect_array(doc: &Document, obj: &Object) -> Option<BoundingBox> {
 
 fn resolve_number(doc: &Document, obj: &Object) -> Option<f64> {
     match obj {
-        Object::Real(f) => Some(f64::from(*f)),
+        Object::Real(f) => Some(*f),
         Object::Integer(i) => Some(*i as f64),
-        Object::Reference(id) => {
-            doc.get_object(*id).ok().and_then(|o| resolve_number(doc, o))
-        }
+        Object::Reference(id) => doc
+            .get_object(*id)
+            .ok()
+            .and_then(|o| resolve_number(doc, o)),
         _ => None,
     }
 }

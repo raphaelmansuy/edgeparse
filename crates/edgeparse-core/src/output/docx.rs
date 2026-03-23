@@ -116,9 +116,7 @@ fn token_rows_text(rows: &[TableTokenRow]) -> String {
 }
 
 fn make_paragraph(text: &str) -> String {
-    format!(
-        "<w:p><w:r><w:t xml:space=\"preserve\">{text}</w:t></w:r></w:p>\n"
-    )
+    format!("<w:p><w:r><w:t xml:space=\"preserve\">{text}</w:t></w:r></w:p>\n")
 }
 
 fn make_heading(text: &str, level: u32) -> String {

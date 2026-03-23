@@ -54,17 +54,37 @@ impl DiffResult {
         if self.is_identical() {
             return "Documents are identical.".to_string();
         }
-        let added = self.changes.iter().filter(|c| c.kind == ChangeKind::Added).count();
-        let removed = self.changes.iter().filter(|c| c.kind == ChangeKind::Removed).count();
-        let modified = self.changes.iter().filter(|c| c.kind == ChangeKind::Modified).count();
+        let added = self
+            .changes
+            .iter()
+            .filter(|c| c.kind == ChangeKind::Added)
+            .count();
+        let removed = self
+            .changes
+            .iter()
+            .filter(|c| c.kind == ChangeKind::Removed)
+            .count();
+        let modified = self
+            .changes
+            .iter()
+            .filter(|c| c.kind == ChangeKind::Modified)
+            .count();
         format!(
             "{} change(s): {} added, {} removed, {} modified{}{}",
             self.changes.len(),
             added,
             removed,
             modified,
-            if self.metadata_changed { ", metadata changed" } else { "" },
-            if self.page_count_changed { ", page count changed" } else { "" },
+            if self.metadata_changed {
+                ", metadata changed"
+            } else {
+                ""
+            },
+            if self.page_count_changed {
+                ", page count changed"
+            } else {
+                ""
+            },
         )
     }
 }
@@ -159,10 +179,10 @@ fn element_tag(elem: &ContentElement) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::document::PdfDocument;
     use crate::models::bbox::BoundingBox;
     use crate::models::chunks::TextChunk;
-    use crate::models::enums::{TextFormat, TextType, PdfLayer};
+    use crate::models::document::PdfDocument;
+    use crate::models::enums::{PdfLayer, TextFormat, TextType};
 
     fn make_text_chunk(text: &str) -> ContentElement {
         ContentElement::TextChunk(TextChunk {

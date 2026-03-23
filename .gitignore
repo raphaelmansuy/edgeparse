@@ -43,4 +43,5 @@ examples/output/
 *.log
 
 mission/
-logs/.playwright-mcp/
+logs/
+.playwright-mcp/

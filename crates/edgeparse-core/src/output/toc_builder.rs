@@ -130,10 +130,7 @@ fn nest_entries(flat: Vec<TocEntry>) -> Vec<TocEntry> {
 }
 
 fn count_entries(entries: &[TocEntry]) -> usize {
-    entries
-        .iter()
-        .map(|e| 1 + count_entries(&e.children))
-        .sum()
+    entries.iter().map(|e| 1 + count_entries(&e.children)).sum()
 }
 
 fn render_markdown(entries: &[TocEntry], out: &mut String) {
@@ -203,10 +200,7 @@ mod tests {
                 title: "Ch1".to_string(),
                 level: 1,
                 page_number: 1,
-                children: vec![
-                    make_entry("S1.1", 2, 2),
-                    make_entry("S1.2", 2, 3),
-                ],
+                children: vec![make_entry("S1.1", 2, 2), make_entry("S1.2", 2, 3)],
             }],
         };
         assert_eq!(toc.total_entries(), 3);

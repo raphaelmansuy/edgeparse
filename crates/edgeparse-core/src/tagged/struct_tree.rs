@@ -117,12 +117,10 @@ fn extract_role_map(doc: &Document) -> HashMap<String, String> {
         return role_map;
     };
     let rm_obj = match rm_obj {
-        Object::Reference(id) => {
-            match doc.get_object(*id) {
-                Ok(o) => o.clone(),
-                Err(_) => return role_map,
-            }
-        }
+        Object::Reference(id) => match doc.get_object(*id) {
+            Ok(o) => o.clone(),
+            Err(_) => return role_map,
+        },
         other => other.clone(),
     };
     if let Ok(rm_dict) = rm_obj.as_dict() {
@@ -175,9 +173,12 @@ fn walk_for_mcids(
     // Determine the effective semantic context for MCID leaves.
     // For structural containers (document, section, non-structural), inherit parent.
     // For semantic elements (heading, paragraph, table, etc.), use this node.
-    let current_context = if role != "document" && role != "section"
-        && role != "non-structural" && role != "unknown"
-        && node.struct_type != "StructTreeRoot" && node.struct_type != "MCID"
+    let current_context = if role != "document"
+        && role != "section"
+        && role != "non-structural"
+        && role != "unknown"
+        && node.struct_type != "StructTreeRoot"
+        && node.struct_type != "MCID"
     {
         Some((role, level, resolved_type.to_string()))
     } else {
@@ -189,12 +190,15 @@ fn walk_for_mcids(
     // If this is an MCID leaf, record it
     if node.struct_type == "MCID" {
         if let (Some(mcid), Some(page_num)) = (node.mcid, page) {
-            if let Some((ref role, ref heading_level, ref struct_type)) = current_context {
-                map.insert((page_num, mcid), McidTagInfo {
-                    role,
-                    heading_level: *heading_level,
-                    struct_type: struct_type.clone(),
-                });
+            if let Some((role, ref heading_level, ref struct_type)) = current_context {
+                map.insert(
+                    (page_num, mcid),
+                    McidTagInfo {
+                        role,
+                        heading_level: *heading_level,
+                        struct_type: struct_type.clone(),
+                    },
+                );
             }
         }
     }

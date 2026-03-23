@@ -54,9 +54,11 @@ pub fn link_captions(pages: &mut [Vec<ContentElement>]) {
             }
 
             // Check if adjacent element above or below is an image or table
-            let has_target_above = i > 0 && is_captionable(&page[i - 1])
+            let has_target_above = i > 0
+                && is_captionable(&page[i - 1])
                 && vertical_gap(&page[i - 1], &page[i]) < MAX_CAPTION_GAP;
-            let has_target_below = i + 1 < len && is_captionable(&page[i + 1])
+            let has_target_below = i + 1 < len
+                && is_captionable(&page[i + 1])
                 && vertical_gap(&page[i], &page[i + 1]) < MAX_CAPTION_GAP;
 
             if has_target_above || has_target_below {
@@ -233,8 +235,12 @@ fn split_block_at(block: &TextBlock, at: usize) -> Option<(TextBlock, TextBlock)
 
 fn rebuild_block(template: &TextBlock, text_lines: Vec<TextLine>, has_end_line: bool) -> TextBlock {
     let bbox = union_line_bboxes(&text_lines);
-    let font_size = text_lines.iter().map(|line| line.font_size).sum::<f64>() / text_lines.len() as f64;
-    let base_line = text_lines.last().map(|line| line.base_line).unwrap_or(template.base_line);
+    let font_size =
+        text_lines.iter().map(|line| line.font_size).sum::<f64>() / text_lines.len() as f64;
+    let base_line = text_lines
+        .last()
+        .map(|line| line.base_line)
+        .unwrap_or(template.base_line);
     let is_hidden_text = text_lines.iter().all(|line| line.is_hidden_text);
 
     TextBlock {
@@ -324,7 +330,8 @@ fn dominant_font_name(block: &TextBlock) -> Option<String> {
     for line in &block.text_lines {
         for chunk in &line.text_chunks {
             if !chunk.font_name.is_empty() {
-                *counts.entry(chunk.font_name.as_str()).or_insert(0) += chunk.value.chars().count().max(1);
+                *counts.entry(chunk.font_name.as_str()).or_insert(0) +=
+                    chunk.value.chars().count().max(1);
             }
         }
     }
@@ -339,11 +346,11 @@ mod tests {
     use super::*;
     use crate::models::bbox::BoundingBox;
     use crate::models::chunks::ImageChunk;
+    use crate::models::chunks::TextChunk;
     use crate::models::enums::SemanticType;
+    use crate::models::enums::{PdfLayer, TextFormat, TextType};
     use crate::models::semantic::{SemanticParagraph, SemanticTextNode};
     use crate::models::text::{TextBlock, TextColumn, TextLine};
-    use crate::models::chunks::TextChunk;
-    use crate::models::enums::{PdfLayer, TextFormat, TextType};
 
     fn make_paragraph(text: &str, y_top: f64, y_bottom: f64) -> ContentElement {
         let chunk = TextChunk {
@@ -611,7 +618,10 @@ mod tests {
         match &pages[0][2] {
             ContentElement::Paragraph(p) => {
                 assert_eq!(p.base.semantic_type, SemanticType::Paragraph);
-                assert!(p.base.value().starts_with("Our nearest astronomical neighbor"));
+                assert!(p
+                    .base
+                    .value()
+                    .starts_with("Our nearest astronomical neighbor"));
             }
             other => panic!("Expected body paragraph, got {other:?}"),
         }

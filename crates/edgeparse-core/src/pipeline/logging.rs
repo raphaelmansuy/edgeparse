@@ -60,9 +60,7 @@ impl PipelineTimer {
 
     /// Total pipeline wall-clock time.
     pub fn total_duration(&self) -> Duration {
-        self.pipeline_start
-            .map(|s| s.elapsed())
-            .unwrap_or_default()
+        self.pipeline_start.map(|s| s.elapsed()).unwrap_or_default()
     }
 
     /// Recorded stage entries.
@@ -73,7 +71,10 @@ impl PipelineTimer {
     /// Format a human-readable timing summary.
     pub fn summary(&self) -> String {
         let mut out = String::from("Pipeline Timing Summary\n");
-        out.push_str(&format!("{:<40} {:>10} {:>10}\n", "Stage", "Time (ms)", "Elements"));
+        out.push_str(&format!(
+            "{:<40} {:>10} {:>10}\n",
+            "Stage", "Time (ms)", "Elements"
+        ));
         out.push_str(&"-".repeat(62));
         out.push('\n');
         for r in &self.records {

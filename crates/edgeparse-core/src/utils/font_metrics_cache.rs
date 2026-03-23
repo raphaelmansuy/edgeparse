@@ -62,7 +62,13 @@ impl FontMetricsCache {
 
     /// Store a measurement in the cache.
     /// If the cache is full, it will be cleared (simple eviction strategy).
-    pub fn put(&mut self, font_name: &str, font_size: f64, text: &str, measurement: TextMeasurement) {
+    pub fn put(
+        &mut self,
+        font_name: &str,
+        font_size: f64,
+        text: &str,
+        measurement: TextMeasurement,
+    ) {
         if self.measurements.len() >= self.max_entries {
             self.measurements.clear();
         }
@@ -185,11 +191,16 @@ mod tests {
         assert_eq!(cache.hits(), 0);
 
         // Store and hit
-        cache.put("Helvetica", 12.0, "hello", TextMeasurement {
-            width: 25.0,
-            char_count: 5,
-            avg_char_width: 5.0,
-        });
+        cache.put(
+            "Helvetica",
+            12.0,
+            "hello",
+            TextMeasurement {
+                width: 25.0,
+                char_count: 5,
+                avg_char_width: 5.0,
+            },
+        );
         let m = cache.get("Helvetica", 12.0, "hello").unwrap();
         assert_eq!(m.width, 25.0);
         assert_eq!(cache.hits(), 1);
@@ -234,27 +245,46 @@ mod tests {
     fn test_eviction_on_full() {
         let mut cache = FontMetricsCache::new(3);
         for i in 0..3 {
-            cache.put("F", 10.0, &format!("text{}", i), TextMeasurement {
-                width: i as f64,
-                char_count: 1,
-                avg_char_width: i as f64,
-            });
+            cache.put(
+                "F",
+                10.0,
+                &format!("text{}", i),
+                TextMeasurement {
+                    width: i as f64,
+                    char_count: 1,
+                    avg_char_width: i as f64,
+                },
+            );
         }
         assert_eq!(cache.len(), 3);
 
         // 4th entry triggers eviction (clear)
-        cache.put("F", 10.0, "text3", TextMeasurement {
-            width: 3.0,
-            char_count: 1,
-            avg_char_width: 3.0,
-        });
+        cache.put(
+            "F",
+            10.0,
+            "text3",
+            TextMeasurement {
+                width: 3.0,
+                char_count: 1,
+                avg_char_width: 3.0,
+            },
+        );
         assert_eq!(cache.len(), 1); // only the new entry remains
     }
 
     #[test]
     fn test_hit_rate() {
         let mut cache = FontMetricsCache::new(100);
-        cache.put("F", 10.0, "a", TextMeasurement { width: 1.0, char_count: 1, avg_char_width: 1.0 });
+        cache.put(
+            "F",
+            10.0,
+            "a",
+            TextMeasurement {
+                width: 1.0,
+                char_count: 1,
+                avg_char_width: 1.0,
+            },
+        );
         let _ = cache.get("F", 10.0, "a"); // hit
         let _ = cache.get("F", 10.0, "a"); // hit
         let _ = cache.get("F", 10.0, "b"); // miss
