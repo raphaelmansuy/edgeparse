@@ -9,7 +9,18 @@ const year = new Date().getFullYear();
     <!-- Brand column -->
     <div class="footer-brand">
       <a href={base} class="footer-logo" aria-label="EdgeParse home">
-        <span class="footer-logo-text">EdgeParse</span>
+        <!-- Icon mark -->
+        <svg class="footer-logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" aria-hidden="true" width="28" height="28">
+          <defs>
+            <linearGradient id="fp-g1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#818cf8"/>
+              <stop offset="100%" stop-color="#6366f1"/>
+            </linearGradient>
+          </defs>
+          <path fill="url(#fp-g1)" fill-rule="evenodd" d="M81 36 64 0 47 36l-1 2-9-10a6 6 0 0 0-9 9l10 10h-2L0 64l36 17h2L28 91a6 6 0 1 0 9 9l9-10 1 2 17 36 17-36v-2l9 10a6 6 0 1 0 9-9l-9-9 2-1 36-17-36-17-2-1 9-9a6 6 0 1 0-9-9l-9 10v-2Zm-17 2-2 5c-4 8-11 15-19 19l-5 2 5 2c8 4 15 11 19 19l2 5 2-5c4-8 11-15 19-19l5-2-5-2c-8-4-15-11-19-19l-2-5Z" clip-rule="evenodd"/>
+          <path fill="#4f46e5" opacity="0.7" d="M118 19a6 6 0 0 0-9-9l-3 3a6 6 0 1 0 9 9l3-3Zm-96 4c-2 2-6 2-9 0l-3-3a6 6 0 1 1 9-9l3 3c3 2 3 6 0 9Zm0 82c-2-2-6-2-9 0l-3 3a6 6 0 1 0 9 9l3-3c3-2 3-6 0-9Zm96 4a6 6 0 0 1-9 9l-3-3a6 6 0 1 1 9-9l3 3Z"/>
+        </svg>
+        <span class="footer-logo-text">Edge<span class="footer-logo-accent">Parse</span></span>
       </a>
       <p class="footer-tagline">
         High-performance PDF extraction for AI agents.<br />
@@ -49,7 +60,8 @@ const year = new Date().getFullYear();
           <li><a href={`${base}api/python/`}>API Reference</a></li>
           <li><a href="https://pypi.org/project/edgeparse/" target="_blank" rel="noopener noreferrer">PyPI</a></li>
           <li><a href="https://www.npmjs.com/package/edgeparse" target="_blank" rel="noopener noreferrer">npm</a></li>
-          <li><a href="https://crates.io/crates/edgeparse" target="_blank" rel="noopener noreferrer">crates.io</a></li>
+          <li><a href="https://crates.io/crates/edgeparse-cli" target="_blank" rel="noopener noreferrer">crates.io (CLI)</a></li>
+          <li><a href="https://crates.io/crates/edgeparse-core" target="_blank" rel="noopener noreferrer">crates.io (Core)</a></li>
         </ul>
       </div>
 
@@ -129,6 +141,14 @@ const year = new Date().getFullYear();
     font-weight: 700;
     color: var(--ep-text-primary, #111827);
     letter-spacing: -0.02em;
+  }
+
+  .footer-logo-accent {
+    color: #6366f1;
+  }
+
+  .footer-logo-icon {
+    flex-shrink: 0;
   }
 
   .footer-tagline {

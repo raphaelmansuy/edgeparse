@@ -13,6 +13,13 @@ export default defineConfig({
 		starlight({
 			title: 'EdgeParse',
 			description: 'High-performance PDF-to-structured-data extraction engine. Rust-native, 10-100× faster than alternatives. Python, Node.js, CLI & Rust SDKs.',
+			logo: {
+				light: './src/assets/logo.svg',
+				dark: './src/assets/logo-dark.svg',
+				replacesTitle: true,
+				alt: 'EdgeParse',
+			},
+			favicon: '/favicon.svg',
 			lastUpdated: true,
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/raphaelmansuy/edgeparse' },

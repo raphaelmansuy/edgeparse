@@ -1,15 +1,22 @@
 {
   "name": "edgeparse-linux-arm64-gnu",
-  "version": "0.1.0",
-  "os": ["linux"],
-  "cpu": ["arm64"],
+  "version": "0.1.1",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
   "main": "edgeparse-node.linux-arm64-gnu.node",
-  "files": ["edgeparse-node.linux-arm64-gnu.node"],
+  "files": [
+    "edgeparse-node.linux-arm64-gnu.node"
+  ],
   "description": "edgeparse native addon for linux-arm64-gnu",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/raphaelmansuy/edgeparse.git",
     "directory": "sdks/node/npm/linux-arm64-gnu"
-  }
+  },
+  "homepage": "https://github.com/raphaelmansuy/edgeparse#readme"
 }
