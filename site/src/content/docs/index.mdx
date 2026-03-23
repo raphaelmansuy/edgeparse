@@ -41,6 +41,21 @@ npx skills add raphaelmansuy/edgeparse --skill edgeparse
 
 # Step 2: Install the Python runtime
 pip install edgeparse` },
+    { label: 'Brew', lang: 'bash', code: `# macOS / Linux — one-time setup
+brew tap raphaelmansuy/tap
+brew install edgeparse
+
+# Verify installation
+edgeparse --version
+
+# Parse a PDF to Markdown
+edgeparse report.pdf --format markdown
+
+# Parse to JSON with bounding boxes
+edgeparse invoice.pdf --format json
+
+# Batch convert a directory
+edgeparse docs/*.pdf --format markdown --output-dir results/` },
     { label: 'Python', lang: 'python', code: `import edgeparse, json
 
 # Convert PDF to Markdown
@@ -72,7 +87,10 @@ const pages = convert("report.pdf", { format: "markdown", pages: "1-5" });
 
 // Save to output directory
 const path = convertFile("report.pdf", { outputDir: "out/", format: "markdown" });` },
-    { label: 'CLI', lang: 'bash', code: `# Install
+    { label: 'CLI', lang: 'bash', code: `# Install via Homebrew (macOS / Linux)
+brew tap raphaelmansuy/tap && brew install edgeparse
+
+# Or via pip
 pip install edgeparse
 
 # Extract PDF to Markdown

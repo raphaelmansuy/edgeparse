@@ -1,15 +1,39 @@
 ---
 title: "Quick Start: CLI"
-description: "Extract PDFs from the command line with edgeparse-cli."
+description: "Extract PDFs from the command line with edgeparse-cli. Install via Homebrew, cargo, or pre-built binary."
 ---
 
 ## Installation
+
+### Homebrew (macOS / Linux) — Recommended
+
+```bash
+brew tap raphaelmansuy/tap
+brew install edgeparse
+```
+
+Verify:
+
+```bash
+edgeparse --version
+```
+
+### cargo (any platform)
 
 ```bash
 cargo install edgeparse-cli
 ```
 
-Or download a pre-built binary from [GitHub Releases](https://github.com/raphaelmansuy/edgeparse/releases).
+### Pre-built binary
+
+Download a platform binary from [GitHub Releases](https://github.com/raphaelmansuy/edgeparse/releases), make it executable, and add it to your `PATH`:
+
+```bash
+# macOS arm64 example
+curl -L https://github.com/raphaelmansuy/edgeparse/releases/latest/download/edgeparse-aarch64-apple-darwin.tar.gz | tar xz
+chmod +x edgeparse
+sudo mv edgeparse /usr/local/bin/
+```
 
 ## Basic Usage
 
