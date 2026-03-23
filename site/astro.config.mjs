@@ -1,15 +1,21 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 
 const siteUrl = 'https://edgeparse.com';
 const fullUrl = siteUrl;
-const ogImageUrl = `${fullUrl}/og-image.svg`;
+const ogImageUrl = `${fullUrl}/og-image.png`;
 
 export default defineConfig({
 	site: siteUrl,
 	integrations: [
+		sitemap({
+			changefreq: 'weekly',
+			priority: 0.7,
+			lastmod: new Date(),
+		}),
 		starlight({
 			title: 'EdgeParse',
 			description: 'High-performance PDF-to-structured-data extraction engine. Rust-native, 10-100× faster than alternatives. Python, Node.js, CLI & Rust SDKs.',
@@ -37,6 +43,14 @@ export default defineConfig({
 				Footer: './src/components/landing/Footer.astro',
 			},
 			head: [
+				// Sitemap discovery link
+				{
+					tag: 'link',
+					attrs: {
+						rel: 'sitemap',
+						href: '/sitemap-index.xml',
+					},
+				},
 				// Preconnect to font services
 				{
 					tag: 'link',
@@ -100,7 +114,21 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						property: 'og:image:type',
-						content: 'image/svg+xml',
+						content: 'image/png',
+					},
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						property: 'og:image:alt',
+						content: 'EdgeParse – High-performance PDF-to-structured-data extraction engine. Rust-native, 10-100× faster.',
+					},
+				},
+				{
+					tag: 'meta',
+					attrs: {
+						property: 'og:image:secure_url',
+						content: ogImageUrl,
 					},
 				},
 				{
@@ -139,6 +167,13 @@ export default defineConfig({
 						content: ogImageUrl,
 					},
 				},
+				{
+					tag: 'meta',
+					attrs: {
+						name: 'twitter:image:alt',
+						content: 'EdgeParse – High-performance PDF-to-structured-data extraction engine. Rust-native, 10-100× faster.',
+					},
+				},
 				// Additional SEO meta tags
 				{
 					tag: 'meta',
@@ -161,13 +196,7 @@ export default defineConfig({
 						content: 'index, follow',
 					},
 				},
-				{
-					tag: 'link',
-					attrs: {
-						rel: 'canonical',
-						href: fullUrl,
-					},
-				},
+				// NOTE: canonical is handled per-page by Starlight; do not set a global one.
 				// JSON-LD: SoftwareApplication
 				{
 					tag: 'script',
@@ -186,7 +215,6 @@ export default defineConfig({
 						softwareVersion: '0.1.1',
 						license: 'https://opensource.org/licenses/Apache-2.0',
 						programmingLanguage: ['Rust', 'Python', 'TypeScript'],
-						codeRepository: 'https://github.com/raphaelmansuy/edgeparse',
 						image: ogImageUrl,
 						screenshot: ogImageUrl,
 						aggregateRating: {
@@ -195,6 +223,20 @@ export default defineConfig({
 							ratingCount: '50',
 							bestRating: '5',
 						},
+					}),
+				},
+				// JSON-LD: SoftwareSourceCode (separate entity for codeRepository)
+				{
+					tag: 'script',
+					attrs: { type: 'application/ld+json' },
+					content: JSON.stringify({
+						'@context': 'https://schema.org',
+						'@type': 'SoftwareSourceCode',
+						name: 'EdgeParse',
+						codeRepository: 'https://github.com/raphaelmansuy/edgeparse',
+						programmingLanguage: ['Rust', 'Python', 'TypeScript'],
+						license: 'https://opensource.org/licenses/Apache-2.0',
+						author: { '@type': 'Person', name: 'Raphael Mansuy', url: 'https://github.com/raphaelmansuy' },
 					}),
 				},
 				// JSON-LD: Organization
@@ -211,7 +253,8 @@ export default defineConfig({
 							'https://github.com/raphaelmansuy/edgeparse',
 							'https://pypi.org/project/edgeparse/',
 							'https://www.npmjs.com/package/edgeparse',
-							'https://crates.io/crates/edgeparse',
+							'https://crates.io/crates/edgeparse-cli',
+							'https://crates.io/crates/edgeparse-core',
 						],
 					}),
 				},

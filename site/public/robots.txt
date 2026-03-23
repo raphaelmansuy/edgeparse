@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://raphaelmansuy.github.io/edgeparse/sitemap-index.xml
+Sitemap: https://edgeparse.com/sitemap-index.xml
