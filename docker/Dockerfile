@@ -1,5 +1,5 @@
 # ─── Stage 1: Build ───────────────────────────────────────────────────────────
-FROM rust:1.85-slim-bookworm AS builder
+FROM rust:1-slim-bookworm AS builder
 
 # Install only what the linker and PDF library need
 RUN apt-get update && apt-get install -y --no-install-recommends \
