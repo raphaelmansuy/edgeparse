@@ -19,39 +19,38 @@ jobs:
           - runner: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             manylinux: auto
+            interpreter: python3.10 python3.11 python3.12 python3.13
           - runner: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             manylinux: auto
-          - runner: macos-13
+            interpreter: python3.10 python3.11 python3.12 python3.13
+          - runner: macos-latest
             target: x86_64-apple-darwin
             manylinux: ''
+            interpreter: python3.10 python3.11 python3.12 python3.13
           - runner: macos-14
             target: aarch64-apple-darwin
             manylinux: ''
+            interpreter: python3.10 python3.11 python3.12 python3.13
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             manylinux: ''
+            interpreter: python3.10 python3.11 python3.12 python3.13
 
     steps:
       - uses: actions/checkout@v4
 
-      # Linux: maturin-action builds all Python versions automatically via
-      # the manylinux container (cp310–cp313).
-      # macOS: install multiple interpreters so maturin produces one wheel
-      # per Python version per arch.
+      # For non-manylinux (macOS, Windows) install multiple Python versions.
+      # For manylinux, actions/setup-python doesn't affect the containerised
+      # build — maturin finds Python inside the container via -i.
       - uses: actions/setup-python@v5
-        if: ${{ !startsWith(matrix.platform.runner, 'ubuntu') }}
+        if: ${{ matrix.platform.manylinux == '' }}
         with:
           python-version: |
             3.10
             3.11
             3.12
             3.13
-
-      - uses: actions/setup-python@v5
-        if: startsWith(matrix.platform.runner, 'ubuntu')
-        with:
-          python-version: '3.12'
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -61,7 +60,7 @@ jobs:
           working-directory: sdks/python
           args: >-
             --release --out dist/
-            ${{ !startsWith(matrix.platform.runner, 'ubuntu') && '-i python3.10 python3.11 python3.12 python3.13' || '' }}
+            -i ${{ matrix.platform.interpreter }}
           sccache: 'true'
 
       - name: Upload wheel artifact

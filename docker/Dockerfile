@@ -30,7 +30,9 @@ RUN sed -E -i \
 
 # Now copy real source and build
 COPY crates/ crates/
-RUN touch crates/edgeparse-core/src/lib.rs crates/edgeparse-cli/src/main.rs \
+# Touch ALL Rust source files so Cargo sees them as newer than the dummy
+# build artifacts and recompiles every crate (especially pdf-cos).
+RUN find crates/ -name '*.rs' -exec touch {} + \
     && cargo build --release -p edgeparse-cli
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
