@@ -80,6 +80,38 @@ brew install edgeparse
 
 ---
 
+## ⚠️ What's Missing / Must Be Configured Before Next Release
+
+| Item | Status | Action Required |
+|------|--------|----------------|
+| **npm — Classic Automation Token** | ❌ Not done | Current `NPM_TOKEN` is a Granular token scoped only to `edgeparse`. Replace with a **Classic Automation token** so all 6 npm packages can publish. See [npm E403 troubleshooting](#npm-e403-forbidden-on-platform-packages-but-main-package-succeeds). |
+| **PyPI — OIDC Trusted Publisher** | ❌ Not done | `release-python.yml` uses OIDC. The Trusted Publisher entry must be added at [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/) before CI can publish. See [PyPI OIDC troubleshooting](#pypi-oidc-invalid-publisher--token-request-failed). |
+| **npm platform packages — manual publish for v0.2.0** | ⚠️ Workaround needed | Because the token is wrong, the 5 platform packages are NOT on npm at 0.2.0. Either fix the token and re-run the workflow, or publish them manually (see below). |
+| **PyPI wheels — manual publish for v0.2.0** | ⚠️ Workaround needed | OIDC not configured. Publish manually with `PYPI_PASSWORD=<api-token> make publish-python` or from the downloaded wheel artifacts. |
+
+### Manual npm publish for v0.2.0 (temporary workaround)
+
+```bash
+# 1. Get a Classic Automation token from npmjs.com
+export NODE_AUTH_TOKEN=<classic-automation-token>
+echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+
+# 2. Download built .node artifacts from the GitHub Actions run:
+#    https://github.com/raphaelmansuy/edgeparse/actions/runs/23481058631
+#    Download all 5 "node-<platform>" artifacts into sdks/node/npm/
+
+# 3. Publish each platform package
+for dir in sdks/node/npm/*/; do
+  echo "Publishing $dir..."
+  (cd "$dir" && npm publish --access public) && echo "✓ $dir" || echo "✗ $dir"
+done
+
+# 4. Cleanup
+rm ~/.npmrc
+```
+
+---
+
 ## Required Secrets and Environments
 
 ### GitHub Repository Secrets
@@ -192,12 +224,13 @@ The npm package is `edgeparse` (unscoped). Platform-specific packages (`edgepars
 **Steps (one-time):**
 
 1. Sign in to [npmjs.com](https://www.npmjs.com) as the publisher account.
-2. Go to **Account → Access Tokens → Generate New Token → Granular Access Token**.
+2. Go to **Account → Access Tokens → Generate New Token → Classic Token**.
+   - Token type: **Automation** (bypasses 2FA prompts in CI)
    - Token name: `edgeparse-github-actions`
-   - Expiration: 365 days (set a calendar reminder to rotate!)
-   - Packages and scopes: **Read and write** — all packages belonging to this account
 3. Copy the token.
 4. Add to GitHub: secret name `NPM_TOKEN`.
+
+> **⚠️ IMPORTANT — Classic token, not Granular token:** A Granular Access Token only grants access to packages you explicitly list at creation time. Publishing 6 packages (`edgeparse` + 5 platform packages) requires either a **Classic Automation token** (access to all packages you own) or a Granular token with all 6 packages listed individually. If you see `E403 Forbidden` on platform packages but the main `edgeparse` publishes fine, your token was created as Granular with only `edgeparse` in scope — recreate it as a Classic Automation token.
 
 > **Token rotation:** npm Granular Access Tokens expire. Rotate before expiry at [npmjs.com → Access Tokens](https://www.npmjs.com/settings/~/tokens).
 
@@ -411,7 +444,39 @@ edgeparse-core = { path = "../edgeparse-core", version = "0.1.0" }
 
 ### npm: E401 Unauthorized
 
-The `NPM_TOKEN` secret is expired or invalid. Generate a new Granular Access Token at [npmjs.com/settings/~/tokens](https://www.npmjs.com/settings/~/tokens) and update the GitHub secret.
+The `NPM_TOKEN` secret is expired or invalid. Generate a new Classic Automation token at [npmjs.com/settings/~/tokens](https://www.npmjs.com/settings/~/tokens) and update the GitHub secret.
+
+### npm: E403 Forbidden on platform packages (but main package succeeds)
+
+**Symptom:** `edgeparse@0.2.0` publishes successfully but all 5 platform packages (`edgeparse-darwin-arm64`, `edgeparse-darwin-x64`, etc.) fail with:
+```
+npm error 403 Forbidden - PUT https://registry.npmjs.org/edgeparse-darwin-arm64
+- You may not perform that action with these credentials.
+```
+
+**Root cause:** The `NPM_TOKEN` is a **Granular Access Token** scoped to only the `edgeparse` package. Platform packages are not in scope.
+
+**Fix — replace with a Classic Automation Token:**
+
+1. Go to [npmjs.com → Account → Access Tokens](https://www.npmjs.com/settings/~/tokens).
+2. Delete or retire the current granular token.
+3. Click **Generate New Token → Classic Token** → type **Automation**.
+4. Copy the token (shown only once).
+5. Go to **GitHub repo → Settings → Secrets and variables → Actions → `NPM_TOKEN` → Update secret**.
+6. Re-run the Node.js workflow:
+   ```bash
+   gh workflow run release-node.yml --field tag_name=v0.2.0
+   ```
+
+> Platform packages that have NEVER been published (`edgeparse-darwin-x64`, `edgeparse-linux-x64-gnu`, etc.) also get E403 with a Granular token because — for packages that don't exist yet — npm still validates scope before creating them.
+
+**Verify your token locally before updating the secret:**
+```bash
+echo "//registry.npmjs.org/:_authToken=<token>" > /tmp/.npmrc
+npm --userconfig /tmp/.npmrc whoami
+# Should print your npm username
+rm /tmp/.npmrc
+```
 
 ### npm: "Scope not found"
 
