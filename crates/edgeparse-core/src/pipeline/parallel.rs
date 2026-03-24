@@ -1,9 +1,13 @@
-//! Parallel page-processing utilities using rayon.
+//! Parallel page-processing utilities.
+//!
+//! On native targets: uses rayon for data parallelism.
+//! On wasm32: falls back to sequential iteration.
 //!
 //! Provides helpers that apply a per-page transformation in parallel across all
 //! pages of a document. Designed as a drop-in replacement for the sequential
 //! `for page in &mut pages { ... }` loops in the orchestrator.
 
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 use crate::models::content::ContentElement;
@@ -24,8 +28,16 @@ pub fn par_map_pages<F>(pages: &mut Vec<PageContent>, op: F)
 where
     F: Fn(Vec<ContentElement>) -> Vec<ContentElement> + Sync + Send,
 {
-    let results: Vec<PageContent> = std::mem::take(pages).into_par_iter().map(op).collect();
-    *pages = results;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let results: Vec<PageContent> = std::mem::take(pages).into_par_iter().map(&op).collect();
+        *pages = results;
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let results: Vec<PageContent> = std::mem::take(pages).into_iter().map(op).collect();
+        *pages = results;
+    }
 }
 
 /// Apply `op` to each page in parallel where the closure also receives a
@@ -34,12 +46,24 @@ pub fn par_map_pages_indexed<F>(pages: &mut Vec<PageContent>, op: F)
 where
     F: Fn(usize, Vec<ContentElement>) -> Vec<ContentElement> + Sync + Send,
 {
-    let results: Vec<PageContent> = std::mem::take(pages)
-        .into_par_iter()
-        .enumerate()
-        .map(|(i, page)| op(i, page))
-        .collect();
-    *pages = results;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let results: Vec<PageContent> = std::mem::take(pages)
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, page)| op(i, page))
+            .collect();
+        *pages = results;
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let results: Vec<PageContent> = std::mem::take(pages)
+            .into_iter()
+            .enumerate()
+            .map(|(i, page)| op(i, page))
+            .collect();
+        *pages = results;
+    }
 }
 
 /// Parallel fold — map each page to a value of type `T` and collect results.
@@ -50,17 +74,32 @@ where
     T: Send,
     F: Fn(&[ContentElement]) -> T + Sync + Send,
 {
-    pages.par_iter().map(|page| op(page)).collect()
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        pages.par_iter().map(|page| op(page)).collect()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        pages.iter().map(|page| op(page)).collect()
+    }
 }
 
 /// Configure the global rayon thread pool with the given number of threads.
 ///
-/// Returns `Ok(())` on success. Calling this more than once (after the pool is
-/// already initialized) returns an error which callers may ignore.
+/// On WASM, this is a no-op.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn configure_thread_pool(num_threads: usize) -> Result<(), rayon::ThreadPoolBuildError> {
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build_global()
+}
+
+/// Configure the global rayon thread pool with the given number of threads.
+///
+/// On WASM, this is a no-op.
+#[cfg(target_arch = "wasm32")]
+pub fn configure_thread_pool(_num_threads: usize) -> Result<(), String> {
+    Ok(())
 }
 
 #[cfg(test)]

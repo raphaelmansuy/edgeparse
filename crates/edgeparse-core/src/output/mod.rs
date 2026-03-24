@@ -1,6 +1,7 @@
 //! Output generators — TOC, JSON, Markdown, HTML, Text, CSV, Annotated PDF.
 
 pub mod csv;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod docx;
 pub mod html;
 pub mod json;

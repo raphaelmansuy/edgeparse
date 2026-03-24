@@ -6,6 +6,7 @@ members = [
     "crates/pdf-cos",
     "crates/edgeparse-python",
     "crates/edgeparse-node",
+    "crates/edgeparse-wasm",
 ]
 default-members = [
     "crates/edgeparse-core",
@@ -24,7 +25,7 @@ description = "EdgeParse — High-performance PDF-to-structured-data extraction 
 [workspace.dependencies]
 # PDF parsing (local fork of lopdf 0.39.0, renamed pdf-cos for clarity)
 # Using package alias so all existing `use lopdf::...` code works unchanged.
-lopdf = { package = "pdf-cos", path = "crates/pdf-cos", version = "0.39.0" }
+lopdf = { package = "pdf-cos", path = "crates/pdf-cos", version = "0.39.0", default-features = false }
 pdf-extract = "0.10.0"
 
 # CLI

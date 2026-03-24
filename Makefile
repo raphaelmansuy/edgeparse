@@ -507,6 +507,30 @@ publish-all: publish-rust publish-python publish-node publish-cli publish-brew #
 	$(call ok,All SDKs + CLI + Homebrew tap published)
 
 # ══════════════════════════════════════════════════════════════════════════════
+## WASM
+# ══════════════════════════════════════════════════════════════════════════════
+
+WASM_CRATE := crates/edgeparse-wasm
+
+wasm-build: ## Build WASM package (release, --target web)
+	$(call info,Building WASM package...)
+	@cd $(WASM_CRATE) && wasm-pack build --target web --release --scope edgeparse
+	$(call ok,WASM package built → $(WASM_CRATE)/pkg/)
+
+wasm-check: ## Check WASM compilation (fast, no codegen)
+	$(call info,Checking WASM compilation...)
+	@cargo check --target wasm32-unknown-unknown -p edgeparse-wasm
+	$(call ok,WASM check passed)
+
+wasm-size: wasm-build ## Show WASM binary size
+	@echo "Raw WASM size:"
+	@du -h $(WASM_CRATE)/pkg/edgeparse_wasm_bg.wasm
+
+wasm-clean: ## Remove WASM build artefacts (pkg/)
+	$(call warn,Removing $(WASM_CRATE)/pkg/ ...)
+	@rm -rf $(WASM_CRATE)/pkg/
+
+# ══════════════════════════════════════════════════════════════════════════════
 ## Clean
 # ══════════════════════════════════════════════════════════════════════════════
 

@@ -23,6 +23,7 @@ use crate::models::content::ContentElement;
 use crate::models::document::PdfDocument;
 use crate::pdf::chunk_parser::extract_page_chunks;
 use crate::pdf::page_info;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::pdf::raster_table_ocr::recover_raster_table_borders;
 use crate::pipeline::orchestrator::{run_pipeline, PipelineState};
 use crate::tagged::struct_tree::build_mcid_map;
@@ -38,6 +39,7 @@ use crate::tagged::struct_tree::build_mcid_map;
 ///
 /// # Errors
 /// Returns an error if the PDF cannot be loaded or processed.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn convert(
     input_path: &std::path::Path,
     config: &ProcessingConfig,
@@ -120,6 +122,91 @@ pub fn convert(
     doc.modification_date = raw_doc.metadata.modification_date;
 
     // Flatten pipeline output into document kids
+    for page in pipeline_state.pages {
+        doc.kids.extend(page);
+    }
+
+    Ok(doc)
+}
+
+/// Convert a PDF from an in-memory byte slice to structured data.
+///
+/// This is the WASM-compatible entry point. It replaces all filesystem
+/// operations with in-memory equivalents and skips raster table OCR.
+///
+/// # Arguments
+/// * `data` — raw PDF bytes (e.g., from a `Uint8Array` in JavaScript)
+/// * `file_name` — display name (used in `PdfDocument.file_name`)
+/// * `config` — processing configuration
+///
+/// # Returns
+/// Structured document or error.
+///
+/// # Errors
+/// Returns an error if the PDF cannot be parsed or processed.
+pub fn convert_bytes(
+    data: &[u8],
+    file_name: &str,
+    config: &ProcessingConfig,
+) -> Result<PdfDocument, EdgePdfError> {
+    let raw_doc = pdf::loader::load_pdf_from_bytes(data, config.password.as_deref())?;
+
+    let page_info_list = page_info::extract_page_info(&raw_doc.document);
+
+    let pages_map = raw_doc.document.get_pages();
+    let mut page_contents = Vec::with_capacity(pages_map.len());
+
+    for (&page_num, &page_id) in &pages_map {
+        let page_chunks = extract_page_chunks(&raw_doc.document, page_num, page_id)?;
+
+        // Raster table OCR requires external pdfimages binary — skip in memory-only mode
+        let recovered_tables = Vec::new();
+
+        let mut elements: Vec<ContentElement> = page_chunks
+            .text_chunks
+            .into_iter()
+            .map(ContentElement::TextChunk)
+            .collect();
+
+        elements.extend(
+            page_chunks
+                .image_chunks
+                .into_iter()
+                .map(ContentElement::Image),
+        );
+        elements.extend(
+            page_chunks
+                .line_chunks
+                .into_iter()
+                .map(ContentElement::Line),
+        );
+        elements.extend(
+            page_chunks
+                .line_art_chunks
+                .into_iter()
+                .map(ContentElement::LineArt),
+        );
+        elements.extend(
+            recovered_tables
+                .into_iter()
+                .map(ContentElement::TableBorder),
+        );
+
+        page_contents.push(elements);
+    }
+
+    let mcid_map = build_mcid_map(&raw_doc.document);
+    let mut pipeline_state = PipelineState::with_mcid_map(page_contents, config.clone(), mcid_map)
+        .with_page_info(page_info_list);
+    run_pipeline(&mut pipeline_state)?;
+
+    let mut doc = PdfDocument::new(file_name.to_string());
+    doc.number_of_pages = pages_map.len() as u32;
+    doc.author = raw_doc.metadata.author;
+    doc.title = raw_doc.metadata.title;
+    doc.creation_date = raw_doc.metadata.creation_date;
+    doc.modification_date = raw_doc.metadata.modification_date;
+
     for page in pipeline_state.pages {
         doc.kids.extend(page);
     }
