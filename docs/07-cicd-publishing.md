@@ -356,7 +356,7 @@ make publish-brew-dry
 
 | Job | Detail |
 |-----|--------|
-| `build-wheels` | Matrix: 5 platforms. Linux builds all cp310–cp313 automatically via manylinux2014. macOS installs Python 3.10–3.13 and passes `-i python3.10 python3.11 python3.12 python3.13` to maturin. Windows builds cp312 only. Uses `maturin-action@v1` with `sccache`. |
+| `build-wheels` | Matrix: 5 platforms. All platforms supply `-i python3.10 python3.11 python3.12 python3.13` to maturin. For Linux manylinux builds `actions/setup-python` has no effect inside the container — the `-i` flag is required to set Python versions explicitly. Uses `maturin-action@v1` with `sccache`. |
 | `build-sdist` | Source distribution via `maturin sdist` |
 | `publish-pypi` | Downloads all wheel artifacts, publishes via `pypa/gh-action-pypi-publish` using OIDC. Gated by `environment: pypi`. |
 
@@ -383,7 +383,9 @@ make publish-brew-dry
 
 **Triggers:** `v*.*.*` tag push
 
-Builds a multi-arch image (`linux/amd64` + `linux/arm64`) using `docker buildx` and pushes to both Docker Hub (`raphaelmansuy/edgeparse`) and GHCR (`ghcr.io/raphaelmansuy/edgeparse`). Runs a Trivy HIGH/CRITICAL vulnerability scan after push.
+Builds a multi-arch image (`linux/amd64` + `linux/arm64`) using `docker buildx` and pushes to both Docker Hub (`rmansuy/edgeparse`) and GHCR (`ghcr.io/raphaelmansuy/edgeparse`). Runs a Trivy HIGH/CRITICAL vulnerability scan after push.
+
+> **Note:** The Docker build uses `rust:1-slim-bookworm` (latest stable) as the builder image. The workspace `rust-version` for the CLI crate is pinned at ≥ 1.85, but transitive dependencies (`time`, `image`) may require a newer compiler. Using `rust:1` (not a pinned version) avoids compatibility issues. Additionally, the build uses `find crates/ -name '*.rs' -exec touch {} +` after copying real sources to ensure Cargo recompiles all crates (not just the empty stubs used for caching).
 
 ---
 
@@ -419,9 +421,24 @@ The package uses the unscoped name `edgeparse`. If you see scope errors, verify 
 
 Like crates.io, PyPI does not allow overwriting a version. Bump the version in `sdks/python/pyproject.toml`.
 
-### PyPI OIDC: "Token request failed"
+### PyPI OIDC: "invalid-publisher" / "Token request failed"
 
-The Trusted Publisher configuration on PyPI must exactly match the GitHub owner, repo name, workflow filename (`release-python.yml`), and environment name (`pypi`). Recheck all four fields at [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/).
+The OIDC Trusted Publisher on PyPI must be configured **before the first release**. If not set up, the wheels will build successfully but the publish step will fail with `invalid-publisher`.
+
+Setup steps at [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/):
+- PyPI Project Name: `edgeparse`
+- GitHub Owner: `raphaelmansuy`
+- Repository name: `edgeparse`
+- Workflow filename: `release-python.yml`
+- Environment name: `pypi`
+
+All five fields must match exactly. After adding the pending publisher, the first publish from CI will register the project. Subsequent runs use the same publisher entry.
+
+**Fallback — manual publish with API token:**
+```bash
+export PYPI_PASSWORD=pypi-<your-api-token>
+make publish-python
+```
 
 ### PyPI local: "403 Forbidden" with API token
 
@@ -448,6 +465,10 @@ cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p edgeparse-cl
 
 The `release-cli.yml` `homebrew` job generates SHA256 from the locally-built artifacts before they are uploaded. If you push the formula manually with `make publish-brew`, run `make publish-cli` first so the artifacts are in `target/release-dist/`.
 
+### macOS runner: "configuration 'macos-13-us-default' is not supported"
+
+The `macos-13` runner label was retired by GitHub. All workflows now use `macos-latest` for the `x86_64-apple-darwin` target. On macOS ARM64 runners, Rust cross-compilation to x86_64 works natively because `cargo` targets `x86_64-apple-darwin` without emulation.
+
 ### npm: WebAuthn 2FA during manual publish
 
 For automated CI, use a Granular Access Token — tokens bypass 2FA. For manual publishing, open the auth URL in a browser, complete the WebAuthn challenge, then press Enter.
@@ -459,6 +480,9 @@ For automated CI, use a Granular Access Token — tokens bypass 2FA. For manual 
 | Decision | Rationale |
 |----------|-----------|
 | `cargo-zigbuild` instead of `cross` for Linux ARM64 cross-compilation | `cross v0.2.5` cannot build Linux targets on a macOS ARM64 host (the runner or local machine). `cargo-zigbuild` uses zig as a linker, requires no Docker daemon, and works identically on macOS and Linux CI runners. |
+| `rust:1-slim-bookworm` (not `rust:1.85`) in Docker builder | Transitive dependencies can require a newer Rust than the workspace `rust-version` floor. Using `rust:1` (latest stable) prevents `rustc X.Y.Z is not supported by ...` errors when deps advance. |
+| `sed`-strip python/node/wasm workspace members before Docker cache warmup | These crates pull in `napi-rs`, `wasm-bindgen`, `pyo3` — dependencies incompatible with the CLI-only Docker build. Stripping them from `Cargo.toml` before the dummy `cargo build` avoids version conflicts in the cache layer. |
+| `-i python3.10 python3.11 python3.12 python3.13` for all maturin platforms | For Linux manylinux cross-builds, `actions/setup-python` does not affect the containerised maturin build. Explicit `-i` flags are required for all matrix entries to avoid "Couldn't find any python interpreters" failures. |
 | Unscoped `edgeparse` npm package | No npm organization required; avoids org overhead. All platform packages (`edgeparse-darwin-arm64`, etc.) are also unscoped. |
 | PyPI OIDC for CI, API token for local Makefile | OIDC tokens expire in minutes and are scoped per run — ideal for CI. The Makefile uses a long-lived API token for convenient local publishing. |
 | `pdf-cos` published separately before `edgeparse-core` | `edgeparse-core` depends on `pdf-cos` from crates.io. Publishing first ensures the index is available when the dependent crate is validated. |
