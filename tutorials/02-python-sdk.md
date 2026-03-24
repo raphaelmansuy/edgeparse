@@ -310,7 +310,7 @@ page1_sorted = sorted(
     reverse=True,  # PDF coordinates start at bottom-left
 )
 for e in page1_sorted[:10]:
-    print(f'  [{e["bounding box"][1]:.0f}] {e["type"]}: {e["content"][:50]}')
+    print(f'  [{e["bounding box"][1]:.0f}] {e["type"]}: {e.get("content", "")[:50]}')
 ```
 
 ---

@@ -76,8 +76,8 @@ print(md[:500])
 
 # Parse structured JSON with bounding boxes
 doc = json.loads(edgeparse.convert("report.pdf", format="json"))
-for el in doc["elements"][:3]:
-    print(el["type"], el["text"][:60])
+for el in doc["kids"][:3]:
+    print(el["type"], el.get("content", "")[:60])
 
 # Save to output file
 path = edgeparse.convert_file("report.pdf", output_dir="out/", format="markdown")
@@ -92,7 +92,7 @@ console.log(md.slice(0, 500));
 
 // Parse structured JSON output
 const doc = JSON.parse(convert("invoice.pdf", { format: "json" }));
-doc.elements.slice(0, 3).forEach(el => console.log(el.type, el.text));
+doc.kids.slice(0, 3).forEach(el => console.log(el.type, el.content ?? ''));
 
 // Extract specific pages
 const pages = convert("report.pdf", { format: "markdown", pages: "1-5" });
