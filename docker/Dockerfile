@@ -13,13 +13,20 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates/edgeparse-core/Cargo.toml   crates/edgeparse-core/
 COPY crates/edgeparse-cli/Cargo.toml    crates/edgeparse-cli/
-COPY crates/pdf-cos/Cargo.toml        crates/pdf-cos/
+COPY crates/pdf-cos/Cargo.toml          crates/pdf-cos/
+COPY crates/edgeparse-python/Cargo.toml crates/edgeparse-python/
+COPY crates/edgeparse-node/Cargo.toml   crates/edgeparse-node/
+COPY crates/edgeparse-wasm/Cargo.toml   crates/edgeparse-wasm/
 
 # Build a dummy binary to pre-warm dependency compilation cache
 RUN mkdir -p crates/edgeparse-core/src crates/edgeparse-cli/src crates/pdf-cos/src \
+    crates/edgeparse-python/src crates/edgeparse-node/src crates/edgeparse-wasm/src \
     && echo "fn main() {}" > crates/edgeparse-cli/src/main.rs \
     && echo "" > crates/edgeparse-core/src/lib.rs \
     && echo "" > crates/pdf-cos/src/lib.rs \
+    && echo "" > crates/edgeparse-python/src/lib.rs \
+    && echo "" > crates/edgeparse-node/src/lib.rs \
+    && echo "" > crates/edgeparse-wasm/src/lib.rs \
     && cargo build --release -p edgeparse-cli \
     && rm -rf crates/*/src
 
