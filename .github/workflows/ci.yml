@@ -34,7 +34,8 @@ jobs:
       - run: pip install maturin pytest
       - run: |
           cd sdks/python
-          maturin develop --release
+          maturin build --release --out dist/
+          pip install dist/*.whl
           pytest tests/ -v
 
   node:
@@ -49,7 +50,13 @@ jobs:
       - run: |
           cd sdks/node
           npm ci
-          npm run build
+          # Build the Rust native addon
+          cargo build --manifest-path ../../crates/edgeparse-node/Cargo.toml --release
+          # Install the platform binary into the local package directory
+          cp ../../target/release/libedgeparse_node.so npm/linux-x64-gnu/edgeparse-node.linux-x64-gnu.node
+          # Install the local platform package so require('edgeparse-linux-x64-gnu') resolves
+          npm install --save-dev file:./npm/linux-x64-gnu
+          npm run build:ts
           npm test
 
   security:
@@ -59,5 +66,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo install cargo-audit cargo-deny --locked
-      - run: cargo audit
+      - run: cargo audit --ignore RUSTSEC-2025-0020
       - run: cargo deny check

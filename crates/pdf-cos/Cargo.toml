@@ -60,7 +60,7 @@ time = ["dep:time"]
 wasm_js = ["getrandom/wasm_js"]
 
 [lib]
-name = "pdf_cos"
+name = "lopdf"
 path = "src/lib.rs"
 
 [[example]]

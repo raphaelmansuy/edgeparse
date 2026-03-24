@@ -6,6 +6,9 @@ vulnerability = "deny"
 unmaintained = "warn"
 yanked = "warn"
 notice = "warn"
+# RUSTSEC-2025-0020: Risk of buffer overflow in pyo3's PyString::from_object.
+# edgeparse-python does not call PyString::from_object so we are not affected.
+ignore = ["RUSTSEC-2025-0020"]
 
 [licenses]
 unlicensed = "deny"
