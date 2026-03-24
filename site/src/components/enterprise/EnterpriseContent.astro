@@ -1,0 +1,455 @@
+---
+/**
+ * Enterprise page content — self-contained marketing page for EdgeParse Enterprise.
+ * Modeled after edgequake.com/enterprise/ with EdgeParse-specific value props.
+ */
+const base = import.meta.env.BASE_URL;
+---
+
+<!-- Hero -->
+<section class="ent-hero" aria-labelledby="ent-hero-heading">
+  <span class="ent-eyebrow">Enterprise</span>
+  <h2 id="ent-hero-heading" class="ent-hero-title">EdgeParse for Enterprise</h2>
+  <p class="ent-hero-subtitle">
+    Production-grade PDF extraction for teams that need deployment control,
+    data isolation, reliable operations, and a path from prototype to internal platform.
+  </p>
+</section>
+
+<!-- Feature cards: Self-Hosted, High Performance, Multi-Format -->
+<section class="ent-features" aria-label="Enterprise features">
+  <div class="ent-features-grid">
+
+    <div class="ent-card" role="group" aria-labelledby="ent-card-selfhosted">
+      <div class="ent-card-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21.75 17.25v-.228a4.5 4.5 0 0 0-.12-1.03l-2.268-9.64a3.375 3.375 0 0 0-3.285-2.602H7.923a3.375 3.375 0 0 0-3.285 2.602l-2.268 9.64a4.5 4.5 0 0 0-.12 1.03v.228m19.5 0a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3m19.5 0a3 3 0 0 0-3-3H5.25a3 3 0 0 0-3 3m16.5 0h.008v.008h-.008v-.008Zm-3 0h.008v.008h-.008v-.008Z"/>
+        </svg>
+      </div>
+      <h3 id="ent-card-selfhosted" class="ent-card-title">Self-Hosted</h3>
+      <p class="ent-card-desc">
+        Deploy on your own infrastructure. Air-gapped environments, private clouds, or
+        on-premises — EdgeParse runs wherever you need it.
+      </p>
+      <ul class="ent-card-checks" role="list">
+        <li>Docker &amp; Kubernetes ready</li>
+        <li>No external API calls</li>
+        <li>No data leaves your network</li>
+      </ul>
+    </div>
+
+    <div class="ent-card" role="group" aria-labelledby="ent-card-perf">
+      <div class="ent-card-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/>
+        </svg>
+      </div>
+      <h3 id="ent-card-perf" class="ent-card-title">High Performance</h3>
+      <p class="ent-card-desc">
+        Process thousands of PDFs per minute with constant, predictable resource usage.
+        Rust-native speed, zero ML overhead.
+      </p>
+      <ul class="ent-card-checks" role="list">
+        <li>40+ pages/second per core</li>
+        <li>10–100× faster than Python alternatives</li>
+        <li>Zero ML &amp; GPU dependencies</li>
+      </ul>
+    </div>
+
+    <div class="ent-card" role="group" aria-labelledby="ent-card-multiformat">
+      <div class="ent-card-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>
+        </svg>
+      </div>
+      <h3 id="ent-card-multiformat" class="ent-card-title">Multi-Format Output</h3>
+      <p class="ent-card-desc">
+        Structured JSON, Markdown, HTML, or plain text — integrate directly into
+        your RAG pipeline, document workflow, or data lake.
+      </p>
+      <ul class="ent-card-checks" role="list">
+        <li>JSON with bounding boxes</li>
+        <li>Table-aware Markdown</li>
+        <li>Clean HTML with headings</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- CTA section: Taking PDF Extraction Into Production? -->
+<section class="ent-cta" aria-labelledby="ent-cta-heading">
+  <h2 id="ent-cta-heading" class="ent-cta-title">Taking PDF Extraction Into Production?</h2>
+  <p class="ent-cta-subtitle">
+    EdgeParse can support internal platforms, customer-facing document pipelines,
+    and regulated deployments that need more than a prototype stack.
+  </p>
+
+  <div class="ent-cta-grid">
+
+    <div class="ent-cta-card" role="group" aria-labelledby="ent-cta-security">
+      <div class="ent-cta-card-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/>
+        </svg>
+      </div>
+      <h3 id="ent-cta-security" class="ent-cta-card-title">Enterprise Security</h3>
+      <p class="ent-cta-card-desc">
+        Support for regulated environments that need full data sovereignty,
+        air-gapped deployment, and auditable processing pipelines.
+      </p>
+    </div>
+
+    <div class="ent-cta-card" role="group" aria-labelledby="ent-cta-support">
+      <div class="ent-cta-card-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/>
+        </svg>
+      </div>
+      <h3 id="ent-cta-support" class="ent-cta-card-title">Priority Support</h3>
+      <p class="ent-cta-card-desc">
+        Work directly with the team on architecture reviews, rollout plans,
+        troubleshooting, and production issues.
+      </p>
+    </div>
+
+    <div class="ent-cta-card" role="group" aria-labelledby="ent-cta-integrations">
+      <div class="ent-cta-card-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14.25 9.75 16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z"/>
+        </svg>
+      </div>
+      <h3 id="ent-cta-integrations" class="ent-cta-card-title">Custom Integrations</h3>
+      <p class="ent-cta-card-desc">
+        Integrate into internal systems, custom deployment patterns, and
+        proprietary workflows — Python, Node.js, Rust, CLI, or WebAssembly.
+      </p>
+    </div>
+
+  </div>
+
+  <a href="https://elitizon.com/" target="_blank" rel="noopener noreferrer" class="ent-cta-button">
+    Talk to the Team
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+    </svg>
+  </a>
+</section>
+
+<!-- Bottom badges -->
+<section class="ent-badges" aria-label="Key guarantees">
+  <div class="ent-badges-inner">
+    <div class="ent-badge-item">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+      </svg>
+      <span>Apache 2.0 — no license lock-in</span>
+    </div>
+    <div class="ent-badge-item">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+      </svg>
+      <span>On-premise deployment — your data stays on your network</span>
+    </div>
+    <div class="ent-badge-item">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+      </svg>
+      <span>Zero ML/GPU/cloud dependency required</span>
+    </div>
+  </div>
+</section>
+
+<!-- Docs links -->
+<section class="ent-links" aria-labelledby="ent-links-heading">
+  <h3 id="ent-links-heading" class="sr-only">Related resources</h3>
+  <div class="ent-links-grid">
+    <a href={`${base}getting-started/quick-start-python/`} class="ent-link-card">
+      <strong>Quick start guide</strong>
+      <span>Install EdgeParse and run your first extraction in 60 seconds.</span>
+    </a>
+    <a href={`${base}guides/docker/`} class="ent-link-card">
+      <strong>Docker deployment</strong>
+      <span>Run EdgeParse in containers with pre-built images.</span>
+    </a>
+    <a href="https://elitizon.com/" target="_blank" rel="noopener noreferrer" class="ent-link-card">
+      <strong>Implementation support</strong>
+      <span>Talk to the team about architecture reviews, rollout planning, or custom integration work.</span>
+    </a>
+  </div>
+</section>
+
+<style>
+  /* ── Hero ──────────────────────────────── */
+  .ent-hero {
+    text-align: center;
+    padding: 5rem 1.5rem 3rem;
+    background: var(--ep-hero-gradient, linear-gradient(135deg, #FAFBFF 0%, #EEF2FF 50%, #FAFBFF 100%));
+  }
+
+  .ent-eyebrow {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sl-color-accent, #4F46E5);
+    background: var(--sl-color-accent-low, #EEF2FF);
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    margin-bottom: 1.25rem;
+  }
+
+  .ent-hero-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: var(--ep-text-primary, #111827);
+    margin: 0 0 1rem;
+  }
+
+  .ent-hero-subtitle {
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
+    color: var(--ep-text-secondary, #4B5563);
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* ── Feature cards ────────────────────── */
+  .ent-features {
+    padding: 4rem 1.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .ent-features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .ent-card {
+    background: var(--ep-card-bg, #fff);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 1rem;
+    padding: 2rem;
+    text-align: left;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .ent-card:hover {
+    box-shadow: var(--ep-card-shadow-hover, 0 8px 25px rgba(79, 70, 229, 0.08));
+    transform: translateY(-2px);
+  }
+
+  .ent-card-icon {
+    display: inline-flex;
+    padding: 0.625rem;
+    border-radius: 0.75rem;
+    background: var(--sl-color-accent-low, #EEF2FF);
+    color: var(--sl-color-accent, #4F46E5);
+    margin-bottom: 1.25rem;
+  }
+
+  .ent-card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ep-text-primary, #111827);
+    margin: 0 0 0.75rem;
+  }
+
+  .ent-card-desc {
+    color: var(--ep-text-secondary, #4B5563);
+    line-height: 1.6;
+    margin: 0 0 1.25rem;
+    font-size: 0.95rem;
+  }
+
+  .ent-card-checks {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .ent-card-checks li {
+    position: relative;
+    padding-left: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--ep-text-secondary, #4B5563);
+    font-size: 0.9rem;
+  }
+
+  .ent-card-checks li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--sl-color-accent, #4F46E5);
+    font-weight: 700;
+  }
+
+  /* ── CTA section ──────────────────────── */
+  .ent-cta {
+    padding: 5rem 1.5rem;
+    text-align: center;
+    background: var(--ep-section-alt-bg, #F9FAFB);
+    border-top: 1px solid var(--ep-card-border, #E5E7EB);
+  }
+
+  .ent-cta-title {
+    font-size: clamp(1.5rem, 4vw, 2.25rem);
+    font-weight: 800;
+    color: var(--ep-text-primary, #111827);
+    margin: 0 0 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  .ent-cta-subtitle {
+    font-size: clamp(1rem, 2.5vw, 1.1rem);
+    color: var(--ep-text-secondary, #4B5563);
+    max-width: 580px;
+    margin: 0 auto 3rem;
+    line-height: 1.7;
+  }
+
+  .ent-cta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    max-width: 900px;
+    margin: 0 auto 2.5rem;
+    text-align: left;
+  }
+
+  .ent-cta-card {
+    background: var(--ep-card-bg, #fff);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 1rem;
+    padding: 1.75rem;
+  }
+
+  .ent-cta-card-icon {
+    color: var(--sl-color-accent, #4F46E5);
+    margin-bottom: 1rem;
+  }
+
+  .ent-cta-card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--ep-text-primary, #111827);
+    margin: 0 0 0.5rem;
+  }
+
+  .ent-cta-card-desc {
+    color: var(--ep-text-secondary, #4B5563);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .ent-cta-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.75rem;
+    background: var(--sl-color-accent, #4F46E5);
+    color: #fff !important;
+    border-radius: 0.625rem;
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+  }
+
+  .ent-cta-button:hover {
+    background: var(--sl-color-accent-high, #3730A3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(79, 70, 229, 0.4);
+    color: #fff !important;
+    text-decoration: none;
+  }
+
+  /* ── Bottom badges ────────────────────── */
+  .ent-badges {
+    padding: 2.5rem 1.5rem;
+    border-top: 1px solid var(--ep-card-border, #E5E7EB);
+  }
+
+  .ent-badges-inner {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .ent-badge-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--ep-text-secondary, #4B5563);
+    font-size: 0.9rem;
+  }
+
+  .ent-badge-item svg {
+    color: var(--sl-color-accent, #4F46E5);
+    flex-shrink: 0;
+  }
+
+  /* ── Doc links ────────────────────────── */
+  .ent-links {
+    padding: 3rem 1.5rem 5rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .ent-links-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+
+  .ent-link-card {
+    display: block;
+    padding: 1.25rem 1.5rem;
+    background: var(--ep-card-bg, #fff);
+    border: 1px solid var(--ep-card-border, #E5E7EB);
+    border-radius: 0.75rem;
+    text-decoration: none;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .ent-link-card:hover {
+    border-color: var(--sl-color-accent, #4F46E5);
+    box-shadow: var(--ep-card-shadow-hover, 0 4px 12px rgba(79, 70, 229, 0.08));
+    text-decoration: none;
+  }
+
+  .ent-link-card strong {
+    display: block;
+    color: var(--ep-text-primary, #111827);
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .ent-link-card span {
+    color: var(--ep-text-secondary, #4B5563);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+
+  /* ── Screen reader only ────────────────── */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
