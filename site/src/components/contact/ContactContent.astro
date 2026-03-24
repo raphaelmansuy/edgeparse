@@ -1,0 +1,395 @@
+---
+/**
+ * Contact page content — self-contained contact page for EdgeParse.
+ * Modeled after edgequake.com/contact/ with EdgeParse-specific channels.
+ */
+const base = import.meta.env.BASE_URL;
+---
+
+<!-- Hero -->
+<section class="ct-hero" aria-labelledby="ct-hero-heading">
+  <span class="ct-eyebrow">Contact</span>
+  <h2 id="ct-hero-heading" class="ct-hero-title">Contact the EdgeParse Team</h2>
+  <p class="ct-hero-subtitle">
+    Reach out if you are evaluating EdgeParse for production, planning a
+    self-hosted deployment, or need help integrating PDF extraction into your AI pipeline.
+    If you are still comparing options, start with the
+    <a href={`${base}getting-started/quick-start-python/`}>documentation</a>,
+    the <a href="/demo/">live demo</a>, or the
+    <a href={`${base}enterprise/`}>enterprise overview</a>
+    before opening a deeper conversation.
+  </p>
+</section>
+
+<!-- Quick contact info (email, GitHub, Elitizon) -->
+<section class="ct-info" aria-label="Primary contact channels">
+  <div class="ct-info-grid">
+
+    <div class="ct-info-card">
+      <div class="ct-info-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/>
+        </svg>
+      </div>
+      <h3 class="ct-info-label">Email</h3>
+      <a href="mailto:contact@elitizon.com" class="ct-info-link">contact@elitizon.com</a>
+    </div>
+
+    <div class="ct-info-card">
+      <div class="ct-info-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.92.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
+        </svg>
+      </div>
+      <h3 class="ct-info-label">GitHub</h3>
+      <a href="https://github.com/raphaelmansuy/edgeparse/discussions" target="_blank" rel="noopener noreferrer" class="ct-info-link">Open a Discussion</a>
+    </div>
+
+    <div class="ct-info-card">
+      <div class="ct-info-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016 2.993 2.993 0 0 0 2.25-1.016 3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z"/>
+        </svg>
+      </div>
+      <h3 class="ct-info-label">Elitizon</h3>
+      <a href="https://www.elitizon.com/" target="_blank" rel="noopener noreferrer" class="ct-info-link">elitizon.com</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- Choose your contact route -->
+<section class="ct-routes" aria-labelledby="ct-routes-heading">
+  <h2 id="ct-routes-heading" class="ct-routes-title">Choose Your Contact Route</h2>
+  <p class="ct-routes-subtitle">
+    Use a verified channel so your message reaches the right team quickly.
+  </p>
+
+  <div class="ct-routes-grid">
+
+    <a href="mailto:contact@elitizon.com?subject=EdgeParse%20Inquiry" class="ct-route-card ct-route-card--email" aria-label="Email the EdgeParse team">
+      <div class="ct-route-card-icon" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/>
+        </svg>
+      </div>
+      <div class="ct-route-card-body">
+        <strong class="ct-route-card-title">Email the team</strong>
+        <span class="ct-route-card-desc">Best for product questions, architecture reviews, and implementation support.</span>
+        <span class="ct-route-card-type">mailto</span>
+      </div>
+    </a>
+
+    <a href="https://github.com/raphaelmansuy/edgeparse/discussions" target="_blank" rel="noopener noreferrer" class="ct-route-card ct-route-card--community">
+      <div class="ct-route-card-icon" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/>
+        </svg>
+      </div>
+      <div class="ct-route-card-body">
+        <strong class="ct-route-card-title">Open a GitHub discussion</strong>
+        <span class="ct-route-card-desc">Best for community questions, feature ideas, and public technical conversations.</span>
+        <span class="ct-route-card-type">community</span>
+      </div>
+    </a>
+
+    <a href="https://www.elitizon.com/" target="_blank" rel="noopener noreferrer" class="ct-route-card ct-route-card--enterprise">
+      <div class="ct-route-card-icon" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016 2.993 2.993 0 0 0 2.25-1.016 3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z"/>
+        </svg>
+      </div>
+      <div class="ct-route-card-body">
+        <strong class="ct-route-card-title">Talk to Elitizon</strong>
+        <span class="ct-route-card-desc">Best for enterprise engagements, custom delivery, and partnership discussions.</span>
+        <span class="ct-route-card-type">enterprise</span>
+      </div>
+    </a>
+
+  </div>
+
+  <p class="ct-response-note">Typical response window: 1 to 2 business days.</p>
+</section>
+
+<!-- Starting points / helpful links -->
+<section class="ct-starting" aria-labelledby="ct-starting-heading">
+  <h3 id="ct-starting-heading" class="ct-starting-title">Helpful starting points</h3>
+  <div class="ct-starting-grid">
+    <a href={`${base}getting-started/quick-start-python/`} class="ct-start-card">
+      <strong>Getting started docs</strong>
+      <span>Install EdgeParse, run your first extraction, and learn the core concepts.</span>
+    </a>
+    <a href="/demo/" class="ct-start-card">
+      <strong>Live demo</strong>
+      <span>Try EdgeParse directly in your browser — no install, no server required.</span>
+    </a>
+    <a href={`${base}enterprise/`} class="ct-start-card">
+      <strong>Enterprise overview</strong>
+      <span>Self-hosted deployment, data sovereignty, priority support, and custom integrations.</span>
+    </a>
+    <a href={`${base}guides/docker/`} class="ct-start-card">
+      <strong>Docker deployment</strong>
+      <span>Run EdgeParse in containers with pre-built images for production pipelines.</span>
+    </a>
+  </div>
+</section>
+
+<style>
+  /* ── Hero ──────────────────────────────── */
+  .ct-hero {
+    text-align: center;
+    padding: 5rem 1.5rem 3rem;
+    background: var(--ep-hero-gradient, linear-gradient(135deg, #FAFBFF 0%, #EEF2FF 50%, #FAFBFF 100%));
+  }
+
+  :global([data-theme="dark"]) .ct-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  }
+
+  .ct-eyebrow {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sl-color-accent, #4F46E5);
+    background: rgba(79, 70, 229, 0.1);
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    margin-bottom: 1.25rem;
+  }
+
+  .ct-hero-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin: 0 0 1rem;
+    color: var(--sl-color-white);
+  }
+
+  .ct-hero-subtitle {
+    font-size: 1.125rem;
+    line-height: 1.7;
+    color: var(--sl-color-gray-2);
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  .ct-hero-subtitle a {
+    color: var(--sl-color-accent, #4F46E5);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* ── Info cards (email, GitHub, Elitizon) ──────────────────────────────── */
+  .ct-info {
+    padding: 3rem 1.5rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .ct-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    justify-items: center;
+  }
+
+  .ct-info-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    background: var(--sl-color-bg-sidebar);
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.75rem;
+    width: 100%;
+    text-align: center;
+  }
+
+  .ct-info-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(79, 70, 229, 0.1);
+    border-radius: 0.5rem;
+    color: var(--sl-color-accent, #4F46E5);
+    margin-bottom: 0.25rem;
+  }
+
+  .ct-info-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--sl-color-gray-3);
+    margin: 0;
+  }
+
+  .ct-info-link {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--sl-color-accent, #4F46E5);
+    text-decoration: none;
+  }
+
+  .ct-info-link:hover {
+    text-decoration: underline;
+  }
+
+  /* ── Contact routes ──────────────────────────────── */
+  .ct-routes {
+    padding: 3rem 1.5rem 2rem;
+    max-width: 900px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .ct-routes-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--sl-color-white);
+    margin: 0 0 0.5rem;
+  }
+
+  .ct-routes-subtitle {
+    font-size: 1rem;
+    color: var(--sl-color-gray-2);
+    margin: 0 0 2rem;
+  }
+
+  .ct-routes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    text-align: left;
+  }
+
+  .ct-route-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.75rem;
+    background: var(--sl-color-bg-sidebar);
+    text-decoration: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  }
+
+  .ct-route-card:hover {
+    border-color: var(--sl-color-accent, #4F46E5);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+    transform: translateY(-1px);
+  }
+
+  .ct-route-card-icon {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--sl-color-accent, #4F46E5);
+  }
+
+  .ct-route-card--community .ct-route-card-icon {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .ct-route-card--enterprise .ct-route-card-icon {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+  }
+
+  .ct-route-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .ct-route-card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--sl-color-white);
+    display: block;
+  }
+
+  .ct-route-card-desc {
+    font-size: 0.875rem;
+    color: var(--sl-color-gray-2);
+    line-height: 1.5;
+    display: block;
+  }
+
+  .ct-route-card-type {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sl-color-gray-3);
+    display: block;
+    margin-top: 0.25rem;
+  }
+
+  .ct-response-note {
+    margin-top: 1.5rem;
+    font-size: 0.875rem;
+    color: var(--sl-color-gray-3);
+    font-style: italic;
+  }
+
+  /* ── Helpful starting points ──────────────────────────────── */
+  .ct-starting {
+    padding: 2rem 1.5rem 4rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .ct-starting-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--sl-color-white);
+    margin: 0 0 1.25rem;
+  }
+
+  .ct-starting-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .ct-start-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.625rem;
+    background: var(--sl-color-bg-sidebar);
+    text-decoration: none;
+    transition: border-color 0.2s ease;
+  }
+
+  .ct-start-card:hover {
+    border-color: var(--sl-color-accent, #4F46E5);
+  }
+
+  .ct-start-card strong {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--sl-color-white);
+  }
+
+  .ct-start-card span {
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-2);
+    line-height: 1.5;
+  }
+</style>
