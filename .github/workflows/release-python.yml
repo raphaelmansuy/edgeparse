@@ -3,6 +3,7 @@ name: Release — Python (PyPI)
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
 
 permissions:
   id-token: write
