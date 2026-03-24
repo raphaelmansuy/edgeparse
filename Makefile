@@ -411,7 +411,7 @@ publish-cli-dry: ## Dry-run: show all CLI artifacts that would be built
 	@printf "  $(CYAN)x86_64-apple-darwin$(RESET)          → edgeparse-$(VERSION)-x86_64-apple-darwin.tar.gz\n"
 	@printf "  $(CYAN)x86_64-unknown-linux-gnu$(RESET)     → edgeparse-$(VERSION)-x86_64-unknown-linux-gnu.tar.gz\n"
 	@printf "  $(CYAN)aarch64-unknown-linux-gnu$(RESET)    → edgeparse-$(VERSION)-aarch64-unknown-linux-gnu.tar.gz\n"
-	@printf "  $(CYAN)x86_64-pc-windows-msvc$(RESET)       → edgeparse-$(VERSION)-x86_64-pc-windows-msvc.zip  (skipped if Docker unavailable)\n"
+	@printf "  $(CYAN)x86_64-pc-windows-gnu$(RESET)        → edgeparse-$(VERSION)-x86_64-pc-windows-gnu.zip   (skipped if cargo-zigbuild unavailable)\n"
 	$(call ok,CLI dry-run — artifacts would be uploaded to GitHub Release v$(VERSION))
 
 publish-cli: ## Build all-arch CLI binaries and attach to GitHub Release v$(VERSION)

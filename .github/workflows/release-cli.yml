@@ -1,0 +1,166 @@
+name: Release — CLI Binaries + Homebrew
+
+# Builds the edgeparse CLI for all 5 target platforms, attaches the
+# tarballs/zips to the GitHub Release created by release-rust.yml, then
+# generates and pushes the Homebrew formula to the tap repository.
+#
+# Required secrets:
+#   HOMEBREW_TAP_TOKEN  — GitHub PAT with `contents: write` access to
+#                         raphaelmansuy/homebrew-edgeparse
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Build per-platform ─────────────────────────────────────────────────────
+  build-cli:
+    name: Build CLI — ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-14
+          - target: x86_64-apple-darwin
+            runner: macos-13
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            use-zigbuild: true
+          - target: x86_64-pc-windows-gnu
+            runner: ubuntu-latest
+            use-zigbuild: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cli-${{ matrix.target }}
+
+      - name: Install zig + cargo-zigbuild (Linux/Windows cross)
+        if: matrix.use-zigbuild
+        run: |
+          pip install ziglang
+          cargo install cargo-zigbuild --locked
+
+      - name: Build CLI binary
+        shell: bash
+        run: |
+          TARGET="${{ matrix.target }}"
+          if [[ "${{ matrix.use-zigbuild }}" == "true" ]]; then
+            # Pin glibc to 2.17 for maximum Linux compatibility
+            cargo zigbuild --release --target "${TARGET}.2.17" -p edgeparse-cli
+          else
+            cargo build --release --target "${TARGET}" -p edgeparse-cli
+          fi
+
+      - name: Package artifact
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          TARGET="${{ matrix.target }}"
+          mkdir -p release-dist
+
+          if [[ "$TARGET" == *"windows"* ]]; then
+            cp "target/${TARGET}/release/edgeparse.exe" release-dist/
+            zip -j "release-dist/edgeparse-${VERSION}-${TARGET}.zip" \
+              release-dist/edgeparse.exe README.md LICENSE
+            rm release-dist/edgeparse.exe
+          else
+            cp "target/${TARGET}/release/edgeparse" release-dist/
+            tar -czf "release-dist/edgeparse-${VERSION}-${TARGET}.tar.gz" \
+              -C release-dist edgeparse \
+              -C "$GITHUB_WORKSPACE" README.md LICENSE
+            rm release-dist/edgeparse
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: release-dist/
+
+  # ── Attach to GitHub Release ───────────────────────────────────────────────
+  attach-release:
+    name: Attach CLI binaries to GitHub Release
+    needs: build-cli
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: release-dist/
+
+      - name: Ensure GitHub Release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" >/dev/null 2>&1 \
+          || gh release create "${{ github.ref_name }}" \
+               --repo "${{ github.repository }}" \
+               --title "${{ github.ref_name }}" \
+               --notes "CLI binaries for ${{ github.ref_name }}"
+
+      - name: Upload CLI artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in release-dist/*.tar.gz release-dist/*.zip; do
+            [ -f "$f" ] || continue
+            echo "Uploading: $f"
+            gh release upload "${{ github.ref_name }}" "$f" \
+              --repo "${{ github.repository }}" --clobber
+          done
+
+  # ── Update Homebrew formula ────────────────────────────────────────────────
+  homebrew:
+    name: Update Homebrew tap formula
+    needs: attach-release
+    runs-on: ubuntu-latest
+    # Only run when HOMEBREW_TAP_TOKEN is configured
+    if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download built artifacts so gen-formula.sh can read local SHA256s
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: target/release-dist/
+
+      - name: Generate Homebrew formula
+        run: |
+          mkdir -p Formula
+          bash scripts/gen-formula.sh "${GITHUB_REF_NAME#v}" Formula/edgeparse.rb
+          echo "--- Generated formula ---"
+          cat Formula/edgeparse.rb
+
+      - name: Push formula to tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          TAPDIR=$(mktemp -d)
+          git clone \
+            "https://x-access-token:${GH_TOKEN}@github.com/raphaelmansuy/homebrew-edgeparse.git" \
+            "$TAPDIR"
+          mkdir -p "$TAPDIR/Formula"
+          cp Formula/edgeparse.rb "$TAPDIR/Formula/edgeparse.rb"
+          cd "$TAPDIR"
+          git config user.email "actions@github.com"
+          git config user.name "EdgeParse Release Bot"
+          git add Formula/edgeparse.rb
+          git diff --cached --quiet \
+            && echo "Formula unchanged, nothing to push." \
+            || git commit -m "edgeparse ${GITHUB_REF_NAME#v}" && git push origin HEAD
+          rm -rf "$TAPDIR"

@@ -6,25 +6,33 @@ This document describes how automated publishing works for all edgeparse distrib
 
 ## Overview
 
-All publishing is driven by four independent GitHub Actions workflows, each triggered by pushing a version tag:
+Publishing is driven by five independent GitHub Actions workflows, each triggered by pushing a version tag:
 
 ```
 git tag v0.2.0 && git push --tags
     │
     ├──► release-rust.yml    ──► crates.io  (pdf-cos, edgeparse-core, edgeparse-cli)
-    ├──► release-python.yml  ──► PyPI       (edgeparse wheels × 5 platforms + sdist)
+    ├──► release-python.yml  ──► PyPI       (edgeparse wheels × 9 platform-Python combos + sdist)
     ├──► release-node.yml    ──► npm        (edgeparse + 5 platform packages)
+    ├──► release-cli.yml     ──► GitHub Release (5 arch binaries) + Homebrew tap
     └──► release-docker.yml  ──► GHCR + Docker Hub  (linux/amd64, linux/arm64)
 ```
 
 A shared `ci.yml` runs on every push and pull request covering Rust build + test, Python wheel build + test, and Node.js build + test.
 
+You can also publish everything locally without CI:
+
+```bash
+# Publish all: crates.io + PyPI + npm + GitHub Release + Homebrew tap
+make publish-all
+```
+
 ---
 
 ## Published Artifacts
 
-| Registry | Package | URL |
-|----------|---------|-----|
+| Registry | Package / Location | URL |
+|----------|-------------------|-----|
 | crates.io | `pdf-cos` | https://crates.io/crates/pdf-cos |
 | crates.io | `edgeparse-core` | https://crates.io/crates/edgeparse-core |
 | crates.io | `edgeparse-cli` | https://crates.io/crates/edgeparse-cli |
@@ -35,8 +43,40 @@ A shared `ci.yml` runs on every push and pull request covering Rust build + test
 | npm | `edgeparse-linux-x64-gnu` | https://www.npmjs.com/package/edgeparse-linux-x64-gnu |
 | npm | `edgeparse-linux-arm64-gnu` | https://www.npmjs.com/package/edgeparse-linux-arm64-gnu |
 | npm | `edgeparse-win32-x64-msvc` | https://www.npmjs.com/package/edgeparse-win32-x64-msvc |
+| GitHub Releases | CLI binaries (5 archs) | https://github.com/raphaelmansuy/edgeparse/releases |
+| Homebrew tap | `raphaelmansuy/edgeparse` | https://github.com/raphaelmansuy/homebrew-edgeparse |
 | Docker Hub | `raphaelmansuy/edgeparse` | https://hub.docker.com/r/raphaelmansuy/edgeparse |
 | GHCR | `ghcr.io/raphaelmansuy/edgeparse` | https://github.com/raphaelmansuy/edgeparse/pkgs/container/edgeparse |
+
+### CLI Binary Targets (GitHub Release)
+
+Each GitHub Release includes ready-to-run binaries for:
+
+| Archive | Platform |
+|---------|----------|
+| `edgeparse-X.Y.Z-aarch64-apple-darwin.tar.gz` | macOS Apple Silicon |
+| `edgeparse-X.Y.Z-x86_64-apple-darwin.tar.gz` | macOS Intel |
+| `edgeparse-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz` | Linux x86_64 (glibc ≥ 2.17) |
+| `edgeparse-X.Y.Z-aarch64-unknown-linux-gnu.tar.gz` | Linux ARM64 (glibc ≥ 2.17) |
+| `edgeparse-X.Y.Z-x86_64-pc-windows-gnu.zip` | Windows x86_64 |
+
+### Python Wheel Coverage (PyPI)
+
+| Platform | Python versions |
+|----------|----------------|
+| Linux x86_64 (manylinux2014) | cp310, cp311, cp312, cp313 |
+| Linux ARM64 (manylinux2014) | cp310, cp311, cp312, cp313 |
+| macOS Apple Silicon | cp310, cp311, cp312, cp313 |
+| macOS Intel | cp310, cp311, cp312, cp313 |
+| Windows x86_64 | cp312 |
+| Source distribution | — |
+
+### Homebrew Installation
+
+```bash
+brew tap raphaelmansuy/edgeparse
+brew install edgeparse
+```
 
 ---
 
@@ -49,8 +89,11 @@ A shared `ci.yml` runs on every push and pull request covering Rust build + test
 | `CARGO_REGISTRY_TOKEN` | crates.io API token with `publish-new` + `publish-update` scope | [crates.io → Account Settings → API Tokens](https://crates.io/settings/tokens) |
 | `NPM_TOKEN` | npm Granular Access Token with read+write to all `edgeparse*` packages | [npmjs.com → Account → Access Tokens](https://www.npmjs.com/settings/~/tokens) |
 | `DOCKERHUB_TOKEN` | Docker Hub personal access token (read+write) | [hub.docker.com → Account Settings → Security](https://hub.docker.com/settings/security) |
+| `HOMEBREW_TAP_TOKEN` | GitHub PAT with `contents: write` access to `raphaelmansuy/homebrew-edgeparse` | [github.com → Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens) |
 
 > **PyPI does not require a secret** — it uses GitHub OIDC Trusted Publishing. See the PyPI section below.
+>
+> **Local publishing** uses `PYPI_PASSWORD` (a PyPI API token) in your shell environment, not OIDC. See the _Local publishing_ section.
 
 Set secrets at: **GitHub repo → Settings → Secrets and variables → Actions → New repository secret**
 
@@ -71,7 +114,7 @@ Create environments at: **GitHub repo → Settings → Environments → New envi
 
 ### 1. crates.io — API Token
 
-**Required for:** `release-rust.yml`
+**Required for:** `release-rust.yml` and `make publish-rust`
 
 1. Sign in to [crates.io](https://crates.io) as the account that owns the packages.
 2. Go to **Account Settings → API Tokens → New Token**.
@@ -80,7 +123,15 @@ Create environments at: **GitHub repo → Settings → Environments → New envi
 3. Copy the token — shown only once.
 4. Add to GitHub: secret name `CARGO_REGISTRY_TOKEN`.
 
+For **local publishing**, export the token:
+
+```bash
+export CARGO_REGISTRY_TOKEN=<token>
+make publish-rust
+```
+
 **Verify locally:**
+
 ```bash
 CARGO_REGISTRY_TOKEN=<token> cargo publish -p edgeparse-core --dry-run
 ```
@@ -90,7 +141,7 @@ CARGO_REGISTRY_TOKEN=<token> cargo publish -p edgeparse-core --dry-run
 2. `edgeparse-core`
 3. `edgeparse-cli`
 
-**Reserved file gotcha.** If `pdf-cos` was extracted from a `.crate` archive, it may contain `.cargo_vcs_info.json`. This file is reserved by cargo and will block publish. The `exclude` field in `crates/pdf-cos/Cargo.toml` handles this automatically:
+**Reserved file gotcha.** If `pdf-cos` was extracted from a `.crate` archive, it may contain `.cargo_vcs_info.json`. The `exclude` field in `crates/pdf-cos/Cargo.toml` handles this:
 ```toml
 exclude = [".cargo_vcs_info.json", ".cargo-ok", "Cargo.toml.orig"]
 ```
@@ -99,9 +150,7 @@ exclude = [".cargo_vcs_info.json", ".cargo-ok", "Cargo.toml.orig"]
 
 ### 2. PyPI — Trusted Publisher (OIDC, no token)
 
-**Required for:** `release-python.yml`
-
-PyPI Trusted Publishing authenticates via GitHub's OIDC — no long-lived token needed.
+**Required for:** `release-python.yml` — CI publishes via OIDC (no long-lived secret).
 
 **Steps (one-time, before first release):**
 
@@ -112,16 +161,24 @@ PyPI Trusted Publishing authenticates via GitHub's OIDC — no long-lived token 
    - Repository name: `edgeparse`
    - Workflow filename: `release-python.yml`
    - Environment name: `pypi`
-3. In GitHub, create the `pypi` **Environment** (Settings → Environments → New environment). No secrets required in the environment.
+3. In GitHub, create the `pypi` **Environment** (Settings → Environments → New environment). No secrets required.
 
-The `release-python.yml` workflow uses `pypa/gh-action-pypi-publish@release/v1` with `id-token: write` permission, which exchanges the GitHub OIDC token for a temporary PyPI upload credential.
+The `release-python.yml` workflow uses `pypa/gh-action-pypi-publish@release/v1` with `id-token: write` permission.
 
-**Verify locally (dry-run):**
+**Local publishing** uses a PyPI API token instead of OIDC:
+
 ```bash
-cd sdks/python
-pip install maturin twine
-maturin build --release --out dist/
-twine check dist/*.whl
+# Create a PyPI API token at https://pypi.org/manage/account/token/
+export PYPI_PASSWORD=pypi-<your-api-token>
+make publish-python
+```
+
+The Makefile uses `--username __token__ --password "$PYPI_PASSWORD"` — the literal string `__token__` is required when authenticating with an API token.
+
+**Verify wheels locally (dry-run):**
+
+```bash
+make publish-python-dry
 ```
 
 ---
@@ -130,7 +187,7 @@ twine check dist/*.whl
 
 **Required for:** `release-node.yml`
 
-The npm package is `edgeparse` (unscoped, no organization required). Platform-specific packages (`edgeparse-darwin-arm64`, etc.) are also unscoped.
+The npm package is `edgeparse` (unscoped). Platform-specific packages (`edgeparse-darwin-arm64`, etc.) are also unscoped.
 
 **Steps (one-time):**
 
@@ -138,33 +195,61 @@ The npm package is `edgeparse` (unscoped, no organization required). Platform-sp
 2. Go to **Account → Access Tokens → Generate New Token → Granular Access Token**.
    - Token name: `edgeparse-github-actions`
    - Expiration: 365 days (set a calendar reminder to rotate!)
-   - Packages and scopes: **Read and write** — all packages belonging to this account (or select specific package names)
-   - Organizations: None needed (unscoped packages)
+   - Packages and scopes: **Read and write** — all packages belonging to this account
 3. Copy the token.
 4. Add to GitHub: secret name `NPM_TOKEN`.
 
-> **Token rotation:** npm Granular Access Tokens expire. Create a new token before the old one expires, update the GitHub secret, then revoke the old token. Check the expiry date in [npmjs.com → Access Tokens](https://www.npmjs.com/settings/~/tokens).
+> **Token rotation:** npm Granular Access Tokens expire. Rotate before expiry at [npmjs.com → Access Tokens](https://www.npmjs.com/settings/~/tokens).
 
 **Verify locally:**
+
 ```bash
-# Check that token works
 NODE_AUTH_TOKEN=<token> npm whoami
-# should print the npm username
-
-# Dry-run pack
 cd sdks/node && npm pack --dry-run
+# Or via Makefile:
+make publish-node-dry
 ```
-
-**Publishing order for Node.js:**
-
-1. First, all 5 platform-specific packages are published (CI downloads the `.node` artifacts built on each platform runner).
-2. Then the main `edgeparse` package is published (it lists the platform packages as `optionalDependencies`).
-
-This order is important: if the main package is published first, npm users will get warnings about missing optional dependencies.
 
 ---
 
-### 4. Docker Hub — Access Token
+### 4. GitHub CLI Binary Release + Homebrew Tap
+
+**Required for:** `release-cli.yml`
+
+`release-cli.yml` builds CLI binaries for all 5 target platforms and attaches them to the GitHub Release. It then generates and pushes the Homebrew formula to the tap repository.
+
+**One-time setup — Homebrew tap repository:**
+
+The formula tap lives at **https://github.com/raphaelmansuy/homebrew-edgeparse** (already created).
+
+**Create `HOMEBREW_TAP_TOKEN`:**
+
+1. Go to [github.com → Settings → Developer settings → Personal access tokens → Fine-grained tokens](https://github.com/settings/tokens?type=beta).
+2. Create a new token:
+   - Token name: `homebrew-tap-push`
+   - Repository access: **Only select repositories** → `raphaelmansuy/homebrew-edgeparse`
+   - Permissions: **Contents → Read and write**
+3. Add to GitHub repo secrets: name `HOMEBREW_TAP_TOKEN`.
+
+**Local publish (no CI needed):**
+
+```bash
+# 1. Build CLI binaries for all archs and attach to GitHub Release
+make publish-cli
+
+# 2. Generate Homebrew formula and push to tap
+make publish-brew
+```
+
+Prerequisites: `cargo-zigbuild` + `zig` for Linux/Windows cross-compilation:
+```bash
+cargo install cargo-zigbuild
+brew install zig
+```
+
+---
+
+### 5. Docker Hub — Access Token
 
 **Required for:** `release-docker.yml`
 
@@ -175,34 +260,65 @@ This order is important: if the main package is published first, npm users will 
    - Access: Read & Write
 4. Add to GitHub: secret name `DOCKERHUB_TOKEN`.
 
-The Docker Hub username is hardcoded as `raphaelmansuy` in the workflow — no username secret is needed. GHCR authentication uses `GITHUB_TOKEN` (auto-provisioned).
+The Docker Hub username is hardcoded as `raphaelmansuy` in the workflow. GHCR uses `GITHUB_TOKEN` automatically.
 
 ---
 
 ## How to Cut a Release
+
+### Option A — Automated (tag push triggers CI)
 
 ```bash
 # 1. Bump the version in the workspace Cargo.toml
 #    [workspace.package]
 #    version = "0.2.0"
 
-# 2. Also bump the Node.js package versions
+# 2. Bump Node.js package versions
 cd sdks/node
 # Update package.json and npm/*/package.json to new version
 
-# 3. Also bump the Python package version in sdks/python/pyproject.toml
+# 3. Bump Python version
+# Update sdks/python/pyproject.toml
 
 # 4. Commit and push
 git add -A
 git commit -m "chore: bump version to 0.2.0"
 git push origin main
 
-# 5. Tag and push — this triggers all four release workflows
+# 5. Tag and push — triggers all five release workflows
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-The tag format must match `v[0-9]+.[0-9]+.[0-9]+` (no pre-release suffixes like `-rc1` — the workflows only match that pattern). The Rust workflow verifies that the tag version matches `edgeparse-core`'s version in Cargo.toml and fails fast if they diverge.
+The tag format must match `v[0-9]+.[0-9]+.[0-9]+`. The Rust workflow verifies the tag version matches `edgeparse-core`'s Cargo.toml version and fails fast if they diverge.
+
+### Option B — Local publishing (Makefile, no CI)
+
+```bash
+# Set credentials in environment
+export CARGO_REGISTRY_TOKEN=<crates-io-token>
+export PYPI_PASSWORD=pypi-<api-token>        # note: --username __token__ is used automatically
+export NPM_TOKEN=<npm-granular-access-token>
+
+# Full publish: crates + PyPI + npm + CLI binaries + Homebrew
+make publish-all
+
+# Or target-by-target:
+make publish-rust      # → crates.io
+make publish-python    # → PyPI
+make publish-node      # → npm
+make publish-cli       # → GitHub Release (binaries)
+make publish-brew      # → Homebrew tap (run after publish-cli)
+```
+
+Dry-run any target first:
+```bash
+make publish-rust-dry
+make publish-python-dry
+make publish-node-dry
+make publish-cli-dry
+make publish-brew-dry
+```
 
 ---
 
@@ -231,7 +347,7 @@ The tag format must match `v[0-9]+.[0-9]+.[0-9]+` (no pre-release suffixes like 
 | Wait 30s | crates.io index propagation delay |
 | Publish edgeparse-core | Core library |
 | Wait 30s | Index propagation |
-| Publish edgeparse-cli | CLI binary |
+| Publish edgeparse-cli | CLI crate (binary) |
 | GitHub Release | Created with generated release notes |
 
 ### `release-python.yml` — PyPI
@@ -240,7 +356,7 @@ The tag format must match `v[0-9]+.[0-9]+.[0-9]+` (no pre-release suffixes like 
 
 | Job | Detail |
 |-----|--------|
-| `build-wheels` | Matrix: 5 platforms (ubuntu x86_64, ubuntu arm64, macos x86_64, macos arm64, windows x86_64). Uses `maturin-action@v1` with `sccache`. |
+| `build-wheels` | Matrix: 5 platforms. Linux builds all cp310–cp313 automatically via manylinux2014. macOS installs Python 3.10–3.13 and passes `-i python3.10 python3.11 python3.12 python3.13` to maturin. Windows builds cp312 only. Uses `maturin-action@v1` with `sccache`. |
 | `build-sdist` | Source distribution via `maturin sdist` |
 | `publish-pypi` | Downloads all wheel artifacts, publishes via `pypa/gh-action-pypi-publish` using OIDC. Gated by `environment: pypi`. |
 
@@ -250,14 +366,24 @@ The tag format must match `v[0-9]+.[0-9]+.[0-9]+` (no pre-release suffixes like 
 
 | Job | Detail |
 |-----|--------|
-| `build-native` | Matrix: 5 platforms. Builds the `.node` NAPI-RS addon via `cargo build --release`. For aarch64 Linux, uses `cross` for cross-compilation. |
-| `publish-npm` | Downloads all 5 `.node` artifacts → syncs version in all package.json files → `npm run build:ts` → publishes 5 platform packages → publishes main `edgeparse` package. Gated by `environment: npm`. |
+| `build-native` | Matrix: 5 platforms. macOS and Windows: native `cargo build`. Linux ARM64: `cargo-zigbuild` with glibc 2.17 floor (no Docker needed). |
+| `publish-npm` | Downloads 5 `.node` artifacts → syncs version in all package.json → `npm run build:ts` → publishes 5 platform packages → publishes main `edgeparse` package. Gated by `environment: npm`. |
+
+### `release-cli.yml` — GitHub Release binaries + Homebrew
+
+**Triggers:** `v*.*.*` tag push
+
+| Job | Detail |
+|-----|--------|
+| `build-cli` | Matrix: 5 platforms. macOS: native `cargo build`. Linux ARM64 + Windows: `cargo-zigbuild` targeting glibc 2.17. Each job uploads its artifact. |
+| `attach-release` | Downloads all 5 artifacts, creates GitHub Release if not already present (release-rust.yml may have created it first), uploads tarballs/zips with `--clobber`. |
+| `homebrew` | Downloads CLI artifacts, runs `scripts/gen-formula.sh` to compute SHA256s locally, commits and pushes updated formula to `raphaelmansuy/homebrew-edgeparse`. Requires `HOMEBREW_TAP_TOKEN` secret. |
 
 ### `release-docker.yml` — Container registries
 
 **Triggers:** `v*.*.*` tag push
 
-Builds a multi-arch image (`linux/amd64` + `linux/arm64`) using `docker buildx` and pushes to both Docker Hub (`raphaelmansuy/edgeparse`) and GHCR (`ghcr.io/raphaelmansuy/edgeparse`).
+Builds a multi-arch image (`linux/amd64` + `linux/arm64`) using `docker buildx` and pushes to both Docker Hub (`raphaelmansuy/edgeparse`) and GHCR (`ghcr.io/raphaelmansuy/edgeparse`). Runs a Trivy HIGH/CRITICAL vulnerability scan after push.
 
 ---
 
@@ -276,7 +402,7 @@ exclude = [".cargo_vcs_info.json", ".cargo-ok", "Cargo.toml.orig"]
 
 ### crates.io: "dependency X does not specify a version"
 
-All `path = "..."` dependencies published to crates.io must also include `version = "x.y.z"`. Example:
+All `path = "..."` dependencies published to crates.io must also include `version = "x.y.z"`:
 ```toml
 edgeparse-core = { path = "../edgeparse-core", version = "0.1.0" }
 ```
@@ -287,7 +413,7 @@ The `NPM_TOKEN` secret is expired or invalid. Generate a new Granular Access Tok
 
 ### npm: "Scope not found"
 
-The package uses the unscoped name `edgeparse` — no npm organization is needed. If you see scope errors, verify `package.json` has `"name": "edgeparse"` (not `"@someorg/edgeparse"`).
+The package uses the unscoped name `edgeparse`. If you see scope errors, verify `package.json` has `"name": "edgeparse"` (not `"@someorg/edgeparse"`).
 
 ### PyPI: "File already exists"
 
@@ -295,19 +421,36 @@ Like crates.io, PyPI does not allow overwriting a version. Bump the version in `
 
 ### PyPI OIDC: "Token request failed"
 
-The Trusted Publisher configuration on PyPI must exactly match the GitHub owner, repo name, workflow filename, and environment name. Recheck all four fields at [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/).
+The Trusted Publisher configuration on PyPI must exactly match the GitHub owner, repo name, workflow filename (`release-python.yml`), and environment name (`pypi`). Recheck all four fields at [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/).
+
+### PyPI local: "403 Forbidden" with API token
+
+Use `--username __token__` (the literal string `__token__`) when authenticating with an API token. The Makefile handles this automatically via `publish-python`. If running `twine` manually:
+```bash
+twine upload dist/*.whl --username __token__ --password "$PYPI_PASSWORD"
+```
+
+### Linux CLI / Node.js build fails (cross-compilation)
+
+`cross v0.2.5` fails on macOS ARM64 when targeting Linux (it tries to install a Linux-runnable toolchain). Use `cargo-zigbuild` instead — it requires no Docker and works on macOS ARM64:
+
+```bash
+cargo install cargo-zigbuild
+brew install zig
+cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p edgeparse-cli
+```
+
+### GitHub Release: CLI binary not attached
+
+`release-cli.yml` runs in parallel with `release-rust.yml`. If it runs first, it creates the Release with placeholder notes; `release-rust.yml` will then update the release body with CHANGELOG content. Both upload with `--clobber`, so re-running either workflow is safe.
+
+### Homebrew formula: wrong SHA256
+
+The `release-cli.yml` `homebrew` job generates SHA256 from the locally-built artifacts before they are uploaded. If you push the formula manually with `make publish-brew`, run `make publish-cli` first so the artifacts are in `target/release-dist/`.
 
 ### npm: WebAuthn 2FA during manual publish
 
-If publishing manually with `npm publish` and your account has WebAuthn 2FA enabled, npm will display a browser auth URL:
-```
-Authenticate your account at:
-https://www.npmjs.com/auth/cli/<uuid>
-Press ENTER to open in the browser...
-```
-Open this URL in a browser, complete the WebAuthn challenge, then press Enter in the terminal to complete the publish.
-
-For automated CI, use a Granular Access Token (not an interactive session) — tokens bypass 2FA for CI operations.
+For automated CI, use a Granular Access Token — tokens bypass 2FA. For manual publishing, open the auth URL in a browser, complete the WebAuthn challenge, then press Enter.
 
 ---
 
@@ -315,8 +458,11 @@ For automated CI, use a Granular Access Token (not an interactive session) — t
 
 | Decision | Rationale |
 |----------|-----------|
-| Unscoped `edgeparse` npm package instead of `@edgeparse/pdf` | No npm organization required; avoids the friction of creating and maintaining an org. All platform packages (`edgeparse-darwin-arm64`, etc.) are also unscoped. |
-| PyPI OIDC instead of API token | No long-lived secret; OIDC tokens expire in minutes and are scoped to each workflow run. |
-| `pdf-cos` published separately before `edgeparse-core` | `edgeparse-core` depends on `pdf-cos = "0.39.0"` from crates.io. Publishing `pdf-cos` first ensures the index is available when `edgeparse-core` is validated. |
-| 30-second wait steps between crates | crates.io index updates are eventually consistent. 30 seconds is sufficient for the dependency to appear in the index before the dependent crate is validated. |
-| `environment: npm` on publish-npm job | Enables GitHub Environment protection rules (optional reviewers, deployment history). Mirrors the `environment: pypi` pattern used for Python. |
+| `cargo-zigbuild` instead of `cross` for Linux ARM64 cross-compilation | `cross v0.2.5` cannot build Linux targets on a macOS ARM64 host (the runner or local machine). `cargo-zigbuild` uses zig as a linker, requires no Docker daemon, and works identically on macOS and Linux CI runners. |
+| Unscoped `edgeparse` npm package | No npm organization required; avoids org overhead. All platform packages (`edgeparse-darwin-arm64`, etc.) are also unscoped. |
+| PyPI OIDC for CI, API token for local Makefile | OIDC tokens expire in minutes and are scoped per run — ideal for CI. The Makefile uses a long-lived API token for convenient local publishing. |
+| `pdf-cos` published separately before `edgeparse-core` | `edgeparse-core` depends on `pdf-cos` from crates.io. Publishing first ensures the index is available when the dependent crate is validated. |
+| 30-second wait steps between crates | crates.io index updates are eventually consistent. 30 seconds is sufficient for the dependency to appear before the dependent crate is validated. |
+| `environment: npm` / `environment: pypi` on publish jobs | Enables GitHub Environment protection rules (optional reviewers, deployment history). |
+| Separate `release-cli.yml` for binaries + Homebrew | CLI binary publishing is unrelated to crates.io and has its own lifecycle. Decoupling avoids blocking the Rust publish on cross-compilation. The Homebrew formula depends on the CLI artifacts, so it lives in the same workflow. |
+| `HOMEBREW_TAP_TOKEN` instead of `GITHUB_TOKEN` for tap push | `GITHUB_TOKEN` only has write access to the current repository. A dedicated PAT scoped to `raphaelmansuy/homebrew-edgeparse` is required to push the formula. |

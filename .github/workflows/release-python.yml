@@ -35,7 +35,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Linux: maturin-action builds all Python versions automatically via
+      # the manylinux container (cp310–cp313).
+      # macOS: install multiple interpreters so maturin produces one wheel
+      # per Python version per arch.
       - uses: actions/setup-python@v5
+        if: ${{ !startsWith(matrix.platform.runner, 'ubuntu') }}
+        with:
+          python-version: |
+            3.10
+            3.11
+            3.12
+            3.13
+
+      - uses: actions/setup-python@v5
+        if: startsWith(matrix.platform.runner, 'ubuntu')
         with:
           python-version: '3.12'
 
@@ -45,7 +59,9 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: ${{ matrix.platform.manylinux }}
           working-directory: sdks/python
-          args: --release --out dist/
+          args: >-
+            --release --out dist/
+            ${{ !startsWith(matrix.platform.runner, 'ubuntu') && '-i python3.10 python3.11 python3.12 python3.13' || '' }}
           sccache: 'true'
 
       - name: Upload wheel artifact
