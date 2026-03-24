@@ -7,6 +7,28 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.0] — 2026-03-24
+
+### Added
+- **WASM SDK** (`edgeparse-wasm`): WebAssembly bindings for browser and edge-runtime deployments
+- **WASM demo** (`demo/`): Interactive in-browser PDF extraction demo using the WASM SDK
+- **Enterprise page** on the website (`/enterprise`) with pricing and contact CTA
+- **Contact page** on the website (`/contact`) routed from all enterprise CTAs
+- **Demo link** in the site header and landing page hero section
+- **Elitizon partnership links** across the site
+- Social-card meta tags, Open Graph images, and sitemap improvements for SEO
+
+### Changed
+- Cross-compilation for Windows CLI binary now uses `cargo zigbuild` correctly (no spurious glibc suffix on Windows targets)
+- Trivy security-scan action pinned to `v0.35.0` (was `@master`) and uses the correct image tag (strips `v` prefix)
+- `edgeparse-core` internal dependency version constraint updated to `0.2.0`
+
+### Fixed
+- CLI release workflow: Windows cross-compiled binary no longer received a Linux glibc suffix (`.2.17`) which could cause `cargo zigbuild` errors
+- Docker release workflow: Trivy scan now pulls the correct image tag (`0.2.0`, not `v0.2.0`)
+
+---
+
 ## [0.1.1] — 2026-03-23
 
 ### Fixed

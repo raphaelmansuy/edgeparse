@@ -59,8 +59,13 @@ jobs:
         run: |
           TARGET="${{ matrix.target }}"
           if [[ "${{ matrix.use-zigbuild }}" == "true" ]]; then
-            # Pin glibc to 2.17 for maximum Linux compatibility
-            cargo zigbuild --release --target "${TARGET}.2.17" -p edgeparse-cli
+            if [[ "$TARGET" == *"linux"* ]]; then
+              # Pin glibc to 2.17 for maximum Linux compatibility
+              cargo zigbuild --release --target "${TARGET}.2.17" -p edgeparse-cli
+            else
+              # Windows cross-compile — no glibc suffix
+              cargo zigbuild --release --target "${TARGET}" -p edgeparse-cli
+            fi
           else
             cargo build --release --target "${TARGET}" -p edgeparse-cli
           fi

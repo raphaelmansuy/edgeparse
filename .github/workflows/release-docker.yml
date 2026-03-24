@@ -62,9 +62,9 @@ jobs:
           sbom: true
 
       - name: Security scan (Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
-          image-ref: 'ghcr.io/raphaelmansuy/edgeparse:${{ github.ref_name }}'
+          image-ref: 'ghcr.io/raphaelmansuy/edgeparse:${{ steps.meta.outputs.version }}'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'HIGH,CRITICAL'

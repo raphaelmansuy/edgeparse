@@ -636,7 +636,7 @@ dependencies = [
 
 [[package]]
 name = "edgeparse-cli"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -650,7 +650,7 @@ dependencies = [
 
 [[package]]
 name = "edgeparse-core"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -674,7 +674,7 @@ dependencies = [
 
 [[package]]
 name = "edgeparse-node"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "edgeparse-core",
  "napi",
@@ -686,7 +686,7 @@ dependencies = [
 
 [[package]]
 name = "edgeparse-python"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "edgeparse-core",
  "pyo3",
@@ -695,7 +695,7 @@ dependencies = [
 
 [[package]]
 name = "edgeparse-wasm"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
