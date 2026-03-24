@@ -4,9 +4,7 @@
 
 use wasm_bindgen::prelude::*;
 
-use edgeparse_core::api::config::{
-    ImageOutput, ProcessingConfig, ReadingOrder, TableMethod,
-};
+use edgeparse_core::api::config::{ImageOutput, ProcessingConfig, ReadingOrder, TableMethod};
 use edgeparse_core::output;
 
 /// Initialize panic hook for better error messages in browser console.

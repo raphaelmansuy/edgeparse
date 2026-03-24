@@ -459,7 +459,10 @@ pub fn binary_mark(input: ParserInput) -> Option<Vec<u8>> {
 
 /// Decode CrossReferenceTable
 fn xref(input: ParserInput) -> NomResult<Xref> {
-    let xref_eol = map(alt((tag(&b" \r"[..]), tag(&b" \n"[..]), tag(&b"\r\n"[..]), tag(&b"\n"[..]))), |_| ());
+    let xref_eol = map(
+        alt((tag(&b" \r"[..]), tag(&b" \n"[..]), tag(&b"\r\n"[..]), tag(&b"\n"[..]))),
+        |_| (),
+    );
     let xref_entry = pair(
         separated_pair(unsigned_int, tag(&b" "[..]), unsigned_int::<u32>),
         delimited(tag(&b" "[..]), map(one_of("nf"), |k| k == 'n'), xref_eol),

@@ -109,9 +109,8 @@ pub fn load_pdf_from_bytes(
         return Err(EdgePdfError::LoadError("Empty PDF data".to_string()));
     }
 
-    let document = Document::load_mem(data).map_err(|e| {
-        EdgePdfError::LoadError(format!("Failed to parse PDF from bytes: {e}"))
-    })?;
+    let document = Document::load_mem(data)
+        .map_err(|e| EdgePdfError::LoadError(format!("Failed to parse PDF from bytes: {e}")))?;
 
     let pages = document.get_pages();
     let num_pages = pages.len() as u32;
