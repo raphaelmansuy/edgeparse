@@ -40,6 +40,7 @@ export interface PdfDocument {
 export type OutputFormat = 'json' | 'markdown' | 'html' | 'text';
 export type WasmStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type ParseStatus = 'idle' | 'parsing' | 'done' | 'error';
+export type RenderStatus = 'idle' | 'rendering';
 
 export interface PageDimensions {
   pdfWidth: number;

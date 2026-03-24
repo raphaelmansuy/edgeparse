@@ -1,4 +1,10 @@
-/** FormatTabs — JSON | Markdown | HTML | Text tab switcher. */
+/** FormatTabs — JSON | Markdown | HTML | Text tab switcher.
+ *
+ * When a format is being rendered (async Markdown/HTML conversion), the active
+ * tab shows an animated pulse dot via the `--loading` modifier class. This
+ * gives the user immediate feedback that the tab click was registered and work
+ * is happening — without blanking the content pane.
+ */
 
 import { el } from '../utils/dom';
 import { store } from '../state';
@@ -28,12 +34,24 @@ export function createFormatTabs(): HTMLElement {
     return btn;
   });
 
+  // Sync active-tab styling whenever outputFormat changes.
   store.subscribe('outputFormat', (value) => {
     const current = value as OutputFormat;
     for (const btn of buttons) {
       const active = btn.dataset.format === current;
       btn.classList.toggle('format-tabs__tab--active', active);
       btn.setAttribute('aria-selected', String(active));
+    }
+  });
+
+  // Show a pulse dot on the active tab while an async render is in progress.
+  // This fires when the OutputViewer sets store.renderStatus = 'rendering'.
+  store.subscribe('renderStatus', (value) => {
+    const isRendering = value === 'rendering';
+    const currentFormat = store.get('outputFormat');
+    for (const btn of buttons) {
+      const isActive = btn.dataset.format === currentFormat;
+      btn.classList.toggle('format-tabs__tab--loading', isActive && isRendering);
     }
   });
 

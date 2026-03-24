@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - 'site/**'
+      - 'demo/**'
+      - 'crates/edgeparse-wasm/pkg/**'
       - '.github/workflows/deploy-site.yml'
   workflow_dispatch:
 
@@ -42,6 +44,18 @@ jobs:
       - name: Install dependencies
         working-directory: site
         run: pnpm install --frozen-lockfile
+
+      - name: Build demo app
+        working-directory: demo
+        run: |
+          npm ci
+          DEMO_BASE_PATH=/demo/ npx vite build
+
+      - name: Copy demo into site
+        run: |
+          rm -rf site/public/demo
+          mkdir -p site/public/demo
+          cp -r demo/dist/* site/public/demo/
 
       - name: Build site
         working-directory: site

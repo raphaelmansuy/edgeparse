@@ -1,18 +1,21 @@
 /**
  * OutputViewer — right pane.
  *
- * Performance design:
- *  • JSON / Text   → CodeMirror (virtualizes rows internally — always fast)
- *  • Markdown      → marked.parse() runs in render-worker (off-thread), then
- *                    DOMPurify sanitizes, result cached in renderCache
- *  • HTML          → DOMPurify only (no markdown conversion); deferred one rAF
- *                    so the loading overlay paints before the sync work runs
+ * UX design for format switching (non-blocking feedback):
+ *  • JSON / Text   → CodeMirror instant update (always fast, no loading state)
+ *  • Markdown      → marked.parse() in render-worker (off-thread); DOMPurify
+ *                    after double-rAF so the shimmer bar is visible first
+ *  • HTML          → DOMPurify after double-rAF so the shimmer bar paints first
  *
- * renderCache (Map<format → sanitized HTML string>) is cleared when a new PDF
- * is loaded (outputText changes), so stale renders are never served.
+ * Loading feedback strategy:
+ *  • PDF parsing        → full-screen overlay (user can't interact anyway)
+ *  • Format rendering   → thin animated shimmer bar (top of pane) +
+ *                         rendered pane dims to 50% opacity (keeps old content
+ *                         visible so the screen never goes blank) +
+ *                         active tab shows a pulse dot (via renderStatus key)
  *
- * renderRevision guards against race conditions when the user switches tabs
- * quickly while an async render is in flight.
+ * renderCache (Map<format → sanitized HTML>) is cleared on new PDF load.
+ * renderRevision guards against race conditions on rapid tab switching.
  */
 
 import { el } from '../utils/dom';
@@ -60,16 +63,23 @@ function markdownToHtml(markdown: string): Promise<string> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Yield to the browser so pending paints (e.g. loading overlay) flush first. */
+/**
+ * Yield two animation frames so pending paints flush before blocking work.
+ * Double-rAF ensures the browser has actually committed a paint cycle:
+ * first rAF fires before the paint, second fires after it.
+ */
 function nextPaint(): Promise<void> {
   return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 }
 
-/** Sanitize and inject HTML into a container using a <template> inert parse. */
-function applyHtml(target: HTMLElement, html: string): void {
-  const clean = DOMPurify.sanitize(html);
+/**
+ * Inject pre-sanitized HTML via an inert <template> parse.
+ * Caller must ensure `sanitizedHtml` has already been through DOMPurify —
+ * this function does NOT double-sanitize.
+ */
+function setSanitizedHtml(target: HTMLElement, sanitizedHtml: string): void {
   const tmpl = document.createElement('template');
-  tmpl.innerHTML = clean;
+  tmpl.innerHTML = sanitizedHtml;
   target.replaceChildren(tmpl.content);
 }
 
@@ -85,7 +95,7 @@ const renderCache = new Map<OutputFormat, string>();
 // discarded (user switched tabs again).
 let renderRevision = 0;
 
-// True while an async render (worker + DOMPurify) is running.
+// True while an async render (worker + DOMPurify) is in flight.
 let renderBusy = false;
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -99,6 +109,13 @@ export function createOutputViewer(): HTMLElement {
     style: 'display: none;',
   });
 
+  // Thin shimmer bar shown during format rendering (NOT during PDF parsing).
+  // Replaces the full overlay for format switches so old content stays visible.
+  const renderProgress = el('div', {
+    className: 'output-viewer__render-progress',
+    ariaHidden: 'true',
+  });
+
   const actions = el('div', {
     className: 'output-viewer__actions',
     innerHTML: `
@@ -107,7 +124,7 @@ export function createOutputViewer(): HTMLElement {
     `,
   });
 
-  // Shared loading overlay — covers both parse-busy and render-busy states.
+  // Full-screen overlay — only for active PDF parsing (not format switching).
   const loadingOverlay = el('div', {
     className: 'output-viewer__loading',
     ariaLive: 'polite',
@@ -119,9 +136,10 @@ export function createOutputViewer(): HTMLElement {
   `;
   loadingOverlay.style.display = 'none';
 
-  container.append(actions, codePane, renderedPane, loadingOverlay);
+  // Layout: actions bar → render progress bar → content panes → parse overlay
+  container.append(actions, renderProgress, codePane, renderedPane, loadingOverlay);
 
-  // CodeMirror
+  // CodeMirror — read-only, line-wrapping, no theme until user picks dark mode
   const cmState = EditorState.create({
     doc: '',
     extensions: [
@@ -134,23 +152,28 @@ export function createOutputViewer(): HTMLElement {
   });
   editorView = new EditorView({ state: cmState, parent: codePane });
 
-  // ── Loading overlay management ──────────────────────────────────────────────
-
-  function loadingMsg(): string {
-    if (renderBusy) return 'Rendering…';
-    const ws = store.get('wasmStatus');
-    return ws === 'loading' ? 'Loading parser…' : 'Parsing PDF…';
-  }
+  // ── Loading state management ────────────────────────────────────────────────
 
   function updateLoadingState(): void {
     const ws  = store.get('wasmStatus');
     const ps  = store.get('parseStatus');
     const has = !!store.get('pdfBytes');
     const parseBusy = ps === 'parsing' || (ws === 'loading' && has);
-    const busy = parseBusy || renderBusy;
-    loadingOverlay.style.display = busy ? '' : 'none';
-    (loadingOverlay.querySelector('.loading-text') as HTMLElement).textContent =
-      loadingMsg();
+
+    // Full overlay: only while parsing a PDF (user cannot interact anyway).
+    loadingOverlay.style.display = parseBusy ? '' : 'none';
+    if (parseBusy) {
+      (loadingOverlay.querySelector('.loading-text') as HTMLElement).textContent =
+        ws === 'loading' ? 'Loading parser…' : 'Parsing PDF…';
+    }
+
+    // Thin shimmer bar: only while rendering a format (never during parse).
+    // Shown alongside dimmed content — user can still see what was there before.
+    const showProgress = !parseBusy && renderBusy;
+    renderProgress.classList.toggle('output-viewer__render-progress--active', showProgress);
+
+    // Propagate render status to store so format-tabs can show a per-tab indicator.
+    store.set('renderStatus', renderBusy ? 'rendering' : 'idle');
   }
 
   store.subscribe('wasmStatus',  updateLoadingState);
@@ -163,18 +186,18 @@ export function createOutputViewer(): HTMLElement {
   async function updateContent(): Promise<void> {
     const text   = store.get('outputText');
     const format = store.get('outputFormat');
-
     const isCode = format === 'json' || format === 'text';
 
-    // Switch CodeMirror / rendered pane visibility
+    // Show/hide the correct pane.
     const codePaneEl = editorView?.dom.parentElement;
     if (codePaneEl) codePaneEl.style.display = isCode ? '' : 'none';
     renderedPane.style.display = isCode ? 'none' : '';
 
     if (isCode) {
-      // Cancel any in-flight render so its finally-block won't re-show overlay.
+      // Cancel any in-flight render; clean up dimming state.
       renderBusy = false;
       renderRevision++;
+      renderedPane.classList.remove('output-viewer__rendered--loading');
       updateLoadingState();
       editorView?.dispatch({
         changes: { from: 0, to: editorView.state.doc.length, insert: text },
@@ -182,37 +205,43 @@ export function createOutputViewer(): HTMLElement {
       return;
     }
 
-    // ── Rendered view (markdown | html) ────────────────────────────────────
+    // ── Rendered view (markdown | html) ──────────────────────────────────────
 
     const cached = renderCache.get(format);
     if (cached !== undefined) {
-      // Instant: re-use cached sanitized HTML string
-      applyHtml(renderedPane, cached);
+      // Cache hit: cancel in-flight render, serve immediately, no overlay.
+      renderBusy = false;
+      renderRevision++;
+      renderedPane.classList.remove('output-viewer__rendered--loading');
+      updateLoadingState();
+      setSanitizedHtml(renderedPane, cached);
       return;
     }
 
-    // Show loading overlay immediately, then do the heavy work.
+    // Cache miss: start async render with non-blocking feedback.
+    // Old content stays visible at 50% opacity while the new one renders.
     const rev = ++renderRevision;
     renderBusy = true;
+    renderedPane.classList.add('output-viewer__rendered--loading');
     updateLoadingState();
 
     try {
       let rawHtml: string;
 
       if (format === 'markdown') {
-        // Heavy step 1: marked.parse() — runs in worker (never blocks main thread)
+        // Worker converts markdown→HTML off-thread (main thread stays free).
         rawHtml = await markdownToHtml(text);
       } else {
-        // HTML format: WASM already produced HTML.
-        // DOMPurify is synchronous — yield first so the overlay paints.
+        // HTML format: WASM already produced HTML; just need to sanitize.
+        // Yield so the shimmer bar + dim are guaranteed to paint first.
         await nextPaint();
         rawHtml = text;
       }
 
       if (rev !== renderRevision) return; // user switched tabs — discard
 
-      // Heavy step 2: DOMPurify — synchronous DOM traversal (~100–600 ms for large docs).
-      // For markdown, yield again so the overlay is visible before this blocks.
+      // DOMPurify is synchronous (~100–600 ms on large docs). Yield one more
+      // paint so the shimmer bar remains visible during this blocking call.
       if (format === 'markdown') await nextPaint();
       if (rev !== renderRevision) return;
 
@@ -220,9 +249,13 @@ export function createOutputViewer(): HTMLElement {
       if (rev !== renderRevision) return;
 
       renderCache.set(format, sanitized);
-      applyHtml(renderedPane, sanitized);
+
+      // Swap content then fade in via CSS transition (class removal → opacity 1).
+      setSanitizedHtml(renderedPane, sanitized);
+      renderedPane.classList.remove('output-viewer__rendered--loading');
     } catch (err: unknown) {
       if (rev === renderRevision) {
+        renderedPane.classList.remove('output-viewer__rendered--loading');
         store.set('errorMessage', `Render error: ${err}`);
       }
     } finally {
@@ -233,13 +266,18 @@ export function createOutputViewer(): HTMLElement {
     }
   }
 
-  // Clear render cache whenever a new PDF is parsed (new outputText).
-  store.subscribe('outputText', () => {
+  // Clear render cache ONLY when a new PDF is loaded (formatCache changes from
+  // the WASM parse worker). Format switches do NOT clear it — so switching back
+  // to a previously-rendered format is always an instant cache hit.
+  store.subscribe('formatCache', () => {
     renderCache.clear();
-    renderRevision++; // cancel any in-flight render
-    updateContent();
+    renderRevision++; // cancel any in-flight render from the previous PDF
   });
-  store.subscribe('outputFormat', () => updateContent());
+
+  // Re-render whenever the output text changes (handles both format switches
+  // and new PDF loads — by the time this fires, outputFormat is already the
+  // new value so both reads are consistent).
+  store.subscribe('outputText', () => updateContent());
   store.subscribe('darkMode', () => updateTheme());
 
   // ── Copy / Download ─────────────────────────────────────────────────────────

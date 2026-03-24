@@ -6,6 +6,7 @@ import type {
   PdfDocument,
   WasmStatus,
   ParseStatus,
+  RenderStatus,
   SemanticType,
 } from './types';
 import type { FormatCache } from './services/wasm-bridge';
@@ -22,6 +23,7 @@ export interface AppState {
   hoveredElement: ContentElement | null;
   wasmStatus: WasmStatus;
   parseStatus: ParseStatus;
+  renderStatus: RenderStatus;
   errorMessage: string | null;
   showOverlay: boolean;
   activeSemanticFilters: Set<SemanticType>;
@@ -47,6 +49,7 @@ class StateStore extends EventTarget {
       hoveredElement: null,
       wasmStatus: 'idle',
       parseStatus: 'idle',
+      renderStatus: 'idle',
       errorMessage: null,
       showOverlay: true,
       activeSemanticFilters: new Set([

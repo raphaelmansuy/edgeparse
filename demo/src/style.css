@@ -499,6 +499,30 @@ html, body {
   color: var(--ep-fg);
 }
 
+/* Pulse dot on active tab during async rendering */
+.format-tabs__tab--loading {
+  padding-right: 22px;  /* make room for the dot */
+  position: relative;
+}
+
+@keyframes ep-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
+.format-tabs__tab--loading::after {
+  content: '';
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  translate: 0 -50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ep-primary);
+  animation: ep-pulse 1s ease-in-out infinite;
+}
+
 /* ══════════════════════════════════════════
    OUTPUT VIEWER (right pane)
 ══════════════════════════════════════════ */
@@ -507,6 +531,37 @@ html, body {
   flex-direction: column;
   height: 100%;
   position: relative;   /* needed for the loading overlay */
+}
+
+/* ── Render progress bar ── */
+/* Thin 2px shimmer bar below the actions strip; shown during format rendering */
+@keyframes ep-render-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.output-viewer__render-progress {
+  height: 2px;
+  flex-shrink: 0;
+  background: transparent;
+  overflow: hidden;
+  /* Transition on/off smoothly */
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.output-viewer__render-progress--active {
+  opacity: 1;
+  background: linear-gradient(
+    90deg,
+    var(--ep-surface)        0%,
+    var(--ep-primary)        35%,
+    var(--ep-primary-hover)  50%,
+    var(--ep-primary)        65%,
+    var(--ep-surface)        100%
+  );
+  background-size: 250% 100%;
+  animation: ep-render-shimmer 1.3s ease-in-out infinite;
 }
 
 .output-viewer__actions {
@@ -555,6 +610,16 @@ html, body {
   padding: 20px 24px;
   font-size: 14px;
   line-height: 1.7;
+  /* Smooth dim when format is rendering; fade-in when content is ready */
+  transition: opacity 0.18s ease;
+  will-change: opacity;
+}
+
+/* Dim old content while new format is being rendered —
+   keeps context visible instead of blanking the pane */
+.output-viewer__rendered--loading {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 /* Virtualise rendered HTML/Markdown: browser skips layout+paint for off-screen blocks */

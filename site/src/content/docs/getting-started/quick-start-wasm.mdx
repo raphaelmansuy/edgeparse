@@ -1,0 +1,162 @@
+---
+title: "Quick Start: WebAssembly"
+description: "Use EdgeParse directly in the browser via WebAssembly — no server required."
+---
+
+## Overview
+
+EdgeParse compiles to WebAssembly, enabling **client-side PDF extraction in any modern browser**. The same Rust engine that powers the CLI, Python, and Node.js SDKs runs locally in the user's browser tab.
+
+**Key properties:**
+- PDF data never leaves the user's device
+- Works offline after initial WASM load (~4 MB)
+- Same accuracy as the native CLI
+- Zero backend infrastructure
+
+## Build the WASM package
+
+```bash
+# Install wasm-pack (one-time)
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+# Build for browser use
+cd crates/edgeparse-wasm
+wasm-pack build --target web --release
+```
+
+Output goes to `crates/edgeparse-wasm/pkg/`.
+
+## Install in your project
+
+```bash
+# Option 1: Link locally
+npm install ./path-to/crates/edgeparse-wasm/pkg
+
+# Option 2: Copy pkg/ into your project
+cp -r crates/edgeparse-wasm/pkg/ src/edgeparse-wasm/
+```
+
+## Basic usage
+
+```typescript
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+
+// Load WASM binary (call once at startup)
+await init();
+
+// Read a PDF file (from user upload, fetch, etc.)
+const response = await fetch('/my-report.pdf');
+const bytes = new Uint8Array(await response.arrayBuffer());
+
+// Extract Markdown
+const markdown = convert_to_string(bytes, 'markdown');
+console.log(markdown);
+
+// Extract structured JSON
+const json = convert_to_string(bytes, 'json');
+
+// Extract HTML
+const html = convert_to_string(bytes, 'html');
+
+// Extract plain text
+const text = convert_to_string(bytes, 'text');
+```
+
+## Handle user file uploads
+
+```typescript
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+
+await init();
+
+const fileInput = document.getElementById('pdf-input') as HTMLInputElement;
+
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files?.[0];
+  if (!file) return;
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const markdown = convert_to_string(bytes, 'markdown');
+
+  document.getElementById('output')!.textContent = markdown;
+});
+```
+
+## Get structured document data
+
+Use `convert()` instead of `convert_to_string()` to get a full JavaScript object with pages, elements, and bounding boxes:
+
+```typescript
+import init, { convert } from '@edgeparse/edgeparse-wasm';
+
+await init();
+
+const bytes = new Uint8Array(await file.arrayBuffer());
+const doc = convert(bytes, 'json');
+
+// Access structured data
+for (const page of doc.pages) {
+  console.log(`Page ${page.page_number}:`);
+  for (const element of page.elements) {
+    console.log(`  [${element.type}] ${element.text}`);
+  }
+}
+```
+
+## Page range selection
+
+```typescript
+// Parse only pages 1-5
+const markdown = convert_to_string(bytes, 'markdown', '1-5');
+
+// Parse specific pages
+const json = convert_to_string(bytes, 'json', '1,3,7');
+```
+
+## Table extraction methods
+
+```typescript
+// Default: ruling-line detection (best for tables with borders)
+const md1 = convert_to_string(bytes, 'markdown', 'all', 'auto', 'default');
+
+// Cluster method: for borderless tables
+const md2 = convert_to_string(bytes, 'markdown', 'all', 'auto', 'cluster');
+```
+
+## Vite configuration
+
+```typescript
+// vite.config.ts
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@edgeparse/edgeparse-wasm'],
+  },
+  build: {
+    target: 'esnext',
+  },
+});
+```
+
+## Webpack configuration
+
+```javascript
+// webpack.config.js
+module.exports = {
+  experiments: {
+    asyncWebAssembly: true,
+  },
+};
+```
+
+## Live demo
+
+Try EdgeParse WASM in your browser: **[edgeparse.com/demo/](https://edgeparse.com/demo/)**
+
+Upload any PDF and see extracted Markdown, JSON, HTML, or text — all processing runs locally.
+
+## Next steps
+
+- [WASM API Reference](/api/wasm/) — full function signatures and parameter details
+- [WASM Use Cases](/guides/wasm-use-cases/) — client-side RAG, offline apps, privacy-first processing

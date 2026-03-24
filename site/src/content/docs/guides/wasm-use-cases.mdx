@@ -1,0 +1,233 @@
+---
+title: "WASM Use Cases"
+description: "Real-world use cases for EdgeParse WebAssembly — client-side RAG, offline apps, privacy-first processing, and more."
+---
+
+EdgeParse WASM runs the full Rust PDF extraction engine directly in the browser. Here are concrete use cases with implementation patterns.
+
+## 1. Client-side RAG preprocessing
+
+Extract structured chunks from PDFs in the browser, then send only the text to your embedding API. The full PDF never leaves the user's device.
+
+```typescript
+import init, { convert } from '@edgeparse/edgeparse-wasm';
+
+await init();
+
+async function extractChunksForRAG(file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const doc = convert(bytes, 'json');
+
+  // Build chunks with metadata
+  const chunks = doc.pages.flatMap(page =>
+    page.elements
+      .filter(el => ['paragraph', 'heading', 'list_item'].includes(el.type))
+      .map(el => ({
+        text: el.text,
+        page: page.page_number,
+        type: el.type,
+        bbox: el.bbox,
+      }))
+  );
+
+  // Only text leaves the browser — not the PDF
+  const response = await fetch('/api/embed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chunks: chunks.map(c => c.text) }),
+  });
+
+  return { chunks, embeddings: await response.json() };
+}
+```
+
+**Why WASM:** Your users upload sensitive documents (contracts, medical records, financials). With WASM, the PDF stays on-device and only extracted text goes to your API.
+
+## 2. Browser-based document viewer
+
+Build a web app where users drag-and-drop PDFs and instantly see structured output. No file uploads, no server queue, no processing delays.
+
+```typescript
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+
+await init();
+
+const dropZone = document.getElementById('drop-zone')!;
+
+dropZone.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer?.files[0];
+  if (!file || file.type !== 'application/pdf') return;
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  // Show Markdown output
+  const markdown = convert_to_string(bytes, 'markdown');
+  document.getElementById('markdown-output')!.textContent = markdown;
+
+  // Show JSON output
+  const json = convert_to_string(bytes, 'json');
+  document.getElementById('json-output')!.textContent = json;
+});
+```
+
+**Why WASM:** Zero latency. No loading spinners, no "processing..." modals. Results appear instantly.
+
+## 3. Offline-capable PWA
+
+Build a Progressive Web App that works without internet. Cache the WASM binary with a service worker and your users can parse PDFs on airplanes, in remote locations, anywhere.
+
+```typescript
+// service-worker.ts
+const CACHE_NAME = 'edgeparse-v1';
+
+self.addEventListener('install', (event: ExtendableEvent) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache =>
+      cache.addAll([
+        '/',
+        '/index.html',
+        '/edgeparse_wasm_bg.wasm',
+        '/edgeparse_wasm.js',
+      ])
+    )
+  );
+});
+
+self.addEventListener('fetch', (event: FetchEvent) => {
+  event.respondWith(
+    caches.match(event.request).then(cached => cached || fetch(event.request))
+  );
+});
+```
+
+**Why WASM:** No server dependency. Once cached, the entire extraction pipeline works offline.
+
+## 4. Static site PDF tools
+
+Deploy PDF conversion tools on GitHub Pages, Netlify, or Vercel with zero backend costs. The entire application is client-side JavaScript + WASM.
+
+```html
+<!DOCTYPE html>
+<html>
+<head><title>PDF to Markdown Converter</title></head>
+<body>
+  <input type="file" id="pdf" accept=".pdf" />
+  <pre id="output"></pre>
+  <script type="module">
+    import init, { convert_to_string } from './edgeparse_wasm.js';
+    await init();
+
+    document.getElementById('pdf').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      document.getElementById('output').textContent =
+        convert_to_string(bytes, 'markdown');
+    });
+  </script>
+</body>
+</html>
+```
+
+**Why WASM:** Free hosting. No compute costs, no API rate limits, no scaling concerns.
+
+## 5. Browser extension
+
+Build a Chrome or Firefox extension that adds "Extract as Markdown" or "Copy as JSON" to any PDF viewed in the browser.
+
+```typescript
+// content-script.ts
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+
+chrome.runtime.onMessage.addListener(async (msg) => {
+  if (msg.action !== 'extract-pdf') return;
+
+  await init();
+  const response = await fetch(window.location.href);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const markdown = convert_to_string(bytes, 'markdown');
+
+  await navigator.clipboard.writeText(markdown);
+  chrome.runtime.sendMessage({ action: 'extracted', length: markdown.length });
+});
+```
+
+**Why WASM:** Runs in the extension context without needing a native binary or server connection.
+
+## 6. Table extraction for spreadsheets
+
+Extract tables from PDFs and convert them to CSV or array data for spreadsheet applications or data analysis tools.
+
+```typescript
+import init, { convert } from '@edgeparse/edgeparse-wasm';
+
+await init();
+
+function extractTables(bytes: Uint8Array) {
+  const doc = convert(bytes, 'json');
+  const tables = [];
+
+  for (const page of doc.pages) {
+    for (const el of page.elements) {
+      if (el.type === 'table') {
+        tables.push({
+          page: page.page_number,
+          rows: el.rows, // array of arrays
+          bbox: el.bbox,
+        });
+      }
+    }
+  }
+
+  return tables;
+}
+```
+
+**Why WASM:** Process hundreds of invoices, receipts, or reports in the browser without uploading sensitive financial data.
+
+## 7. Embedded SaaS feature
+
+Add PDF extraction as a feature in your web application without provisioning additional backend compute. Each user's browser handles its own processing.
+
+```typescript
+// In your React/Vue/Svelte component
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+
+let wasmReady = false;
+
+export async function initEdgeParse() {
+  if (wasmReady) return;
+  await init();
+  wasmReady = true;
+}
+
+export async function parsePdf(file: File, format: string = 'markdown') {
+  await initEdgeParse();
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return convert_to_string(bytes, format);
+}
+```
+
+**Why WASM:** Zero marginal compute cost per user. No backends to scale, no API quotas to manage.
+
+## Performance considerations
+
+- **First load:** ~4 MB WASM download, compiled and cached by the browser
+- **Subsequent loads:** Instant (from browser cache)
+- **Parsing speed:** Depends on PDF complexity; most documents parse in < 1 second
+- **Memory:** Uses browser memory; very large PDFs (100+ pages) may need attention
+- **Threading:** Single-threaded in WASM (no Rayon parallelism); for batch processing, use the native CLI or Python/Node SDK
+
+## When to use native SDKs instead
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Batch processing (100+ documents) | Use CLI or Python SDK with Rayon parallelism |
+| Server-side pipeline | Use Python or Node.js SDK |
+| Very large PDFs (500+ pages) | Use native SDK for better memory handling |
+| CI/CD integration | Use CLI binary |
+| Single-document, user-facing | **Use WASM** |
+
+## Live demo
+
+See EdgeParse WASM in action: **[edgeparse.com/demo/](https://edgeparse.com/demo/)**
