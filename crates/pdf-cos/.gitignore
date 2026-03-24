@@ -1,7 +1,10 @@
 target
 Cargo.lock
+# Generated test output PDFs (created/modified by tests)
 test*.pdf
 *.pdf
+# Allow fixture PDFs in assets/ — needed by doc-tests and integration tests
+!assets/*.pdf
 .idea
 *log.txt
 specs
