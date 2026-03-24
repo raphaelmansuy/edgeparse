@@ -23,7 +23,7 @@ jobs:
             node-platform: linux-arm64-gnu
             use-zigbuild: true
           - target: x86_64-apple-darwin
-            runner: macos-13
+            runner: macos-latest
             node-platform: darwin-x64
           - target: aarch64-apple-darwin
             runner: macos-14
