@@ -10,31 +10,30 @@ EdgeParse WASM runs the full Rust PDF extraction engine directly in the browser.
 Extract structured chunks from PDFs in the browser, then send only the text to your embedding API. The full PDF never leaves the user's device.
 
 ```typescript
-import init, { convert } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
 
 await init();
 
 async function extractChunksForRAG(file: File) {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const doc = convert(bytes, 'json');
+  // Use JSON string — same schema as Python/Node.js SDK
+  const doc = JSON.parse(convert_to_string(bytes, 'json'));
 
   // Build chunks with metadata
-  const chunks = doc.pages.flatMap(page =>
-    page.elements
-      .filter(el => ['paragraph', 'heading', 'list_item'].includes(el.type))
-      .map(el => ({
-        text: el.text,
-        page: page.page_number,
-        type: el.type,
-        bbox: el.bbox,
-      }))
-  );
+  const chunks = doc.kids
+    .filter((el: any) => ['paragraph', 'heading'].includes(el.type))
+    .map((el: any) => ({
+      text: el.content,
+      page: el['page number'],
+      type: el.type,
+      bbox: el['bounding box'],
+    }));
 
   // Only text leaves the browser — not the PDF
   const response = await fetch('/api/embed', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chunks: chunks.map(c => c.text) }),
+    body: JSON.stringify({ chunks: chunks.map((c: any) => c.text) }),
   });
 
   return { chunks, embeddings: await response.json() };
@@ -159,27 +158,21 @@ chrome.runtime.onMessage.addListener(async (msg) => {
 Extract tables from PDFs and convert them to CSV or array data for spreadsheet applications or data analysis tools.
 
 ```typescript
-import init, { convert } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
 
 await init();
 
 function extractTables(bytes: Uint8Array) {
-  const doc = convert(bytes, 'json');
-  const tables = [];
+  // Use JSON string — same schema as Python/Node.js SDK
+  const doc = JSON.parse(convert_to_string(bytes, 'json'));
 
-  for (const page of doc.pages) {
-    for (const el of page.elements) {
-      if (el.type === 'table') {
-        tables.push({
-          page: page.page_number,
-          rows: el.rows, // array of arrays
-          bbox: el.bbox,
-        });
-      }
-    }
-  }
-
-  return tables;
+  return doc.kids
+    .filter((el: any) => el.type === 'table')
+    .map((el: any) => ({
+      page: el['page number'],
+      rows: el.rows, // array of row objects with cells
+      bbox: el['bounding box'],
+    }));
 }
 ```
 

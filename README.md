@@ -519,11 +519,11 @@ Combine formats: `--format markdown,json`
   "type": "heading",
   "id": 42,
   "level": "Title",
-  "page_number": 1,
-  "bounding_box": [72.0, 700.0, 540.0, 730.0],
-  "heading_level": 1,
+  "page number": 1,
+  "bounding box": [72.0, 700.0, 540.0, 730.0],
+  "heading level": 1,
   "font": "Helvetica-Bold",
-  "font_size": 24.0,
+  "font size": 24.0,
   "content": "Introduction"
 }
 ```
@@ -532,16 +532,16 @@ Combine formats: `--format markdown,json`
 |-------|-------------|
 | `type` | Element type: `heading`, `paragraph`, `table`, `list`, `image`, `caption` |
 | `id` | Unique identifier for cross-referencing |
-| `page_number` | 1-indexed page reference |
-| `bounding_box` | `[left, bottom, right, top]` in PDF points (72 pt = 1 inch) |
-| `heading_level` | Heading depth (1+) |
+| `page number` | 1-indexed page reference |
+| `bounding box` | `[left, bottom, right, top]` in PDF points (72 pt = 1 inch) |
+| `heading level` | Heading depth (1+) |
 | `content` | Extracted text |
 
 ---
 
 ## RAG / LLM Integration
 
-EdgeParse is designed for AI pipelines. Every element has a `bounding_box` and `page_number`, so you can cite exact sources in answers.
+EdgeParse is designed for AI pipelines. Every element has a `bounding box` and `page number`, so you can cite exact sources in answers.
 
 ### Extract Markdown for chunking
 
@@ -561,11 +561,11 @@ import json, edgeparse
 
 data = json.loads(edgeparse.convert("report.pdf", format="json"))
 
-for element in data["elements"]:
+for element in data["kids"]:
     if element["type"] == "paragraph":
-        # element["bounding_box"] → highlight location in original PDF
-        # element["page_number"] → link back to source page
-        print(f"p.{element['page_number']}: {element['content'][:80]}")
+        # element["bounding box"] → highlight location in original PDF
+        # element["page number"] → link back to source page
+        print(f"p.{element['page number']}: {element['content'][:80]}")
 ```
 
 ### LangChain integration
@@ -579,14 +579,14 @@ import edgeparse, json
 def load_pdf(path: str) -> list[Document]:
     data = json.loads(edgeparse.convert(path, format="json"))
     docs = []
-    for el in data["elements"]:
-        if el["type"] in ("paragraph", "heading", "table"):
+    for el in data["kids"]:
+        if el["type"] in ("paragraph", "heading"):
             docs.append(Document(
                 page_content=el["content"],
                 metadata={
                     "source": path,
-                    "page": el["page_number"],
-                    "bbox": el["bounding_box"],
+                    "page": el["page number"],
+                    "bbox": el["bounding box"],
                     "type": el["type"],
                 }
             ))
@@ -604,9 +604,9 @@ def edgeparse_reader(path: str) -> list[Document]:
     return [
         Document(
             text=el["content"],
-            metadata={"page": el["page_number"], "source": path}
+            metadata={"page": el["page number"], "source": path}
         )
-        for el in data["elements"]
+        for el in data["kids"]
         if el.get("content")
     ]
 ```
@@ -618,7 +618,7 @@ def edgeparse_reader(path: str) -> list[Document]:
 | Feed PDF to LLM | `markdown` | Clean structure, fits in context window |
 | RAG with source citations | `json` | Bounding boxes enable "click-to-source" UX |
 | Semantic chunking by section | `markdown` | Headings make natural chunk boundaries |
-| Element-level filtering | `json` | Filter by `type`, `page_number`, `heading_level` |
+| Element-level filtering | `json` | Filter by `type`, `page number`, `heading level` |
 | Web display | `html` | Styled output with semantic elements |
 
 ---
@@ -716,7 +716,7 @@ For RAG pipelines, you need a parser that preserves document structure, maintain
 
 ### How do I cite PDF sources in RAG answers?
 
-Every element in JSON output includes a `bounding_box` (`[left, bottom, right, top]` in PDF points, 72 pt = 1 inch) and `page_number`. Map the source chunk back to its bounding box to highlight the exact location in the original PDF — enabling "click-to-source" UX. No other non-OCR open-source parser provides bounding boxes for every element by default.
+Every element in JSON output includes a `bounding box` (`[left, bottom, right, top]` in PDF points, 72 pt = 1 inch) and `page number`. Map the source chunk back to its bounding box to highlight the exact location in the original PDF — enabling "click-to-source" UX. No other non-OCR open-source parser provides bounding boxes for every element by default.
 
 ### How do I extract tables from PDF?
 
@@ -753,7 +753,7 @@ Same input PDF → same output, every time. No stochastic models, no floating-po
 
 ### How do I chunk PDFs for semantic search?
 
-Use `format="markdown"`. EdgeParse preserves heading hierarchy and table structure in Markdown output — headings make natural chunk boundaries for `RecursiveCharacterTextSplitter` (LangChain) or heading-based splitters. For element-level control, use `format="json"` and split on `heading_level` boundaries or `page_number` changes.
+Use `format="markdown"`. EdgeParse preserves heading hierarchy and table structure in Markdown output — headings make natural chunk boundaries for `RecursiveCharacterTextSplitter` (LangChain) or heading-based splitters. For element-level control, use `format="json"` and split on `heading level` boundaries or `page number` changes.
 
 ### Does the Python SDK run on Windows?
 

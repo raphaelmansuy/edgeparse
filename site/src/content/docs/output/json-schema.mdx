@@ -29,15 +29,15 @@ Each element in `kids` has a `type` field identifying its kind:
 | `id` | `int` | Globally unique sequential ID |
 | `page number` | `int` | 1-based page index |
 | `bounding box` | `[left, bottom, right, top]` | Coordinates in PDF points |
-| `content` | `string` | Extracted text |
-| `font` | `string` | Font name |
-| `font size` | `float` | Font size in points |
+| `content` | `string` | Extracted text (present on `paragraph`, `heading`, `caption`, `list item`; absent on `table`, `image`, `list`, `header`, `footer`) |
+| `font` | `string` | Font name (text elements only) |
+| `font size` | `float` | Font size in points (text elements only) |
 
 ## Heading-Specific Fields
 
 | Field | Type | Description |
 |-------|------|------------|
-| `level` | `string` | `"title"`, `"section"`, `"subsection"` |
+| `level` | `string` | Semantic label: `"Title"`, `"Subtitle"`, `"Heading1"`, `"Heading2"`, `"Heading3"`, `"Heading4"` |
 | `heading level` | `int` | Numeric heading level (1–6) |
 
 ## Table-Specific Fields
@@ -57,11 +57,12 @@ Each element in `kids` has a `type` field identifying its kind:
 
 | Field | Type | Description |
 |-------|------|------------|
-| `col` | `int` | 0-based column index |
-| `content` | `string` | Cell text |
-| `is header` | `bool?` | Whether in a header row |
-| `row span` | `int?` | Rows spanned (default: 1) |
-| `col span` | `int?` | Columns spanned (default: 1) |
+| `type` | `string` | Always `"table cell"` |
+| `row number` | `int` | 1-based row index |
+| `column number` | `int` | 1-based column index |
+| `row span` | `int` | Number of rows spanned (default: 1) |
+| `column span` | `int` | Number of columns spanned (default: 1) |
+| `kids` | `Element[]` | Nested child elements (typically empty) |
 
 ## Full Example
 

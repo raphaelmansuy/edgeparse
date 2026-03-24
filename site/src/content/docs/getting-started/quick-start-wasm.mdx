@@ -84,22 +84,21 @@ fileInput.addEventListener('change', async () => {
 
 ## Get structured document data
 
-Use `convert()` instead of `convert_to_string()` to get a full JavaScript object with pages, elements, and bounding boxes:
+Use `convert_to_string()` with `'json'` format and `JSON.parse()` to get the same structured schema as the Python/Node.js SDKs — a flat `kids` array with element objects:
 
 ```typescript
-import init, { convert } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
 
 await init();
 
 const bytes = new Uint8Array(await file.arrayBuffer());
-const doc = convert(bytes, 'json');
+
+// Parse JSON string — same schema as Python/Node.js SDK
+const doc = JSON.parse(convert_to_string(bytes, 'json'));
 
 // Access structured data
-for (const page of doc.pages) {
-  console.log(`Page ${page.page_number}:`);
-  for (const element of page.elements) {
-    console.log(`  [${element.type}] ${element.text}`);
-  }
+for (const el of doc.kids) {
+  console.log(`[${el.type}] page ${el['page number']}: ${el.content ?? ''}`);
 }
 ```
 

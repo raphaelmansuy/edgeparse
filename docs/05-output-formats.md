@@ -50,7 +50,7 @@ This is the **default output format** (used when `--format json` or no format sp
   "author": "Alice Smith",
   "creation date": "D:20240101",
   "modification date": "D:20240201",
-  "elements": [ ... ]
+  "kids": [ ... ]
 }
 ```
 
@@ -72,11 +72,10 @@ Type-specific fields:
 ```json
 {
   "type": "heading",
-  "level": "h1",
-  "value": "Introduction",
-  "font name": "Helvetica-Bold",
-  "font size": "14.0",
-  "font weight": "700.0",
+  "level": "Title",
+  "content": "Introduction",
+  "font": "Helvetica-Bold",
+  "font size": 14.0,
   "text color": "[0.0, 0.0, 0.0]"
 }
 ```
@@ -88,9 +87,10 @@ Type-specific fields:
   "rows": [
     {
       "type": "table row",
+      "row number": 1,
       "cells": [
-        { "type": "table header cell", "value": "Name" },
-        { "type": "table data cell",   "value": "Alice" }
+        { "type": "table cell", "row number": 1, "column number": 1, "row span": 1, "column span": 1, "kids": [] },
+        { "type": "table cell", "row number": 1, "column number": 2, "row span": 1, "column span": 1, "kids": [] }
       ]
     }
   ]
@@ -102,7 +102,8 @@ Type-specific fields:
 {
   "type": "list",
   "list items": [
-    { "type": "list item", "label value": "•", "body value": "First item" }
+    { "type": "list item", "content": "First item", "kids": [] },
+    { "type": "list item", "content": "Second item", "kids": [] }
   ]
 }
 ```

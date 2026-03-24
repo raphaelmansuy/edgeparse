@@ -46,50 +46,36 @@ function convert(
 
 ### Return value
 
-A JavaScript object matching the `PdfDocument` structure:
+A JavaScript object representing the Rust `PdfDocument` struct, serialized via `serde_wasm_bindgen`. The top-level document has a `kids` array containing `ContentElement` enum variants (externally-tagged):
 
 ```typescript
 {
-  pages: [
-    {
-      page_number: 1,
-      width: 612.0,
-      height: 792.0,
-      elements: [
-        {
-          type: "heading",       // "heading" | "paragraph" | "table" | "list" | "image" | ...
-          text: "Introduction",
-          level: 1,              // heading level (1-6)
-          bbox: {
-            x0: 72.0,
-            y0: 700.0,
-            x1: 300.0,
-            y1: 720.0,
-          },
-        },
-        // ... more elements
-      ],
-    },
-  ],
+  file_name: string,
+  number_of_pages: number,
+  author: string | null,
+  title: string | null,
+  kids: Array<Record<string, any>>  // externally-tagged Rust enum variants
 }
 ```
+
+Each element in `kids` is an externally-tagged enum object like `{ "Paragraph": { ... } }` or `{ "Heading": { ... } }`. For most use cases, `convert_to_string(bytes, 'json')` + `JSON.parse()` is simpler and gives the same structured schema as the Python/Node.js SDK.
 
 ### Example
 
 ```typescript
-import init, { convert } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
 
 await init();
 
 const bytes = new Uint8Array(await file.arrayBuffer());
-const doc = convert(bytes, 'json');
 
-// Iterate pages and elements
-for (const page of doc.pages) {
-  for (const el of page.elements) {
-    if (el.type === 'table') {
-      console.log('Table found on page', page.page_number);
-    }
+// Easiest: parse JSON string — same schema as Python/Node.js SDK
+const doc = JSON.parse(convert_to_string(bytes, 'json'));
+
+// Iterate elements (uses same keys as Python/Node.js JSON output)
+for (const el of doc.kids) {
+  if (el.type === 'table') {
+    console.log('Table found on page', el['page number']);
   }
 }
 ```

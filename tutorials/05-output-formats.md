@@ -109,14 +109,21 @@ Additional fields: `level` (semantic label: `"Title"`, `"H1"` … `"H6"`), `head
   "id": 12,
   "page number": 3,
   "bounding box": [72.0, 400.0, 540.0, 600.0],
+  "number of rows": 2,
   "rows": [
-    ["Method", "Accuracy", "Speed"],
-    ["EdgeParse", "0.881", "0.023 s"]
+    {
+      "type": "table row",
+      "row number": 1,
+      "cells": [
+        { "type": "table cell", "row number": 1, "column number": 1, "row span": 1, "column span": 1, "kids": [] },
+        { "type": "table cell", "row number": 1, "column number": 2, "row span": 1, "column span": 1, "kids": [] }
+      ]
+    }
   ]
 }
 ```
 
-Additional field: `rows` — a 2D array of strings (row-major order). First row is the header row when detected.
+Additional field: `rows` — array of row objects. Each row has `row number` and `cells` (array of cell objects with `row number`, `column number`, `row span`, `column span`, `kids`).
 
 #### `image`
 
@@ -126,11 +133,11 @@ Additional field: `rows` — a 2D array of strings (row-major order). First row 
   "id": 8,
   "page number": 2,
   "bounding box": [72.0, 300.0, 300.0, 500.0],
-  "image path": "output/images/page2_img1.png"
+  "source": "output/document_images/imageFile1.png"
 }
 ```
 
-`image path` is present only when `--image-output external` is set.
+`source` is always present and contains the generated image path.
 
 #### `list`
 
@@ -140,10 +147,9 @@ Additional field: `rows` — a 2D array of strings (row-major order). First row 
   "id": 20,
   "page number": 4,
   "bounding box": [72.0, 200.0, 400.0, 280.0],
-  "items": [
-    "First item",
-    "Second item",
-    "Nested list item"
+  "list items": [
+    { "type": "list item", "content": "First item", "kids": [] },
+    { "type": "list item", "content": "Second item", "kids": [] }
   ]
 }
 ```
@@ -176,7 +182,7 @@ Additional field: `rows` — a 2D array of strings (row-major order). First row 
 ### Bounding Box Coordinates
 
 ```
-bounding_box = [x0, y0, x1, y1]
+"bounding box" = [x0, y0, x1, y1]
 ```
 
 - **Origin**: bottom-left corner of the page
@@ -214,7 +220,8 @@ for e in doc["kids"]:
     if e["type"] == "table":
         print(f'\nTable on page {e["page number"]}:')
         for row in e["rows"]:
-            print("  ", " | ".join(row))
+            n_cells = len(row.get("cells", []))
+            print(f'  Row {row["row number"]}: {n_cells} cell(s)')
 
 # --- Get bounding boxes for all paragraphs on page 1 --------------------
 page1_paras = [
@@ -255,7 +262,10 @@ headings.slice(0, 5).forEach(h => {
 const tables = doc.kids.filter(e => e.type === 'table');
 tables.forEach(t => {
   console.log(`\nTable on page ${t['page number']}:`);
-  t.rows.forEach(row => console.log('  ', row.join(' | ')));
+  t.rows.forEach(row => {
+    const nCells = row.cells?.length ?? 0;
+    console.log(`  Row ${row['row number']}: ${nCells} cell(s)`);
+  });
 });
 
 // --- Prepare RAG chunks -------------------------------------------------
