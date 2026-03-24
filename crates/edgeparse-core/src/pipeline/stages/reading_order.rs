@@ -10,6 +10,8 @@ use crate::models::bbox::BoundingBox;
 use crate::models::content::ContentElement;
 use crate::pdf::page_info::PageInfo;
 use crate::utils::xycut;
+
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 /// Sort content elements on each page into reading order.
@@ -17,7 +19,7 @@ use rayon::prelude::*;
 /// `page_info` is indexed 0..N matching `pages`. Pass an empty slice to use
 /// the A4 fallback for all pages.
 pub fn sort_reading_order(pages: &mut [Vec<ContentElement>], page_info: &[PageInfo]) {
-    pages.par_iter_mut().enumerate().for_each(|(i, page)| {
+    let sort_page = |(i, page): (usize, &mut Vec<ContentElement>)| {
         let page_bbox = page_info
             .get(i)
             .map(|info| {
@@ -31,7 +33,16 @@ pub fn sort_reading_order(pages: &mut [Vec<ContentElement>], page_info: &[PageIn
             })
             .unwrap_or_else(|| BoundingBox::new(None, 0.0, 0.0, 595.0, 842.0));
         xycut::xycut_sort(page, &page_bbox);
-    });
+    };
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        pages.par_iter_mut().enumerate().for_each(sort_page);
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        pages.iter_mut().enumerate().for_each(sort_page);
+    }
 }
 
 #[cfg(test)]

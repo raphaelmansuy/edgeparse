@@ -17,14 +17,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 all-features = false
 
 [dependencies]
-lopdf = { workspace = true }
+lopdf = { workspace = true, default-features = false, features = ["chrono", "jiff", "time"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
-rayon = { workspace = true }
-image = { workspace = true }
+rayon = { workspace = true, optional = true }
+image = { workspace = true, optional = true }
 base64 = { workspace = true }
 regex = { workspace = true }
 unicode-normalization = { workspace = true }
@@ -32,12 +32,14 @@ indexmap = { workspace = true }
 ordered-float = { workspace = true }
 ttf-parser = { workspace = true }
 euclid = { workspace = true }
-zip = { workspace = true }
+zip = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 [features]
-default = []
+default = ["native"]
+native = ["rayon", "image", "zip", "lopdf/rayon"]
+wasm = ["lopdf/wasm_js"]
 hybrid = ["dep:reqwest", "dep:tokio"]
 
 [dev-dependencies]

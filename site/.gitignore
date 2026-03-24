@@ -19,3 +19,6 @@ pnpm-debug.log*
 
 # macOS-specific files
 .DS_Store
+
+# Built demo app (CI builds from demo/ source)
+public/demo/

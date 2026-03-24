@@ -10,7 +10,7 @@
 
 EdgeParse converts any digital PDF into Markdown, JSON (with bounding boxes), HTML, or plain text — deterministically, without a JVM, without a GPU, without OCR models, and with **best-in-class accuracy** among non-OCR tools on the 200-document benchmark suite included in this repository.
 
-Available as a **Rust library**, **CLI binary**, **Python package** (`edgeparse`), and **Node.js package** (`edgeparse`).
+Available as a **Rust library**, **CLI binary**, **Python package** (`edgeparse`), **Node.js package** (`edgeparse`), and **WebAssembly module** for in-browser PDF parsing.
 
 ---
 
@@ -23,6 +23,7 @@ Available as a **Rust library**, **CLI binary**, **Python package** (`edgeparse`
 - [CLI Reference](#cli-reference)
 - [Python SDK](#python-sdk)
 - [Node.js SDK](#nodejs-sdk)
+- [WebAssembly SDK](#webassembly-sdk)
 - [Architecture](#architecture)
 - [Benchmark](#benchmark)
   - [Why it matters](#why-it-matters)
@@ -54,6 +55,7 @@ Available as a **Rust library**, **CLI binary**, **Python package** (`edgeparse`
 | Markdown, JSON, HTML, plain-text output | ✅ |
 | Python SDK (PyO3 native extension) | ✅ |
 | Node.js SDK (NAPI-RS native addon) | ✅ |
+| WebAssembly SDK (in-browser PDF parsing) | ✅ |
 | Batch processing API | ✅ |
 | Hybrid backend support (Docling-Fast) | ✅ |
 | Zero JVM dependency | ✅ |
@@ -388,6 +390,68 @@ npx edgeparse report.pdf --format json --pages "1-5"
 
 ---
 
+## WebAssembly SDK
+
+EdgeParse compiles to WebAssembly, enabling **client-side PDF extraction in any modern browser** — no server, no uploads, no backend infrastructure.
+
+**Key advantages:**
+- Same Rust engine, same accuracy — identical output to CLI/Python/Node
+- PDF data never leaves the user's device (privacy by design)
+- Works offline after initial WASM load (~4 MB cached)
+- Zero infrastructure cost — deploy on static hosting
+
+### Quick start
+
+```typescript
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+
+// Load WASM binary (once)
+await init();
+
+// Read PDF file from user upload or fetch
+const bytes = new Uint8Array(await file.arrayBuffer());
+
+// Extract Markdown
+const markdown = convert_to_string(bytes, 'markdown');
+
+// Extract structured JSON
+const json = convert_to_string(bytes, 'json');
+
+// Extract HTML
+const html = convert_to_string(bytes, 'html');
+```
+
+### API
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `convert(bytes, format?, pages?, readingOrder?, tableMethod?)` | JS object | Structured `PdfDocument` with pages, elements, bounding boxes |
+| `convert_to_string(bytes, format?, pages?, readingOrder?, tableMethod?)` | `string` | Formatted output (Markdown, JSON, HTML, or text) |
+| `version()` | `string` | EdgeParse version |
+
+### Build from source
+
+```bash
+# Install wasm-pack
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+# Build WASM package
+cd crates/edgeparse-wasm
+wasm-pack build --target web --release
+```
+
+Output goes to `crates/edgeparse-wasm/pkg/`. Use it locally or publish to npm.
+
+### Live demo
+
+Try EdgeParse WASM in your browser: **[edgeparse.com/demo/](https://edgeparse.com/demo/)**
+
+Drag-and-drop any PDF and see extracted Markdown, JSON, HTML, or plain text — all processing runs locally in your browser.
+
+Full documentation: [docs/09-wasm-sdk.md](docs/09-wasm-sdk.md)
+
+---
+
 ## Architecture
 
 ### Crate structure
@@ -571,6 +635,7 @@ Technical documentation lives in [`docs/`](docs/):
 | [docs/06-sdk-integration.md](docs/06-sdk-integration.md) | CLI flag reference, Python SDK API, Node.js SDK API, Batch API |
 | [docs/07-cicd-publishing.md](docs/07-cicd-publishing.md) | CI/CD publishing pipeline — how it works and how to configure it |
 | [docs/08-agent-skill.md](docs/08-agent-skill.md) | EdgeParse agent skill — `npx skills add`, SKILL.md structure, SDK patterns |
+| [docs/09-wasm-sdk.md](docs/09-wasm-sdk.md) | WebAssembly SDK — objectives, API, use cases, build instructions |
 
 ---
 
@@ -587,7 +652,7 @@ edgeparse/
 ├── crates/
 │   ├── pdf-cos/             # lopdf 0.39 fork — low-level PDF object model
 │   ├── edgeparse-core/      # Core extraction engine (~90 source files)
-│   ├── edgeparse-cli/       # CLI binary (clap, 25+ flags)
+│   ├── edgeparse-cli/       # CLI binary (clap, 25+ flags)│   ├── edgeparse-wasm/      # WebAssembly build for browsers│   ├── edgeparse-wasm/      # WebAssembly build for browsers (wasm-bindgen)
 │   ├── edgeparse-python/    # PyO3 native Python extension
 │   └── edgeparse-node/      # NAPI-RS native Node.js addon
 │
@@ -609,6 +674,9 @@ edgeparse/
 │   └── src/                 # Python evaluators and engine adapters
 │
 ├── docs/                    # Technical documentation (Markdown)
+│
+├── demo/                    # Interactive WASM demo (Vite + TypeScript)
+│   └── src/                 # Demo application source
 │
 ├── examples/
 │   └── pdf/                 # Sample PDFs for quick testing

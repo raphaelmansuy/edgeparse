@@ -45,3 +45,6 @@ examples/output/
 mission/
 logs/
 .playwright-mcp/
+
+# Root-level screenshots (use site/public/ or docs/ for committed images)
+/*.png

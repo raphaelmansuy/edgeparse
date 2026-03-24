@@ -90,6 +90,40 @@ fn extract_metadata(doc: &Document) -> PdfMetadata {
     metadata
 }
 
+/// Load a PDF from an in-memory byte slice.
+///
+/// Uses lopdf's `Document::load_mem()` which parses PDF from `&[u8]`.
+/// This is the WASM-compatible loader — no filesystem access required.
+///
+/// # Arguments
+/// * `data` — raw PDF bytes
+/// * `_password` — optional decryption password (not yet implemented)
+///
+/// # Errors
+/// Returns `EdgePdfError::LoadError` if the bytes cannot be parsed as PDF.
+pub fn load_pdf_from_bytes(
+    data: &[u8],
+    _password: Option<&str>,
+) -> Result<RawPdfDocument, EdgePdfError> {
+    if data.is_empty() {
+        return Err(EdgePdfError::LoadError("Empty PDF data".to_string()));
+    }
+
+    let document = Document::load_mem(data).map_err(|e| {
+        EdgePdfError::LoadError(format!("Failed to parse PDF from bytes: {e}"))
+    })?;
+
+    let pages = document.get_pages();
+    let num_pages = pages.len() as u32;
+    let metadata = extract_metadata(&document);
+
+    Ok(RawPdfDocument {
+        document,
+        num_pages,
+        metadata,
+    })
+}
+
 /// Extract a string field from a PDF dictionary.
 fn extract_string_field(dict: &lopdf::Dictionary, key: &[u8]) -> Option<String> {
     dict.get(key).ok().and_then(|obj| match obj {

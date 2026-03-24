@@ -1,0 +1,185 @@
+---
+title: "WebAssembly API"
+description: "API reference for the EdgeParse WebAssembly SDK — convert(), convert_to_string(), and version()."
+---
+
+## Package
+
+**npm:** `@edgeparse/edgeparse-wasm` · **Source:** [`crates/edgeparse-wasm/`](https://github.com/raphaelmansuy/edgeparse/tree/main/crates/edgeparse-wasm)
+
+## Initialization
+
+Before calling any conversion function, initialize the WASM module:
+
+```typescript
+import init from '@edgeparse/edgeparse-wasm';
+
+// Async initialization — fetches and compiles the .wasm binary
+await init();
+```
+
+Call `init()` once at application startup. Subsequent calls are no-ops.
+
+## `convert()`
+
+Parses PDF bytes and returns a structured JavaScript object representing the full document.
+
+```typescript
+function convert(
+  pdf_bytes: Uint8Array,
+  format?: string | null,
+  pages?: string | null,
+  reading_order?: string | null,
+  table_method?: string | null,
+): any;
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `pdf_bytes` | `Uint8Array` | *(required)* | Raw PDF file bytes |
+| `format` | `string \| null` | `"json"` | Output format hint: `"json"`, `"markdown"`, `"html"`, `"text"` |
+| `pages` | `string \| null` | `"all"` | Page range: `"all"`, `"1-5"`, `"1,3,7"` |
+| `reading_order` | `string \| null` | `"auto"` | Reading order algorithm: `"auto"` (XY-Cut++) or `"off"` |
+| `table_method` | `string \| null` | `"default"` | Table detection: `"default"` (ruling lines) or `"cluster"` (borderless) |
+
+### Return value
+
+A JavaScript object matching the `PdfDocument` structure:
+
+```typescript
+{
+  pages: [
+    {
+      page_number: 1,
+      width: 612.0,
+      height: 792.0,
+      elements: [
+        {
+          type: "heading",       // "heading" | "paragraph" | "table" | "list" | "image" | ...
+          text: "Introduction",
+          level: 1,              // heading level (1-6)
+          bbox: {
+            x0: 72.0,
+            y0: 700.0,
+            x1: 300.0,
+            y1: 720.0,
+          },
+        },
+        // ... more elements
+      ],
+    },
+  ],
+}
+```
+
+### Example
+
+```typescript
+import init, { convert } from '@edgeparse/edgeparse-wasm';
+
+await init();
+
+const bytes = new Uint8Array(await file.arrayBuffer());
+const doc = convert(bytes, 'json');
+
+// Iterate pages and elements
+for (const page of doc.pages) {
+  for (const el of page.elements) {
+    if (el.type === 'table') {
+      console.log('Table found on page', page.page_number);
+    }
+  }
+}
+```
+
+## `convert_to_string()`
+
+Parses PDF bytes and returns a formatted string.
+
+```typescript
+function convert_to_string(
+  pdf_bytes: Uint8Array,
+  format?: string | null,
+  pages?: string | null,
+  reading_order?: string | null,
+  table_method?: string | null,
+): string;
+```
+
+### Parameters
+
+Same as `convert()`.
+
+### Return value
+
+A string in the requested format:
+
+| Format | Output |
+|--------|--------|
+| `"json"` | JSON string with bounding boxes and element types |
+| `"markdown"` | Standard Markdown with GFM tables |
+| `"html"` | HTML5 with semantic elements |
+| `"text"` | Plain UTF-8 text with reading order preserved |
+
+### Example
+
+```typescript
+import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+
+await init();
+
+const bytes = new Uint8Array(await file.arrayBuffer());
+
+const markdown = convert_to_string(bytes, 'markdown');
+const html = convert_to_string(bytes, 'html');
+const text = convert_to_string(bytes, 'text');
+const json = convert_to_string(bytes, 'json');
+```
+
+## `version()`
+
+Returns the EdgeParse version string.
+
+```typescript
+function version(): string;
+```
+
+### Example
+
+```typescript
+import { version } from '@edgeparse/edgeparse-wasm';
+console.log(version()); // "0.1.1"
+```
+
+## Error handling
+
+Both `convert()` and `convert_to_string()` throw `JsError` on failure (corrupted PDF, invalid page range, etc.):
+
+```typescript
+try {
+  const markdown = convert_to_string(bytes, 'markdown');
+} catch (err) {
+  console.error('PDF parsing failed:', err.message);
+}
+```
+
+## Browser compatibility
+
+| Browser | Minimum version |
+|---------|----------------|
+| Chrome | 57+ |
+| Firefox | 52+ |
+| Safari | 11+ |
+| Edge | 16+ |
+
+Requires `WebAssembly` and ES module support. The `build.target: 'esnext'` setting in Vite/Webpack ensures compatibility.
+
+## TypeScript support
+
+Full `.d.ts` type definitions ship with the package. Your IDE will provide autocomplete and type checking automatically.
+
+## Live demo
+
+Try the interactive demo: **[edgeparse.com/demo/](https://edgeparse.com/demo/)**

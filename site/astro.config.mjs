@@ -323,6 +323,7 @@ export default defineConfig({
 						{ label: 'Node.js', slug: 'getting-started/quick-start-nodejs' },
 						{ label: 'CLI', slug: 'getting-started/quick-start-cli' },
 						{ label: 'Rust', slug: 'getting-started/quick-start-rust' },
+						{ label: 'WebAssembly', slug: 'getting-started/quick-start-wasm' },
 					],
 				},
 				{
@@ -352,6 +353,7 @@ export default defineConfig({
 						{ label: 'RAG Integration', slug: 'guides/rag-integration' },
 						{ label: 'Hybrid Mode', slug: 'guides/hybrid-mode' },
 						{ label: 'Image Extraction', slug: 'guides/image-extraction' },
+						{ label: 'WASM Use Cases', slug: 'guides/wasm-use-cases' },
 					],
 				},
 				{
@@ -362,6 +364,7 @@ export default defineConfig({
 						{ label: 'CLI Reference', slug: 'api/cli' },
 						{ label: 'Rust API', slug: 'api/rust' },
 						{ label: 'ProcessingConfig', slug: 'api/processing-config' },
+						{ label: 'WebAssembly API', slug: 'api/wasm' },
 					],
 				},
 				{

@@ -14,5 +14,6 @@ pub mod line_extractor;
 pub mod loader;
 pub mod metadata_writer;
 pub mod page_info;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod raster_table_ocr;
 pub mod text_extractor;

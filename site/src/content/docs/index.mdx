@@ -11,6 +11,10 @@ hero:
     - text: Install the Skill
       link: /getting-started/quick-start-python/
       icon: right-arrow
+    - text: Try Live Demo
+      link: /demo/
+      icon: external
+      variant: minimal
     - text: View on GitHub
       link: https://github.com/raphaelmansuy/edgeparse
       icon: external
@@ -101,6 +105,24 @@ edgeparse invoice.pdf --format json
 
 # Batch convert entire directory
 edgeparse docs/*.pdf --format markdown --output-dir results/` },
+    { label: 'WebAssembly', lang: 'typescript', code: `import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+
+// Load WASM binary (once)
+await init();
+
+// Read PDF from user upload
+const bytes = new Uint8Array(await file.arrayBuffer());
+
+// Extract Markdown — runs entirely in the browser
+const markdown = convert_to_string(bytes, 'markdown');
+
+// Extract structured JSON
+const json = convert_to_string(bytes, 'json');
+
+// Extract HTML
+const html = convert_to_string(bytes, 'html');
+
+// Try it live: edgeparse.com/demo/` },
   ]}
 />
 
