@@ -33,7 +33,15 @@ jobs:
       - name: Publish pdf-cos (lopdf fork)
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p pdf-cos
+        run: |
+          OUTPUT=$(cargo publish -p pdf-cos 2>&1) && echo "$OUTPUT" || {
+            echo "$OUTPUT"
+            if echo "$OUTPUT" | grep -q "already exists on crates.io"; then
+              echo "pdf-cos already published at this version — skipping."
+            else
+              exit 1
+            fi
+          }
 
       - name: Wait for crates.io index (pdf-cos)
         run: sleep 30

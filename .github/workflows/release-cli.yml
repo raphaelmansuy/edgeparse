@@ -133,8 +133,6 @@ jobs:
     name: Update Homebrew tap formula
     needs: attach-release
     runs-on: ubuntu-latest
-    # Only run when HOMEBREW_TAP_TOKEN is configured
-    if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -155,6 +153,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "HOMEBREW_TAP_TOKEN not configured — skipping Homebrew tap update."
+            exit 0
+          fi
           TAPDIR=$(mktemp -d)
           git clone \
             "https://x-access-token:${GH_TOKEN}@github.com/raphaelmansuy/homebrew-edgeparse.git" \
