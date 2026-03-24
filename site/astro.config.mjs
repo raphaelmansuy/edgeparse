@@ -186,7 +186,7 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						name: 'keywords',
-						content: 'PDF parser, PDF extraction, Rust PDF, structured data, RAG pipeline, table extraction, reading order, Python PDF, Node.js PDF, edgeparse, open source',
+					content: 'PDF parser, PDF extraction, Rust PDF, structured data, RAG pipeline, table extraction, reading order, Python PDF, Node.js PDF, edgeparse, open source, AI agent, PDF to JSON, PDF to markdown, WebAssembly PDF, agent skill, LLM documents',
 					},
 				},
 				{
@@ -194,6 +194,14 @@ export default defineConfig({
 					attrs: {
 						name: 'robots',
 						content: 'index, follow',
+					},
+				},
+				// og:url — canonical URL for social sharing
+				{
+					tag: 'meta',
+					attrs: {
+						property: 'og:url',
+						content: siteUrl,
 					},
 				},
 				// NOTE: canonical is handled per-page by Starlight; do not set a global one.
@@ -311,7 +319,24 @@ export default defineConfig({
 						itemListElement: [
 							{ '@type': 'ListItem', position: 1, name: 'EdgeParse', item: fullUrl },
 							{ '@type': 'ListItem', position: 2, name: 'Documentation', item: `${fullUrl}/getting-started/quick-start-python/` },
+							{ '@type': 'ListItem', position: 3, name: 'Contact', item: `${fullUrl}/contact/` },
 						],
+					}),
+				},
+				// JSON-LD: ContactPage
+				{
+					tag: 'script',
+					attrs: { type: 'application/ld+json' },
+					content: JSON.stringify({
+						'@context': 'https://schema.org',
+						'@type': 'ContactPage',
+						name: 'Contact EdgeParse',
+						url: `${fullUrl}/contact/`,
+						description: 'Contact the EdgeParse team via email, GitHub Discussions, or Elitizon for enterprise engagements.',
+						contactType: 'customer support',
+						email: 'contact@elitizon.com',
+						areaServed: 'Worldwide',
+						availableLanguage: 'English',
 					}),
 				},
 			],
@@ -386,6 +411,13 @@ export default defineConfig({
 					label: 'Releases',
 					items: [
 						{ label: 'Changelog', slug: 'changelog' },
+					],
+				},
+				{
+					label: 'More',
+					items: [
+						{ label: 'Enterprise', slug: 'enterprise' },
+						{ label: 'Contact', slug: 'contact' },
 					],
 				},
 			],
