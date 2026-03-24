@@ -45,7 +45,7 @@ make publish-all
 | npm | `edgeparse-win32-x64-msvc` | https://www.npmjs.com/package/edgeparse-win32-x64-msvc |
 | GitHub Releases | CLI binaries (5 archs) | https://github.com/raphaelmansuy/edgeparse/releases |
 | Homebrew tap | `raphaelmansuy/edgeparse` | https://github.com/raphaelmansuy/homebrew-edgeparse |
-| Docker Hub | `raphaelmansuy/edgeparse` | https://hub.docker.com/r/raphaelmansuy/edgeparse |
+| Docker Hub | `rmansuy/edgeparse` | https://hub.docker.com/r/rmansuy/edgeparse |
 | GHCR | `ghcr.io/raphaelmansuy/edgeparse` | https://github.com/raphaelmansuy/edgeparse/pkgs/container/edgeparse |
 
 ### CLI Binary Targets (GitHub Release)
@@ -253,14 +253,14 @@ brew install zig
 
 **Required for:** `release-docker.yml`
 
-1. Sign in to [hub.docker.com](https://hub.docker.com) as `raphaelmansuy`.
+1. Sign in to [hub.docker.com](https://hub.docker.com) as `rmansuy`.
 2. Create a public repository: **Repositories → Create Repository** → `raphaelmansuy/edgeparse`, Public.
 3. Create an Access Token: **Account Settings → Security → Access Tokens → New Access Token**
    - Description: `edgeparse-github-actions`
    - Access: Read & Write
 4. Add to GitHub: secret name `DOCKERHUB_TOKEN`.
 
-The Docker Hub username is hardcoded as `raphaelmansuy` in the workflow. GHCR uses `GITHUB_TOKEN` automatically.
+The Docker Hub username is `rmansuy`. GHCR uses `GITHUB_TOKEN` automatically.
 
 ---
 
