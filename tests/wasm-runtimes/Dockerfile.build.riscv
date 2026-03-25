@@ -1,0 +1,68 @@
+# ─── Reproducible RISC-V Cross-Compilation ──────────────────────────────────
+# Greg's AI coding buddy:
+#   Cross-compiles edgeparse for riscv64gc-unknown-linux-gnu.
+#   Produces TWO binaries:
+#     1. Dynamic-linked  → runs under QEMU user-mode (with sysroot)
+#     2. Static-linked   → runs on Spike/libriscv/RVVM/CKB-VM (no sysroot)
+#
+#   riscv64gc = RV64IMAFDC — the "general-purpose computing" profile
+#   that Linux distros target (Debian, Ubuntu, Fedora all ship riscv64gc).
+#
+# Usage:
+#   docker build -f tests/wasm-runtimes/Dockerfile.build.riscv \
+#                -t edgeparse-riscv-build .
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM rust:1-slim-bookworm AS builder
+
+# Cross-compilation toolchain for RISC-V 64-bit
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc-riscv64-linux-gnu \
+    libc6-dev-riscv64-cross \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rustup target add riscv64gc-unknown-linux-gnu
+
+# Tell cargo which linker to use for the RISC-V target
+ENV CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_LINKER=riscv64-linux-gnu-gcc
+
+WORKDIR /build
+
+# ── Cache cargo registry: copy manifests first ──────────────────────────────
+COPY Cargo.toml Cargo.lock ./
+COPY crates/edgeparse-core/Cargo.toml   crates/edgeparse-core/
+COPY crates/edgeparse-cli/Cargo.toml    crates/edgeparse-cli/
+COPY crates/pdf-cos/Cargo.toml          crates/pdf-cos/
+
+# Strip workspace members that need native platform SDKs
+RUN sed -E -i \
+      '/"crates\/(edgeparse-python|edgeparse-node|edgeparse-wasm)"/d' \
+      Cargo.toml && \
+    mkdir -p crates/edgeparse-core/src crates/edgeparse-cli/src crates/pdf-cos/src && \
+    echo "fn main() {}" > crates/edgeparse-cli/src/main.rs && \
+    touch crates/edgeparse-core/src/lib.rs && \
+    touch crates/pdf-cos/src/lib.rs && \
+    cargo build --target riscv64gc-unknown-linux-gnu --release \
+        -p edgeparse-cli 2>/dev/null || true
+
+# ── Copy real source and build (dynamic) ────────────────────────────────────
+COPY crates/ crates/
+RUN find crates/ -name '*.rs' -exec touch {} + && \
+    cargo build --target riscv64gc-unknown-linux-gnu --release \
+        -p edgeparse-cli
+
+# Save dynamic binary before static build overwrites it
+RUN cp target/riscv64gc-unknown-linux-gnu/release/edgeparse /tmp/edgeparse-dynamic
+
+# ── Build statically-linked variant for Spike/libriscv/RVVM/CKB-VM ─────────
+# These VMs have minimal/no dynamic linker — static linking is essential.
+RUN RUSTFLAGS="-C target-feature=+crt-static" \
+    cargo build --target riscv64gc-unknown-linux-gnu --release \
+        -p edgeparse-cli && \
+    cp target/riscv64gc-unknown-linux-gnu/release/edgeparse /tmp/edgeparse-static
+
+# ── Output stage ────────────────────────────────────────────────────────────
+FROM scratch AS output
+COPY --from=builder /tmp/edgeparse-dynamic /out/edgeparse
+COPY --from=builder /tmp/edgeparse-static  /out/edgeparse-static
