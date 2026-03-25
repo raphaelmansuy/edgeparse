@@ -872,7 +872,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). In short:
    <img alt="Star History Chart" src="https://api.star-history.com/image?repos=raphaelmansuy/edgeparse&type=date&legend=top-left" />
  </picture>
 </a>
-
 ## License
 
 EdgeParse is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) for the full text.
