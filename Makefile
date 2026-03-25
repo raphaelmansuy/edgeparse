@@ -531,6 +531,26 @@ wasm-clean: ## Remove WASM build artefacts (pkg/)
 	@rm -rf $(WASM_CRATE)/pkg/
 
 # ══════════════════════════════════════════════════════════════════════════════
+## WASI / RISC-V Integration Tests  (Docker-based)
+# ══════════════════════════════════════════════════════════════════════════════
+
+WASI_SCRIPT := tests/wasm-runtimes/wasm-test.sh
+
+wasi-build: ## Build all WASM runtime + RISC-V Docker test images
+	$(call log,Building WASM/RISC-V integration test images…)
+	@$(WASI_SCRIPT) build all
+
+wasi-test: ## Run WASM/RISC-V integration tests across all runtimes
+	$(call log,Running WASM/RISC-V integration tests…)
+	@$(WASI_SCRIPT) test all
+
+wasi-status: ## Show Docker image / container status for WASI tests
+	@$(WASI_SCRIPT) status
+
+wasi-clean: ## Remove all WASI test Docker images and artefacts
+	@$(WASI_SCRIPT) clean
+
+# ══════════════════════════════════════════════════════════════════════════════
 ## Clean
 # ══════════════════════════════════════════════════════════════════════════════
 
