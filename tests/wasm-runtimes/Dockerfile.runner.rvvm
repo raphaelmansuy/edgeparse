@@ -4,11 +4,12 @@
 #   Tracing JIT with claims of outperforming QEMU TCG.
 #   Full system emulator with multi-core + device support.
 #
-#   RVVM is a full system emulator (boots Linux kernels), so for our
-#   user-mode integration tests we use its userland emulation mode.
+#   RVVM is a FULL SYSTEM EMULATOR ONLY — it boots firmware/kernels
+#   (OpenSBI → Linux), NOT user-mode binaries. There is no userland
+#   emulation mode like QEMU's qemu-riscv64 or libriscv's rvlinux.
 #
-#   EXPERIMENTAL: RVVM's userland emulation may not support all
-#   Linux syscalls needed by edgeparse. Tests may partially fail.
+#   STATUS: INCOMPATIBLE — kept as documentation for future reference.
+#   If RVVM adds userland mode, this Dockerfile is ready to use.
 #
 #   docker build -f tests/wasm-runtimes/Dockerfile.runner.rvvm \
 #                -t edgeparse-riscv-rvvm .

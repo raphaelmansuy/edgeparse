@@ -32,8 +32,13 @@ RUN git clone --depth 1 https://github.com/riscv-software-src/riscv-isa-sim /tmp
 
 # Build pk (proxy kernel) — needs the riscv64 cross-compiler
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc-riscv64-linux-gnu g++-riscv64-linux-gnu \
+    gcc-riscv64-linux-gnu g++-riscv64-linux-gnu libc6-dev-riscv64-cross \
     && rm -rf /var/lib/apt/lists/*
+
+# pk needs gnu/stubs-lp64.h but the cross-libc only ships lp64d (double-float).
+# Symlink to satisfy the include, then build with matching ABI.
+RUN ln -sf /usr/riscv64-linux-gnu/include/gnu/stubs-lp64d.h \
+           /usr/riscv64-linux-gnu/include/gnu/stubs-lp64.h
 
 RUN git clone --depth 1 https://github.com/riscv-software-src/riscv-pk /tmp/pk && \
     cd /tmp/pk && \
@@ -43,6 +48,10 @@ RUN git clone --depth 1 https://github.com/riscv-software-src/riscv-pk /tmp/pk &
     make -j"$(nproc)" && \
     make install && \
     rm -rf /tmp/pk
+
+# Symlink pk where spike expects it (riscv64-unknown-elf vs riscv64-linux-gnu)
+RUN mkdir -p /usr/local/riscv64-unknown-elf/bin && \
+    ln -sf /usr/local/riscv64-linux-gnu/bin/pk /usr/local/riscv64-unknown-elf/bin/pk
 
 # Verify
 RUN spike --help 2>&1 | head -1 || true
