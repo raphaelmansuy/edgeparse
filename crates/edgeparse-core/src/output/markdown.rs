@@ -30,6 +30,10 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     if let Some(rendered) = render_layout_matrix_document(doc) {
         return Ok(rendered);
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_panel_stub_document(doc) {
+        return Ok(rendered);
+    }
 
     let mut output = String::new();
 
@@ -405,6 +409,14 @@ struct LayoutAnchorRow {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
+struct LayoutPanelHeaderCandidate {
+    line_idx: usize,
+    headers: Vec<String>,
+    starts: Vec<usize>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn render_layout_matrix_document(doc: &PdfDocument) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
@@ -430,6 +442,43 @@ fn render_layout_matrix_document(doc: &PdfDocument) -> Option<String> {
     let mut rendered_rows = Vec::with_capacity(rows.len() + 1);
     rendered_rows.push(header.headers.clone());
     rendered_rows.append(&mut rows);
+
+    let mut output = String::new();
+    if let Some(heading) = doc.kids.iter().find_map(|element| match element {
+        ContentElement::Heading(h) => Some(h.base.base.value()),
+        ContentElement::NumberHeading(nh) => Some(nh.base.base.base.value()),
+        _ => None,
+    }) {
+        let trimmed = heading.trim();
+        if !trimmed.is_empty() {
+            output.push_str("# ");
+            output.push_str(trimmed);
+            output.push_str("\n\n");
+        }
+    }
+    output.push_str(&render_pipe_rows(&rendered_rows));
+    Some(output)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_panel_stub_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let source_path = doc.source_path.as_deref()?;
+    let lines = read_pdftotext_layout_lines(Path::new(source_path))?;
+    let header = find_layout_panel_header_candidate(&lines)?;
+    let rows = build_layout_panel_stub_rows(&lines, &header)?;
+    if rows.len() < 2 || rows.len() > 6 {
+        return None;
+    }
+
+    let mut rendered_rows = Vec::with_capacity(rows.len() + 1);
+    let mut header_row = vec![String::new()];
+    header_row.extend(header.headers.clone());
+    rendered_rows.push(header_row);
+    rendered_rows.extend(rows);
 
     let mut output = String::new();
     if let Some(heading) = doc.kids.iter().find_map(|element| match element {
@@ -489,6 +538,28 @@ fn find_layout_header_candidate(lines: &[String]) -> Option<LayoutHeaderCandidat
                 starts,
             })
         })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn find_layout_panel_header_candidate(lines: &[String]) -> Option<LayoutPanelHeaderCandidate> {
+    lines.iter().enumerate().find_map(|(line_idx, line)| {
+        let spans = split_layout_line_spans(line);
+        if spans.len() != 3 {
+            return None;
+        }
+
+        let headers: Vec<String> = spans.iter().map(|(_, text)| text.clone()).collect();
+        let starts: Vec<usize> = spans.iter().map(|(start, _)| *start).collect();
+        let header_like = headers
+            .iter()
+            .all(|text| text.split_whitespace().count() <= 4 && text.len() <= 32);
+        let increasing = starts.windows(2).all(|pair| pair[1] > pair[0] + 16);
+        (header_like && increasing).then_some(LayoutPanelHeaderCandidate {
+            line_idx,
+            headers,
+            starts,
+        })
+    })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -557,6 +628,155 @@ fn extract_layout_entries(lines: &[String], header: &LayoutHeaderCandidate) -> V
     }
 
     entries
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn build_layout_panel_stub_rows(
+    lines: &[String],
+    header: &LayoutPanelHeaderCandidate,
+) -> Option<Vec<Vec<String>>> {
+    let body_starts = infer_layout_panel_body_starts(lines, header)?;
+    let mut starts = vec![0usize];
+    starts.extend(body_starts.iter().copied());
+    let mut next_starts = starts.iter().copied().skip(1).collect::<Vec<_>>();
+    next_starts.push(usize::MAX);
+
+    let mut entries = Vec::<LayoutEntry>::new();
+    for (line_idx, line) in lines.iter().enumerate().skip(header.line_idx + 1) {
+        if line.contains('\u{c}') {
+            break;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if trimmed.chars().all(|ch| ch.is_ascii_digit()) && trimmed.len() <= 4 {
+            continue;
+        }
+
+        let cells = starts
+            .iter()
+            .copied()
+            .zip(next_starts.iter().copied())
+            .map(|(start, next_start)| {
+                if start >= line.len() {
+                    String::new()
+                } else {
+                    let end = next_start.min(line.len());
+                    normalize_layout_matrix_text(line[start..end].trim())
+                }
+            })
+            .collect::<Vec<_>>();
+        if cells.iter().any(|cell| !cell.is_empty()) {
+            entries.push(LayoutEntry { line_idx, cells });
+        }
+    }
+
+    let stub_threshold = body_starts[0].saturating_div(2).max(6);
+    let anchor_indices = entries
+        .iter()
+        .filter(|entry| {
+            let spans = split_layout_line_spans(&lines[entry.line_idx]);
+            spans.first().is_some_and(|(start, text)| {
+                *start <= stub_threshold
+                    && !text.trim().is_empty()
+                    && text.split_whitespace().count() <= 3
+                    && text.len() <= 24
+            })
+        })
+        .map(|entry| entry.line_idx)
+        .collect::<Vec<_>>();
+    if anchor_indices.len() < 2 {
+        return None;
+    }
+
+    let mut rows = anchor_indices
+        .iter()
+        .map(|line_idx| {
+            let anchor = entries
+                .iter()
+                .find(|entry| entry.line_idx == *line_idx)
+                .expect("anchor index should exist");
+            let mut row = vec![String::new(); anchor.cells.len()];
+            row[0] = anchor.cells[0].clone();
+            row
+        })
+        .collect::<Vec<_>>();
+
+    for entry in entries {
+        let row_idx = anchor_indices
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, anchor_idx)| anchor_idx.abs_diff(entry.line_idx))
+            .map(|(idx, _)| idx)?;
+
+        for col_idx in 0..rows[row_idx].len().min(entry.cells.len()) {
+            if col_idx == 0 && anchor_indices[row_idx] == entry.line_idx {
+                continue;
+            }
+            append_cell_text(&mut rows[row_idx][col_idx], &entry.cells[col_idx]);
+        }
+    }
+
+    let normalized_rows = rows
+        .into_iter()
+        .map(|mut row| {
+            row[0] = normalize_layout_stage_text(&row[0]);
+            row[1] = normalize_layout_body_text(&row[1]);
+            row[2] = normalize_layout_body_text(&row[2]);
+            row[3] = normalize_layout_body_text(&row[3]);
+            row
+        })
+        .filter(|row| row.iter().skip(1).any(|cell| !cell.trim().is_empty()))
+        .collect::<Vec<_>>();
+    Some(normalized_rows)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn infer_layout_panel_body_starts(
+    lines: &[String],
+    header: &LayoutPanelHeaderCandidate,
+) -> Option<Vec<usize>> {
+    let mut candidates = Vec::<[usize; 3]>::new();
+    for line in lines.iter().skip(header.line_idx + 1) {
+        if line.contains('\u{c}') {
+            break;
+        }
+        let spans = split_layout_line_spans(line);
+        if spans.len() < 2 {
+            continue;
+        }
+
+        let last_three = spans
+            .iter()
+            .rev()
+            .take(3)
+            .map(|(start, _)| *start)
+            .collect::<Vec<_>>();
+        if last_three.len() != 3 {
+            continue;
+        }
+
+        let mut starts = last_three;
+        starts.reverse();
+        if starts[0] >= header.starts[0] {
+            continue;
+        }
+        if !(starts[0] < starts[1] && starts[1] < starts[2]) {
+            continue;
+        }
+        candidates.push([starts[0], starts[1], starts[2]]);
+    }
+
+    if candidates.len() < 3 {
+        return None;
+    }
+
+    Some(
+        (0..3)
+            .map(|col_idx| candidates.iter().map(|starts| starts[col_idx]).min().unwrap_or(0))
+            .collect(),
+    )
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -3515,16 +3735,27 @@ fn build_geometric_table_region(
         return None;
     }
 
-    let needs_stub = infer_left_stub_requirement(doc, &candidate_indices, &table_rows, &column_ranges);
-    if !needs_stub {
+    let needs_external_stub =
+        infer_left_stub_requirement(doc, &candidate_indices, &table_rows, &column_ranges);
+    let supports_embedded_stub_header =
+        supports_embedded_stub_header(&table_rows, &column_ranges, doc, &candidate_indices);
+    if !needs_external_stub && !supports_embedded_stub_header {
         return None;
     }
-    let slot_ranges = slot_ranges(&column_ranges, doc, &candidate_indices, needs_stub)?;
+    let slot_ranges = if needs_external_stub {
+        slot_ranges(&column_ranges, doc, &candidate_indices, true)?
+    } else {
+        column_ranges.clone()
+    };
     let mut header_rows = reconstruct_aligned_rows(doc, &candidate_indices, &slot_ranges, true, 2);
     if header_rows.is_empty() {
         return None;
     }
-    normalize_leading_stub_header(&mut header_rows);
+    if needs_external_stub {
+        normalize_leading_stub_header(&mut header_rows);
+    } else {
+        promote_embedded_stub_header(&mut header_rows, &table_rows);
+    }
 
     let slot_count = slot_ranges.len();
     let dense_header_rows = header_rows
@@ -3539,10 +3770,10 @@ fn build_geometric_table_region(
     combined_rows.extend(header_rows);
 
     let following_indices = collect_table_footer_candidate_indices(doc, table_idx, table);
-    let body_rows = if needs_stub && should_merge_panel_body_rows(&table_rows) {
+    let body_rows = if needs_external_stub && should_merge_panel_body_rows(&table_rows) {
         let trailing_rows = reconstruct_aligned_rows(doc, &following_indices, &slot_ranges, false, 1);
         vec![merge_panel_body_row(&table_rows, &trailing_rows, slot_count)]
-    } else if needs_stub {
+    } else if needs_external_stub {
         table_rows
             .iter()
             .map(|row| {
@@ -3710,6 +3941,55 @@ fn infer_left_stub_requirement(
     first_col_word_counts.sort_unstable();
     let median = first_col_word_counts[first_col_word_counts.len() / 2];
     median >= 5
+}
+
+fn supports_embedded_stub_header(
+    table_rows: &[Vec<String>],
+    column_ranges: &[(f64, f64)],
+    doc: &PdfDocument,
+    candidate_indices: &[usize],
+) -> bool {
+    if table_rows.len() < 2 || column_ranges.len() < 3 {
+        return false;
+    }
+
+    let first_row = &table_rows[0];
+    if first_row.len() != column_ranges.len() || first_row[0].trim().is_empty() {
+        return false;
+    }
+    if first_row[0].split_whitespace().count() > 3 || first_row[0].trim().len() > 24 {
+        return false;
+    }
+
+    let data_fill = first_row
+        .iter()
+        .skip(1)
+        .filter(|cell| !cell.trim().is_empty())
+        .count();
+    if data_fill + 1 < column_ranges.len() {
+        return false;
+    }
+
+    let labeled_rows = table_rows
+        .iter()
+        .skip(1)
+        .filter(|row| row.first().is_some_and(|cell| !cell.trim().is_empty()))
+        .count();
+    if labeled_rows == 0 {
+        return false;
+    }
+
+    let slot_ranges = column_ranges.to_vec();
+    let header_rows = reconstruct_aligned_rows(doc, candidate_indices, &slot_ranges, true, 2);
+    header_rows.iter().any(|row| {
+        row.first().is_none_or(|cell| cell.trim().is_empty())
+            && row
+                .iter()
+                .skip(1)
+                .filter(|cell| !cell.trim().is_empty())
+                .count()
+                >= column_ranges.len().saturating_sub(1)
+    })
 }
 
 fn slot_ranges(
@@ -3943,6 +4223,42 @@ fn normalize_leading_stub_header(rows: &mut [Vec<String>]) {
 
     rows[0][0] = rows[1][0].trim().to_string();
     rows[1][0].clear();
+}
+
+fn promote_embedded_stub_header(header_rows: &mut [Vec<String>], table_rows: &[Vec<String>]) {
+    let Some(header_row) = header_rows.first_mut() else {
+        return;
+    };
+    let Some(first_body_row) = table_rows.first() else {
+        return;
+    };
+    if header_row.is_empty() || first_body_row.is_empty() {
+        return;
+    }
+    if !header_row[0].trim().is_empty() {
+        return;
+    }
+
+    let promoted = first_body_row[0].trim();
+    if promoted.is_empty() || promoted.split_whitespace().count() > 3 || promoted.len() > 24 {
+        return;
+    }
+
+    let header_fill = header_row
+        .iter()
+        .skip(1)
+        .filter(|cell| !cell.trim().is_empty())
+        .count();
+    let body_fill = first_body_row
+        .iter()
+        .skip(1)
+        .filter(|cell| !cell.trim().is_empty())
+        .count();
+    if header_fill < header_row.len().saturating_sub(1) || body_fill < first_body_row.len().saturating_sub(1) {
+        return;
+    }
+
+    header_row[0] = promoted.to_string();
 }
 
 fn should_merge_panel_body_rows(rows: &[Vec<String>]) -> bool {
@@ -4563,6 +4879,54 @@ mod tests {
         assert_eq!(rows[2][1], "Create and manage Labeling Space");
         assert_eq!(rows[3][1], "Model training");
         assert!(rows[3][2].contains("Various basic models for each selected document"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_build_layout_panel_stub_rows_reconstructs_left_stub_table() {
+        let lines = vec![
+            "AI Pack".to_string(),
+            "Upstage offers 3 AI packs that process unstructured information and data".to_string(),
+            "".to_string(),
+            "                                     OCR                                                Recommendation                                    Product semantic search".to_string(),
+            "".to_string(),
+            "              A solution that recognizes characters in an                A solution that recommends the best products and   A solution that enables semantic search, analyzes and".to_string(),
+            "              image and extracts necessary information                   contents                                           organizes key information in unstructured text data".to_string(),
+            "   Pack".to_string(),
+            "                                                                                                                            into a standardized form (DB)".to_string(),
+            "".to_string(),
+            "              Applicable to all fields that require text extraction      Applicable to all fields that use any form of      Applicable to all fields that deal with various types of".to_string(),
+            "              from standardized documents, such as receipts,             recommendation including alternative products,     unstructured data containing text information that".to_string(),
+            "Application   bills, credit cards, ID cards, certificates, and medical   products and contents that are likely to be        require semantic search and conversion into a DB".to_string(),
+            "              receipts                                                   purchased next".to_string(),
+            "".to_string(),
+            "              Achieved 1st place in the OCR World Competition            Team with specialists and technologies that        Creation of the first natural language evaluation".to_string(),
+            "              The team includes specialists who have                     received Kaggle’s Gold Medal recommendation        system in Korean (KLUE)".to_string(),
+            "              presented 14 papers in the world’s most                    (Education platform)                               World’s No.1 in Kaggle text embedding competition in".to_string(),
+            " Highlight".to_string(),
+            "              renowned AI conferences                                    Proven superior performance of more than 170%      E-commerce subject (Shopee)".to_string(),
+            "                                                                         compared to other global top-tier recommendation".to_string(),
+            "                                                                         models".to_string(),
+        ];
+
+        let header = find_layout_panel_header_candidate(&lines).unwrap();
+        let rows = build_layout_panel_stub_rows(&lines, &header).unwrap();
+
+        assert_eq!(
+            header.headers,
+            vec![
+                "OCR".to_string(),
+                "Recommendation".to_string(),
+                "Product semantic search".to_string()
+            ]
+        );
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0][0], "Pack");
+        assert!(rows[0][1].contains("image and extracts necessary information"));
+        assert_eq!(rows[1][0], "Application");
+        assert!(rows[1][3].contains("require semantic search and conversion into a DB"));
+        assert_eq!(rows[2][0], "Highlight");
+        assert!(rows[2][2].contains("top-tier recommendation models"));
     }
 
     #[test]
@@ -5556,6 +5920,56 @@ mod tests {
         assert!(md.contains(
             "received Kaggle's Gold Medal recommendation top-tier recommendation models"
         ));
+    }
+
+    #[test]
+    fn test_embedded_stub_header_is_promoted_from_first_table_column() {
+        let mut doc = PdfDocument::new("embedded-stub-header.pdf".to_string());
+        doc.kids.push(make_chunked_paragraph_line(&[("OCR", 220.0, 250.0)], 720.0, 732.0));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("Recommendation", 430.0, 540.0)],
+            720.0,
+            732.0,
+        ));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("Product semantic search", 660.0, 860.0)],
+            720.0,
+            732.0,
+        ));
+        doc.kids.push(make_n_column_table(
+            &[
+                vec![
+                    "Pack",
+                    "A solution that recognizes characters in an image and extracts necessary information",
+                    "A solution that recommends the best products and contents",
+                    "A solution that enables semantic search and organizes key information",
+                ],
+                vec![
+                    "Application",
+                    "Applicable to all fields that require text extraction",
+                    "Applicable to all fields that use any form of recommendation",
+                    "Applicable to all fields that deal with unstructured data",
+                ],
+                vec![
+                    "Highlight",
+                    "Achieved 1st place in the OCR World Competition",
+                    "Received Kaggle's Gold Medal recommendation",
+                    "Creation of the first natural language evaluation system in Korean",
+                ],
+            ],
+            &[
+                (72.0, 120.0),
+                (120.0, 360.0),
+                (360.0, 630.0),
+                (630.0, 910.0),
+            ],
+        ));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains("| Pack | OCR | Recommendation | Product semantic search |"));
+        assert!(md.contains("| Application | Applicable to all fields that require text extraction |"));
+        assert!(md.contains("| Highlight | Achieved 1st place in the OCR World Competition |"));
+        assert!(!md.contains("OCR\n\nRecommendation\n\nProduct semantic search"));
     }
 
     #[test]
