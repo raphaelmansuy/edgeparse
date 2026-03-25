@@ -3677,6 +3677,52 @@ fn render_pipe_rows(rows: &[Vec<String>]) -> String {
     out
 }
 
+fn normalized_numeric_marker(text: &str) -> Option<String> {
+    let digits = text
+        .chars()
+        .filter(|ch| ch.is_ascii_digit())
+        .collect::<String>();
+    (!digits.is_empty() && digits.len() <= 2).then_some(digits)
+}
+
+fn render_infographic_card_rows(rows: &[Vec<String>]) -> Option<String> {
+    if rows.is_empty() || !rows.iter().all(|row| row.len() == 2) {
+        return None;
+    }
+
+    let marker = normalized_numeric_marker(rows[0][0].trim())?;
+    if rows[0][1].split_whitespace().count() < 4 {
+        return None;
+    }
+    if rows
+        .iter()
+        .skip(1)
+        .any(|row| normalized_numeric_marker(row[0].trim()).is_some())
+    {
+        return None;
+    }
+    if rows
+        .iter()
+        .skip(1)
+        .any(|row| !row[0].trim().is_empty() && row[0].trim().len() > 2)
+    {
+        return None;
+    }
+
+    let body = rows
+        .iter()
+        .filter_map(|row| row.get(1))
+        .map(|cell| cell.trim())
+        .filter(|cell| !cell.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if body.split_whitespace().count() < 8 {
+        return None;
+    }
+
+    Some(format!("{marker}. {body}\n\n"))
+}
+
 fn extract_element_text(element: &ContentElement) -> String {
     match element {
         ContentElement::Paragraph(p) => clean_paragraph_text(&p.base.value()),
@@ -3723,6 +3769,11 @@ fn render_table_border(out: &mut String, table: &crate::models::table::TableBord
     let mut rendered_rows = collect_table_border_rows(table);
 
     if rendered_rows.is_empty() {
+        return;
+    }
+
+    if let Some(rendered) = render_infographic_card_rows(&rendered_rows) {
+        out.push_str(&rendered);
         return;
     }
 
@@ -5001,6 +5052,28 @@ mod tests {
         let md = to_markdown(&doc).unwrap();
         assert!(md.contains("| Added cation | Relative Size & Settling Rates of Floccules |"));
         assert!(md.contains("| K+ |  |"));
+    }
+
+    #[test]
+    fn test_infographic_card_table_renders_as_numbered_item() {
+        let mut doc = PdfDocument::new("infographic-card.pdf".to_string());
+        doc.number_of_pages = 1;
+        doc.kids.push(make_two_column_table(&[
+            (
+                "1",
+                "We're all both consumers and creators of creative work.",
+            ),
+            (
+                "",
+                "As consumers, we watch movies, listen to music, read books, and more.",
+            ),
+        ]));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains(
+            "1. We're all both consumers and creators of creative work. As consumers, we watch movies, listen to music, read books, and more."
+        ));
+        assert!(!md.contains("| 1 |"));
     }
 
     #[test]

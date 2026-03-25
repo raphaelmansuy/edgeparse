@@ -10,6 +10,7 @@ use image::{GenericImageView, GrayImage, Luma};
 
 use crate::models::bbox::BoundingBox;
 use crate::models::chunks::{ImageChunk, TextChunk};
+use crate::models::content::ContentElement;
 use crate::models::enums::{PdfLayer, TextFormat, TextType};
 use crate::models::table::{
     TableBorder, TableBorderCell, TableBorderRow, TableToken, TableTokenType,
@@ -27,6 +28,9 @@ const MIN_LINE_DARK_RATIO: f64 = 0.55;
 const MIN_CELL_SIZE_PX: u32 = 10;
 const CELL_INSET_PX: u32 = 4;
 const OCR_SCALE_FACTOR: u32 = 3;
+const MAX_NATIVE_TEXT_CHARS_FOR_PAGE_RASTER_OCR: usize = 180;
+const MIN_EMPTY_TABLE_COVERAGE_FOR_PAGE_RASTER_OCR: f64 = 0.08;
+const MAX_EMPTY_TABLES_FOR_PAGE_RASTER_OCR: usize = 24;
 
 #[derive(Debug, Clone)]
 struct OcrWord {
@@ -188,6 +192,106 @@ pub fn recover_raster_table_borders(
     tables
 }
 
+/// Recover OCR text into empty bordered tables by rasterizing the full page.
+///
+/// This targets graphics-dominant pages where native PDF text is sparse but the
+/// page still exposes strong bordered geometry. It enriches existing empty
+/// `TableBorder` cells directly from the rendered page appearance.
+pub fn recover_page_raster_table_cell_text(
+    input_path: &Path,
+    page_bbox: &BoundingBox,
+    page_number: u32,
+    elements: &mut [ContentElement],
+) {
+    if page_bbox.area() <= 0.0 {
+        return;
+    }
+
+    let native_text_chars = page_native_text_chars(elements);
+    if native_text_chars > MAX_NATIVE_TEXT_CHARS_FOR_PAGE_RASTER_OCR {
+        return;
+    }
+
+    let candidate_indices: Vec<usize> = elements
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, elem)| table_candidate_ref(elem).filter(|table| table_needs_page_raster_ocr(table)).map(|_| idx))
+        .take(MAX_EMPTY_TABLES_FOR_PAGE_RASTER_OCR)
+        .collect();
+    if candidate_indices.is_empty() {
+        return;
+    }
+
+    let coverage: f64 = candidate_indices
+        .iter()
+        .filter_map(|idx| table_candidate_ref(&elements[*idx]).map(|table| table.bbox.area()))
+        .sum::<f64>()
+        / page_bbox.area().max(1.0);
+    if coverage < MIN_EMPTY_TABLE_COVERAGE_FOR_PAGE_RASTER_OCR {
+        return;
+    }
+
+    let temp_dir = match create_temp_dir(page_number) {
+        Ok(dir) => dir,
+        Err(_) => return,
+    };
+    let prefix = temp_dir.join("page");
+    let status = Command::new("pdftoppm")
+        .arg("-png")
+        .arg("-f")
+        .arg(page_number.to_string())
+        .arg("-l")
+        .arg(page_number.to_string())
+        .arg("-singlefile")
+        .arg(input_path)
+        .arg(&prefix)
+        .status();
+    match status {
+        Ok(s) if s.success() => {}
+        _ => {
+            let _ = fs::remove_dir_all(&temp_dir);
+            return;
+        }
+    }
+
+    let page_image_path = prefix.with_extension("png");
+    let gray = match image::open(&page_image_path) {
+        Ok(img) => img.to_luma8(),
+        Err(_) => {
+            let _ = fs::remove_dir_all(&temp_dir);
+            return;
+        }
+    };
+
+    for idx in candidate_indices {
+        let Some(elem) = elements.get_mut(idx) else {
+            continue;
+        };
+        let Some(table) = table_candidate_mut(elem) else {
+            continue;
+        };
+        enrich_empty_table_from_page_raster(&gray, page_bbox, table);
+    }
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+fn table_candidate_ref(elem: &ContentElement) -> Option<&TableBorder> {
+    match elem {
+        ContentElement::TableBorder(table) => Some(table),
+        ContentElement::Table(table) => Some(&table.table_border),
+        _ => None,
+    }
+}
+
+fn table_candidate_mut(elem: &mut ContentElement) -> Option<&mut TableBorder> {
+    match elem {
+        ContentElement::TableBorder(table) => Some(table),
+        ContentElement::Table(table) => Some(&mut table.table_border),
+        _ => None,
+    }
+}
+
 fn recover_from_page_images(
     input_path: &Path,
     temp_dir: &Path,
@@ -265,6 +369,177 @@ fn recover_from_page_images(
     }
 
     recovered
+}
+
+fn page_native_text_chars(elements: &[ContentElement]) -> usize {
+    elements
+        .iter()
+        .map(|elem| match elem {
+            ContentElement::Paragraph(p) => p.base.value().chars().count(),
+            ContentElement::Heading(h) => h.base.base.value().chars().count(),
+            ContentElement::NumberHeading(h) => h.base.base.base.value().chars().count(),
+            ContentElement::TextBlock(tb) => tb.value().chars().count(),
+            ContentElement::TextLine(tl) => tl.value().chars().count(),
+            ContentElement::TextChunk(tc) => tc.value.chars().count(),
+            ContentElement::List(list) => list
+                .list_items
+                .iter()
+                .flat_map(|item| item.contents.iter())
+                .map(|content| match content {
+                    ContentElement::Paragraph(p) => p.base.value().chars().count(),
+                    ContentElement::TextBlock(tb) => tb.value().chars().count(),
+                    ContentElement::TextLine(tl) => tl.value().chars().count(),
+                    ContentElement::TextChunk(tc) => tc.value.chars().count(),
+                    _ => 0,
+                })
+                .sum(),
+            _ => 0,
+        })
+        .sum()
+}
+
+fn table_needs_page_raster_ocr(table: &TableBorder) -> bool {
+    table.num_rows >= 1
+        && table.num_columns >= 2
+        && table
+            .rows
+            .iter()
+            .flat_map(|row| row.cells.iter())
+            .all(|cell| !cell.content.iter().any(|token| matches!(token.token_type, TableTokenType::Text)))
+}
+
+fn enrich_empty_table_from_page_raster(
+    gray: &GrayImage,
+    page_bbox: &BoundingBox,
+    table: &mut TableBorder,
+) {
+    for row in &mut table.rows {
+        for cell in &mut row.cells {
+            if cell
+                .content
+                .iter()
+                .any(|token| matches!(token.token_type, TableTokenType::Text))
+            {
+                continue;
+            }
+            let Some((x1, y1, x2, y2)) = page_bbox_to_raster_box(gray, page_bbox, &cell.bbox) else {
+                continue;
+            };
+            let Some(text) = extract_page_raster_cell_text(gray, &cell.bbox, x1, y1, x2, y2) else {
+                continue;
+            };
+            if text.is_empty() {
+                continue;
+            }
+            cell.content.push(TableToken {
+                base: TextChunk {
+                    value: text,
+                    bbox: cell.bbox.clone(),
+                    font_name: "OCR".to_string(),
+                    font_size: cell.bbox.height().max(6.0),
+                    font_weight: 400.0,
+                    italic_angle: 0.0,
+                    font_color: "#000000".to_string(),
+                    contrast_ratio: 21.0,
+                    symbol_ends: Vec::new(),
+                    text_format: TextFormat::Normal,
+                    text_type: TextType::Regular,
+                    pdf_layer: PdfLayer::Content,
+                    ocg_visible: true,
+                    index: None,
+                    page_number: cell.bbox.page_number,
+                    level: None,
+                    mcid: None,
+                },
+                token_type: TableTokenType::Text,
+            });
+        }
+    }
+}
+
+fn page_bbox_to_raster_box(
+    gray: &GrayImage,
+    page_bbox: &BoundingBox,
+    bbox: &BoundingBox,
+) -> Option<(u32, u32, u32, u32)> {
+    if page_bbox.width() <= 0.0 || page_bbox.height() <= 0.0 {
+        return None;
+    }
+
+    let left = ((bbox.left_x - page_bbox.left_x) / page_bbox.width() * f64::from(gray.width()))
+        .clamp(0.0, f64::from(gray.width()));
+    let right =
+        ((bbox.right_x - page_bbox.left_x) / page_bbox.width() * f64::from(gray.width()))
+            .clamp(0.0, f64::from(gray.width()));
+    let top = ((page_bbox.top_y - bbox.top_y) / page_bbox.height() * f64::from(gray.height()))
+        .clamp(0.0, f64::from(gray.height()));
+    let bottom =
+        ((page_bbox.top_y - bbox.bottom_y) / page_bbox.height() * f64::from(gray.height()))
+            .clamp(0.0, f64::from(gray.height()));
+
+    let x1 = left.floor() as u32;
+    let x2 = right.ceil() as u32;
+    let y1 = top.floor() as u32;
+    let y2 = bottom.ceil() as u32;
+    (x2 > x1 && y2 > y1).then_some((x1, y1, x2, y2))
+}
+
+fn extract_page_raster_cell_text(
+    gray: &GrayImage,
+    cell_bbox: &BoundingBox,
+    x1: u32,
+    y1: u32,
+    x2: u32,
+    y2: u32,
+) -> Option<String> {
+    let inset_x = CELL_INSET_PX.min((x2 - x1) / 4);
+    let inset_y = CELL_INSET_PX.min((y2 - y1) / 4);
+    let crop_left = x1 + inset_x;
+    let crop_top = y1 + inset_y;
+    let crop_width = x2.saturating_sub(x1 + inset_x * 2);
+    let crop_height = y2.saturating_sub(y1 + inset_y * 2);
+    if crop_width < MIN_CELL_SIZE_PX || crop_height < MIN_CELL_SIZE_PX {
+        return Some(String::new());
+    }
+
+    let cropped = gray.view(crop_left, crop_top, crop_width, crop_height).to_image();
+    let bordered = expand_white_border(&cropped, 12);
+    let scaled = image::imageops::resize(
+        &bordered,
+        bordered.width() * OCR_SCALE_FACTOR,
+        bordered.height() * OCR_SCALE_FACTOR,
+        image::imageops::FilterType::Lanczos3,
+    );
+    let psm = if cell_bbox.width() <= cell_bbox.height() * 1.15 {
+        "10"
+    } else {
+        "6"
+    };
+    let raw_text = run_tesseract_plain_text(&scaled, psm)?;
+    Some(normalize_page_raster_cell_text(cell_bbox, raw_text))
+}
+
+fn normalize_page_raster_cell_text(cell_bbox: &BoundingBox, text: String) -> String {
+    let normalized = text
+        .replace('|', " ")
+        .replace('—', "-")
+        .replace('“', "\"")
+        .replace('”', "\"")
+        .replace('’', "'")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    if normalized.is_empty() {
+        return normalized;
+    }
+
+    let narrow_cell = cell_bbox.width() <= cell_bbox.height() * 1.15;
+    if narrow_cell && normalized.len() <= 3 && !normalized.chars().any(|ch| ch.is_ascii_digit()) {
+        return String::new();
+    }
+
+    normalized
 }
 
 fn is_ocr_candidate(

@@ -217,6 +217,16 @@ Latest continuation slice after the twelfth pass:
 - On targeted `00187` evaluation, the new renderer lifted `TEDS_S` from `0.6098` to `0.6585`; the new occupancy metric reports `0.5538` on the preserved-header output and makes the structural repair visible even when lexical whitespace metrics remain mostly unchanged.
 - No full-corpus benchmark board has been locked for this slice yet; this was a bounded frontier repair plus metric-system improvement.
 
+Latest continuation slice after the thirteenth pass:
+
+- `01030000000141` was re-audited as a native-text-starved but geometry-rich image-first infographic. `pdftotext -layout` produced almost no useful content, while the rendered page and legacy JSON preserved ten bordered card regions with recoverable page geometry.
+- Landed change: `raster_table_ocr.rs` now includes a generic page-raster enrichment path that rasterizes the full page once, maps existing empty bordered-table cells into raster coordinates, OCRs each empty cell crop, and injects recovered text back into the corresponding table cells.
+- The recovery is geometry-driven rather than benchmark-string-driven: activation is bounded by page text sparsity, empty-table coverage, and existing table ownership; semantic `Table` wrappers and direct `TableBorder` elements are both supported.
+- `output/markdown.rs` now adds a generic infographic-card projection for narrow-left / wide-right two-column bordered cards, so recovered numbered cards render as numbered prose items instead of pipe tables.
+- Focused validation on `00141` showed a strong retained local gain: `overall 0.1430 -> 0.4861`, `NID 0.0413 -> 0.5441`, `BLEU-4 0.6613`, `ROUGE-1 0.7774`, `ROUGE-L 0.4746`, and `text_quality_score 0.6919`.
+- A later OCR-cleanup variant was explicitly rejected because it reduced the measured score; only the stronger generic page-raster OCR + card-projection path was retained.
+- No full-corpus benchmark board has been locked for this slice yet; the retained work is a source-signal frontier improvement plus a committed checkpoint for the next optimization wave.
+
 ## Cohort Summary
 
 - `NID tail`: 20-document sentinel set
