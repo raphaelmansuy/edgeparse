@@ -227,6 +227,14 @@ Latest continuation slice after the thirteenth pass:
 - A later OCR-cleanup variant was explicitly rejected because it reduced the measured score; only the stronger generic page-raster OCR + card-projection path was retained.
 - No full-corpus benchmark board has been locked for this slice yet; the retained work is a source-signal frontier improvement plus a committed checkpoint for the next optimization wave.
 
+Latest continuation slice after the fourteenth pass:
+
+- Another 50 OODA loops were executed on `01030000000141` after the `a5f0cfa` checkpoint, still constrained to first-principles geometry and source-signal improvements rather than benchmark-specific string repair.
+- The main finding was real but not yet board-positive: 200-DPI card crops materially improve OCR over the default raster, and Tesseract TSV reveals that many remaining junk tokens are sparse edge-only lines formed by connector marks and decorative shapes rather than true sentence content.
+- A bounded experimental branch used higher-DPI page rasterization, wide-cell TSV line reconstruction, and narrow-cell OCR context tuning. This cleaned some prose and improved some local text-shape metrics, but it also destabilized card numbering and mixed-table projection on the page.
+- Best experimental rerun reached `overall 0.4819`, `NID 0.5393`, `ROUGE-1 0.7980`, `ROUGE-L 0.4988`, and `text_quality_score 0.6842`, which still underperformed the retained thirteenth-slice checkpoint (`overall 0.4861`, `TQS 0.6919`).
+- Result: the entire fourteenth-pass parser branch was rejected and reverted. The retained codebase stays at the committed `a5f0cfa` state, while the new geometric findings are preserved as guidance for the next `00141` OCR-fidelity attempt.
+
 ## Cohort Summary
 
 - `NID tail`: 20-document sentinel set
