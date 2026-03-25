@@ -1,0 +1,2 @@
+# Build artifacts — extracted binaries from Docker builds
+.build/

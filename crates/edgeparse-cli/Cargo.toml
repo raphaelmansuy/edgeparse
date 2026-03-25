@@ -15,12 +15,16 @@ documentation = "https://docs.rs/edgeparse-cli"
 name = "edgeparse"
 path = "src/main.rs"
 
+[features]
+default = ["native"]
+native = ["rayon", "edgeparse-core/native"]
+
 [dependencies]
-edgeparse-core = { path = "../edgeparse-core", version = "0.2.0" }
+edgeparse-core = { path = "../edgeparse-core", version = "0.2.0", default-features = false }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
-rayon = { workspace = true }
+rayon = { workspace = true, optional = true }
