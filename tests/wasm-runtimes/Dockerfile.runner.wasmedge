@@ -1,0 +1,30 @@
+# ─── WasmEdge Runner ────────────────────────────────────────────────────────
+# Greg's AI coding buddy:
+#   WasmEdge — CNCF Sandbox project, the cloud-native WASM runtime.
+#   C++ core, AOT compilation support, smallest footprint among JIT runtimes.
+#   If you're into Kubernetes + WASM, this is your jam.
+#
+#   We download the release tarball directly instead of using the installer
+#   script (which drags in python + git — overkill for a test container).
+#
+#   docker build -f tests/wasm-runtimes/Dockerfile.runner.wasmedge \
+#                -t edgeparse-wasi-wasmedge .
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM edgeparse-wasi-base
+
+# Pin version for reproducibility; update when needed
+ARG WASMEDGE_VERSION=0.14.1
+
+RUN ARCH="$(uname -m)" && \
+    curl -sSL "https://github.com/WasmEdge/WasmEdge/releases/download/${WASMEDGE_VERSION}/WasmEdge-${WASMEDGE_VERSION}-ubuntu20.04_${ARCH}.tar.gz" \
+    | tar xz --strip-components=1 -C /usr/local && \
+    ldconfig
+
+# Verify installation
+RUN wasmedge --version
+
+# Copy pre-built WASM binary
+COPY tests/wasm-runtimes/.build/edgeparse.wasm /test/edgeparse.wasm
+
+CMD ["wasmedge"]

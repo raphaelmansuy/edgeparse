@@ -1,0 +1,31 @@
+# ─── WASIX on Wasmer Runner ─────────────────────────────────────────────────
+# Greg's AI coding buddy:
+#   WASIX = WASI on steroids. Full POSIX process model: threads, sockets,
+#   fork/exec, chdir, TTY — everything WASI p1 left on the table.
+#   Only Wasmer speaks WASIX, so this is a Wasmer-exclusive party.
+#
+#   We test two things here:
+#   1. That a standard wasm32-wasip1 binary runs correctly on Wasmer's
+#      WASIX runtime (backward compatibility)
+#   2. That WASIX-specific flags (--net, etc.) don't break anything
+#
+#   A full WASIX build (cargo wasix / wasm32-wasmer-wasi target) would
+#   unlock threads + sockets, but edgeparse's PDF parsing doesn't need
+#   those — so we validate runtime compatibility instead.
+#
+#   docker build -f tests/wasm-runtimes/Dockerfile.runner.wasix \
+#                -t edgeparse-wasi-wasix .
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM edgeparse-wasi-base
+
+RUN curl https://get.wasmer.io -sSfL | sh
+ENV PATH="/root/.wasmer/bin:${PATH}"
+
+# Verify installation
+RUN wasmer --version
+
+# Copy standard WASI p1 binary (backward compatible with WASIX runtime)
+COPY tests/wasm-runtimes/.build/edgeparse.wasm /test/edgeparse.wasm
+
+CMD ["wasix"]

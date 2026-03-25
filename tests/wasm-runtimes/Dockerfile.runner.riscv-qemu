@@ -1,0 +1,38 @@
+# ─── RISC-V QEMU Runner ─────────────────────────────────────────────────────
+# Greg's AI coding buddy:
+#   Runs the RISC-V cross-compiled edgeparse binary under QEMU user-mode
+#   emulation. No real RISC-V hardware needed — qemu-riscv64 translates
+#   RV64GC instructions to your host ISA on the fly.
+#
+#   This is the same approach Debian/Fedora use for their riscv64 ports:
+#   binfmt_misc + qemu-user-static. We just do it explicitly.
+#
+#   docker build -f tests/wasm-runtimes/Dockerfile.runner.riscv-qemu \
+#                -t edgeparse-riscv-qemu .
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM ubuntu:24.04
+
+# QEMU user-mode for RISC-V + the riscv64 sysroot for dynamic linking
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    qemu-user \
+    libc6-riscv64-cross \
+    libgcc-s1-riscv64-cross \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /test
+
+# Copy test fixtures and test script
+COPY tests/fixtures/sample.pdf          /test/fixtures/
+COPY tests/wasm-runtimes/run-tests.sh   /test/
+RUN chmod +x /test/run-tests.sh
+
+# Copy pre-built RISC-V binary (built by Dockerfile.build.riscv)
+COPY tests/wasm-runtimes/.build/edgeparse-riscv64 /test/edgeparse-riscv64
+
+# QEMU needs to know where the riscv64 dynamic linker lives
+ENV QEMU_LD_PREFIX=/usr/riscv64-linux-gnu
+
+ENTRYPOINT ["/test/run-tests.sh"]
+CMD ["riscv-qemu"]
