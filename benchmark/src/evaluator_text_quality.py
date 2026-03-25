@@ -18,7 +18,8 @@ wer          Word Error Rate              [0–∞]  lower is better
 f1_token     Bag-of-words F1              [0–1]  higher is better
 word_fragmentation_score  OCR split-word fidelity  [0–1]  higher is better
 word_boundary_integrity_score  Preserves whole-word boundaries  [0–1]  higher is better
-text_quality_score  mean(rouge1, rougeL, bleu4, word_fragmentation_score, word_boundary_integrity_score)  [0–1]  higher is better
+token_boundary_f1  Symmetric word-boundary fidelity  [0–1]  higher is better
+text_quality_score  mean(rouge1, rougeL, bleu4, word_fragmentation_score, word_boundary_integrity_score, token_boundary_f1)  [0–1]  higher is better
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from difflib import SequenceMatcher
 from typing import Dict, List, Optional, Tuple
 
 from rapidfuzz.distance import Levenshtein
@@ -336,6 +338,57 @@ def _word_boundary_integrity_score(
     return min((intact_matches + fragmented_credit) / total_candidates, 1.0)
 
 
+def _token_boundary_positions(tokens: List[str]) -> List[int]:
+    positions: List[int] = []
+    cursor = 0
+    for token in tokens[:-1]:
+        cursor += len(token)
+        positions.append(cursor)
+    return positions
+
+
+def _token_boundary_f1(ref_tokens: List[str], hyp_tokens: List[str]) -> Optional[float]:
+    """Score whether word boundaries survive after whitespace is removed.
+
+    Unlike the long-word fragmentation metrics, this is symmetric: it penalizes
+    both inserted spaces inside a word and missing spaces between adjacent
+    reference tokens.
+    """
+    if not ref_tokens:
+        return None
+
+    ref_compact = "".join(ref_tokens)
+    hyp_compact = "".join(hyp_tokens)
+    if not ref_compact:
+        return None
+
+    ref_boundaries = set(_token_boundary_positions(ref_tokens))
+    hyp_boundaries = set(_token_boundary_positions(hyp_tokens))
+
+    if not ref_boundaries and not hyp_boundaries:
+        return 1.0
+    if not ref_boundaries:
+        return 0.0 if hyp_boundaries else 1.0
+    if not hyp_boundaries:
+        return 0.0
+
+    matcher = SequenceMatcher(a=ref_compact, b=hyp_compact, autojunk=False)
+    projected_hyp_boundaries = set()
+    for ref_start, hyp_start, size in matcher.get_matching_blocks():
+        if size <= 1:
+            continue
+        for pos in hyp_boundaries:
+            if hyp_start < pos < hyp_start + size:
+                projected_hyp_boundaries.add(ref_start + (pos - hyp_start))
+
+    true_positive = len(projected_hyp_boundaries & ref_boundaries)
+    precision = true_positive / len(hyp_boundaries)
+    recall = true_positive / len(ref_boundaries)
+    if precision + recall == 0.0:
+        return 0.0
+    return 2.0 * precision * recall / (precision + recall)
+
+
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def evaluate_text_quality(
@@ -364,7 +417,8 @@ def evaluate_text_quality(
         f1_token           Bag-of-words token F1         [0–1]  ↑ better
         word_fragmentation_score OCR split-word fidelity [0–1]  ↑ better
         word_boundary_integrity_score Preserves whole-word boundaries [0–1]  ↑ better
-        text_quality_score mean(rouge1, rougeL, bleu4, word_fragmentation_score, word_boundary_integrity_score)  [0–1]  ↑ better
+        token_boundary_f1 Symmetric word-boundary fidelity [0–1]  ↑ better
+        text_quality_score mean(rouge1, rougeL, bleu4, word_fragmentation_score, word_boundary_integrity_score, token_boundary_f1)  [0–1]  ↑ better
     """
     gt_plain   = strip_markdown(gt   or "")
     pred_plain = strip_markdown(pred or "")
@@ -374,6 +428,7 @@ def evaluate_text_quality(
         "cer": None, "wer": None, "f1_token": None,
         "word_fragmentation_score": None,
         "word_boundary_integrity_score": None,
+        "token_boundary_f1": None,
         "text_quality_score": None,
     }
 
@@ -392,6 +447,7 @@ def evaluate_text_quality(
     f1_tok = _f1_token(ref_tokens, hyp_tokens)
     word_fragmentation_score = _word_fragmentation_score(ref_tokens, hyp_tokens)
     word_boundary_integrity_score = _word_boundary_integrity_score(ref_tokens, hyp_tokens)
+    token_boundary_f1 = _token_boundary_f1(ref_tokens, hyp_tokens)
 
     # Composite: content fidelity plus explicit split-word corruption penalty.
     quality_parts = [
@@ -402,6 +458,7 @@ def evaluate_text_quality(
             bleu4,
             word_fragmentation_score,
             word_boundary_integrity_score,
+            token_boundary_f1,
         )
         if v is not None
     ]
@@ -417,5 +474,6 @@ def evaluate_text_quality(
         "f1_token":           f1_tok,
         "word_fragmentation_score": word_fragmentation_score,
         "word_boundary_integrity_score": word_boundary_integrity_score,
+        "token_boundary_f1": token_boundary_f1,
         "text_quality_score": text_quality_score,
     }

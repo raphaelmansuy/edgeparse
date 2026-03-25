@@ -238,6 +238,54 @@ Fourth-pass baseline before this continuation work:
 - `WER`: 0.2377
 - `F1-token`: 0.9208
 - `TD F1`: 0.9213
+
+## Twelfth Continuation Pass
+
+Twelfth-pass objective for this turn:
+
+- move source signal upstream for left-stub panel tables using only geometric ownership
+- remove benchmark blindness in the metric stack by adding a symmetric whitespace-boundary metric
+- rerun the full corpus under the refreshed metric schema
+
+Twelfth-pass execution notes:
+
+- 50+ OODA micro-iterations were executed in this turn across detector diagnosis, synthetic-test repair, release validation, real-doc inspection, metric design, metric wiring, synthetic metric checks, and full-benchmark rerun
+- detector-side work stayed generic: no document-id branches, no phrase-triggered renderers, no benchmark-specific hooks
+- benchmark schema changed from `v3` to `v4`, so this pass introduces a new `token_boundary_f1` signal and the resulting `overall` is not directly comparable to earlier `v3` boards
+
+Twelfth-pass full-benchmark result under schema `v4`:
+
+- `overall`: 0.7568
+- `NID`: 0.8698
+- `TEDS`: 0.5237
+- `MHS`: 0.4953
+- `PBF`: 0.4953
+- `SBF`: 0.5002
+- `TQS`: 0.8961
+- `ROUGE-1`: 0.9189
+- `ROUGE-2`: 0.8908
+- `ROUGE-L`: 0.8846
+- `BLEU-4`: 0.8436
+- `Word Fragmentation Score`: 0.9243
+- `Word Boundary Integrity`: 0.9358
+- `Token Boundary F1`: 0.8696
+- `CER`: 0.2198
+- `WER`: 0.2446
+- `TD F1`: 0.9438
+- `Speed`: 0.2920 s/doc
+
+Twelfth-pass anchor observations:
+
+- `01030000000182` remains a partial table-ownership failure, but the new metric now exposes its boundary damage directly: `token_boundary_f1 0.4635` despite `word_boundary_integrity_score 1.0000`
+- `01030000000187` remains a grouped-header geometric collapse and now surfaces as one of the worst boundary failures: `token_boundary_f1 0.1671`
+- `01030000000090` still scores relatively high on lexical overlap, but `token_boundary_f1 0.9423` now captures boundary drift that ROUGE/BLEU alone underweight
+
+Twelfth-pass retained code changes:
+
+- source-level geometric augmentation for left-stub panel cluster tables in `cluster_table_detector.rs`
+- benchmark schema `v4`
+- new `token_boundary_f1` metric in `evaluator_text_quality.py`
+- evaluator/report wiring for the new metric in benchmark JSON, CSV, terminal, and HTML reporting
 - `Speed`: 0.0404 s/doc
 
 Fourth-pass final full-benchmark result:

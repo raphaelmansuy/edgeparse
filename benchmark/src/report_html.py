@@ -150,7 +150,7 @@ METRIC_INFO = {
         "name": "TQS — Text Content Quality",
         "short": "TQS",
         "description": (
-            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4, fragmentation score, boundary integrity). "
+            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4, fragmentation score, boundary integrity, token-boundary F1). "
             "Measures how accurately the extracted text matches the ground truth "
             "after stripping Markdown formatting."
         ),
@@ -195,6 +195,12 @@ METRIC_INFO = {
         "name": "Word Boundary Integrity",
         "short": "Boundary",
         "description": "Penalizes artificial internal spaces inside long words even when the letters are otherwise preserved.",
+        "higher_better": True, "why": "", "when": [],
+    },
+    "token_boundary_f1": {
+        "name": "Token Boundary F1",
+        "short": "Boundary F1",
+        "description": "Character-aligned whitespace-boundary fidelity that penalizes both split words and run-together words.",
         "higher_better": True, "why": "", "when": [],
     },
     "cer": {
@@ -896,7 +902,7 @@ def generate_html_report(
     metric_data: Dict[str, Dict[str, Optional[float]]] = {
         "nid": {}, "teds": {}, "mhs": {}, "td_f1": {}, "speed": {}, "overall": {},
         "tqs": {}, "rouge1": {}, "rougeL": {}, "bleu4": {}, "frag": {},
-        "word_boundary_integrity_score": {}, "cer": {}, "wer": {},
+        "word_boundary_integrity_score": {}, "token_boundary_f1": {}, "cer": {}, "wer": {},
     }
     for eng in engines:
         d = results[eng]
@@ -915,12 +921,13 @@ def generate_html_report(
         metric_data["bleu4"][eng] = scores.get("bleu4_mean")
         metric_data["frag"][eng] = scores.get("word_fragmentation_score_mean")
         metric_data["word_boundary_integrity_score"][eng] = scores.get("word_boundary_integrity_score_mean")
+        metric_data["token_boundary_f1"][eng] = scores.get("token_boundary_f1_mean")
         metric_data["cer"][eng] = scores.get("cer_mean")
         metric_data["wer"][eng] = scores.get("wer_mean")
 
     # Compute ranks
     ranks: Dict[str, Dict[str, int]] = {}
-    for mk in ["nid", "teds", "mhs", "td_f1", "overall", "tqs", "rouge1", "rougeL", "bleu4", "frag", "word_boundary_integrity_score"]:
+    for mk in ["nid", "teds", "mhs", "td_f1", "overall", "tqs", "rouge1", "rougeL", "bleu4", "frag", "word_boundary_integrity_score", "token_boundary_f1"]:
         vals = [(e, metric_data[mk].get(e)) for e in engines]
         ranks[mk] = _compute_ranks(vals, True)
     for mk in ["speed", "cer", "wer"]:
@@ -1043,7 +1050,8 @@ def generate_html_report(
     for mk, info in [("tqs", METRIC_INFO["tqs"]), ("rouge1", METRIC_INFO["rouge1"]),
                      ("rougeL", METRIC_INFO["rougeL"]), ("bleu4", METRIC_INFO["bleu4"]),
                      ("frag", METRIC_INFO["frag"]),
-                     ("word_boundary_integrity_score", METRIC_INFO["word_boundary_integrity_score"])]:
+                     ("word_boundary_integrity_score", METRIC_INFO["word_boundary_integrity_score"]),
+                     ("token_boundary_f1", METRIC_INFO["token_boundary_f1"])]:
         data = [(e, metric_data[mk].get(e)) for e in engines]
         chart = _svg_bar_chart(
             info["name"], data, info["higher_better"],

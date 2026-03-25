@@ -147,6 +147,17 @@ METRIC_INFO = {
             "even when most letters are still present."
         ),
     },
+    "token_boundary_f1": {
+        "name": "Token Boundary F1",
+        "short": "Boundary F1",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "Character-aligned boundary fidelity: compares where word breaks "
+            "fall after whitespace is removed. Penalizes both split words and "
+            "run-together words."
+        ),
+    },
     "rouge1": {
         "name": "ROUGE-1 — Unigram F1",
         "short": "ROUGE-1",
@@ -220,8 +231,8 @@ METRIC_INFO = {
         "higher_better": True,
         "description": (
             "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4, fragmentation, "
-            "boundary integrity). Composite of lexical fidelity plus split-word "
-            "damage. Higher is better."
+            "boundary integrity, token-boundary F1). Composite of lexical "
+            "fidelity plus whitespace-boundary preservation. Higher is better."
         ),
     },
 }
@@ -317,6 +328,7 @@ def print_single_report(eval_data: dict, engine_name: str = "edgeparse") -> None
     f1_token           = scores.get("f1_token_mean")
     word_fragmentation_score = scores.get("word_fragmentation_score_mean")
     word_boundary_integrity_score = scores.get("word_boundary_integrity_score_mean")
+    token_boundary_f1 = scores.get("token_boundary_f1_mean")
     text_quality_score = scores.get("text_quality_score_mean")
 
     from engine_registry import display_name
@@ -369,6 +381,7 @@ def print_single_report(eval_data: dict, engine_name: str = "edgeparse") -> None
         ("bleu4",   bleu4),
         ("word_fragmentation_score", word_fragmentation_score),
         ("word_boundary_integrity_score", word_boundary_integrity_score),
+        ("token_boundary_f1", token_boundary_f1),
         ("f1_token", f1_token),
     ]
     for key, value in text_metrics:

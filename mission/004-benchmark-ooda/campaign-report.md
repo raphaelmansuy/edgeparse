@@ -193,6 +193,22 @@ Net effect versus the original live execution baseline (`0.7427 / 0.8702 / 0.490
 - `F1-token`: latest `0.9241`
 - `Speed`: improved from `0.1993 s/doc` to `0.0220 s/doc`
 
+Twelfth-pass closeout focused on first-principles geometry and metric visibility rather than benchmark-specific rendering:
+
+- Implemented source-level geometric augmentation for left-stub panel tables inside `cluster_table_detector.rs`, validated by a new synthetic detector test and the full cluster-table detector suite.
+- Added `token_boundary_f1`, a symmetric character-aligned whitespace-boundary metric that penalizes both split words and run-together words, and upgraded benchmark payloads to schema `v4`.
+- Wired the new metric through `evaluation.json`, CSV export, terminal reports, and HTML reports so benchmark blind spots are visible without manual inspection.
+- The refreshed full-corpus board under schema `v4` is: `overall 0.7568`, `NID 0.8698`, `TEDS 0.5237`, `MHS 0.4953`, `PBF 0.4953`, `SBF 0.5002`, `TQS 0.8961`, `ROUGE-1 0.9189`, `ROUGE-2 0.8908`, `ROUGE-L 0.8846`, `BLEU-4 0.8436`, `word_fragmentation_score 0.9243`, `word_boundary_integrity_score 0.9358`, `token_boundary_f1 0.8696`, `CER 0.2198`, `WER 0.2446`, `TD F1 0.9438`, `speed 0.2920 s/doc`.
+- This twelfth-pass board is not numerically comparable to the earlier `v3` overall because `text_quality_score` now includes `token_boundary_f1`.
+- The new metric materially clarifies failure shape on the live frontier: `01030000000182` reports `token_boundary_f1 0.4635` and `01030000000187` reports `0.1671`, exposing boundary collapse that prior ROUGE/BLEU-weighted summaries understated.
+
+Current frontier after the twelfth pass:
+
+- `01030000000141`: image-first extraction collapse
+- `01030000000187`: grouped-header table ownership collapse
+- `01030000000182`: partial panel-table ownership with duplicated residual text
+- `01030000000090`: relatively high lexical scores but still visible whitespace-boundary drift
+
 ## Cohort Summary
 
 - `NID tail`: 20-document sentinel set

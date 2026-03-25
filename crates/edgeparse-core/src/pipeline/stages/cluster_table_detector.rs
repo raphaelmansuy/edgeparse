@@ -169,6 +169,7 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
         &elements,
         &occupied_indices,
     ));
+    let tables = augment_panel_cluster_tables(&elements, tables);
 
     if tables.is_empty() {
         return elements;
@@ -300,6 +301,27 @@ struct ColumnBound {
 struct ClusterTable {
     consumed_block_indices: Vec<usize>,
     table_border: TableBorder,
+}
+
+#[derive(Clone)]
+struct PanelLine {
+    bbox: BoundingBox,
+    baseline: f64,
+    font_size: f64,
+    chunks: Vec<crate::models::chunks::TextChunk>,
+}
+
+#[derive(Clone)]
+struct PanelFragment {
+    slot_idx: usize,
+    bbox: BoundingBox,
+    text: String,
+}
+
+#[derive(Clone)]
+struct PanelRow {
+    bbox: BoundingBox,
+    cells: Vec<String>,
 }
 
 struct FlowCell {
@@ -2045,6 +2067,487 @@ fn build_cluster_table(
     })
 }
 
+fn augment_panel_cluster_tables(
+    elements: &[ContentElement],
+    tables: Vec<ClusterTable>,
+) -> Vec<ClusterTable> {
+    tables
+        .into_iter()
+        .map(|table| augment_panel_cluster_table(elements, &table).unwrap_or(table))
+        .collect()
+}
+
+fn augment_panel_cluster_table(
+    elements: &[ContentElement],
+    table: &ClusterTable,
+) -> Option<ClusterTable> {
+    if table.table_border.num_columns < 3 || table.consumed_block_indices.is_empty() {
+        return None;
+    }
+
+    let band_indices = collect_panel_band_indices(elements, table)?;
+    let slot_ranges = derive_panel_slot_ranges(elements, &band_indices, &table.table_border)?;
+    if slot_ranges.len() != table.table_border.num_columns + 1 {
+        return None;
+    }
+
+    let mut rows = reconstruct_panel_rows(elements, &band_indices, &slot_ranges);
+    if rows.len() < table.table_border.num_rows {
+        return None;
+    }
+    merge_panel_stub_companion_rows(&mut rows);
+    merge_panel_continuation_rows(&mut rows);
+    if rows.len() < 3 {
+        return None;
+    }
+
+    let header_like_rows = rows
+        .iter()
+        .take(2)
+        .filter(|row| row.cells.iter().skip(1).filter(|cell| !cell.trim().is_empty()).count()
+            >= slot_ranges.len().saturating_sub(2))
+        .count();
+    let stub_rows = rows
+        .iter()
+        .filter(|row| !row.cells[0].trim().is_empty())
+        .count();
+    if header_like_rows == 0 || stub_rows < 2 {
+        return None;
+    }
+
+    let x_coords = slot_ranges
+        .iter()
+        .map(|(left, _)| *left)
+        .chain(slot_ranges.last().map(|(_, right)| *right))
+        .collect::<Vec<_>>();
+    let y_coords = build_panel_y_coordinates(&rows);
+    let page_number = table.table_border.bbox.page_number;
+    let min_x = *x_coords.first()?;
+    let max_x = *x_coords.last()?;
+    let max_y = *y_coords.first()?;
+    let min_y = *y_coords.last()?;
+
+    let mut border_rows = Vec::with_capacity(rows.len());
+    for (row_idx, row) in rows.iter().enumerate() {
+        let row_top = y_coords[row_idx];
+        let row_bottom = y_coords[row_idx + 1];
+        let mut cells = Vec::with_capacity(slot_ranges.len());
+        for (col_idx, cell_text) in row.cells.iter().enumerate() {
+            let bbox = BoundingBox::new(
+                page_number,
+                slot_ranges[col_idx].0,
+                row_bottom,
+                slot_ranges[col_idx].1,
+                row_top,
+            );
+            let content = if cell_text.trim().is_empty() {
+                Vec::new()
+            } else {
+                vec![make_text_token(cell_text.trim(), &bbox)]
+            };
+            let contents = content
+                .iter()
+                .map(|token| ContentElement::TextChunk(token.base.clone()))
+                .collect();
+            cells.push(TableBorderCell {
+                bbox,
+                index: None,
+                level: None,
+                row_number: row_idx,
+                col_number: col_idx,
+                row_span: 1,
+                col_span: 1,
+                content,
+                contents,
+                semantic_type: None,
+            });
+        }
+        border_rows.push(TableBorderRow {
+            bbox: BoundingBox::new(page_number, min_x, row_bottom, max_x, row_top),
+            index: None,
+            level: None,
+            row_number: row_idx,
+            cells,
+            semantic_type: None,
+        });
+    }
+
+    Some(ClusterTable {
+        consumed_block_indices: band_indices,
+        table_border: TableBorder {
+            bbox: BoundingBox::new(page_number, min_x, min_y, max_x, max_y),
+            index: None,
+            level: Some("1".to_string()),
+            x_coordinates: x_coords.clone(),
+            x_widths: vec![0.0; x_coords.len()],
+            y_coordinates: y_coords.clone(),
+            y_widths: vec![0.0; y_coords.len()],
+            rows: border_rows,
+            num_rows: rows.len(),
+            num_columns: slot_ranges.len(),
+            is_bad_table: false,
+            is_table_transformer: false,
+            previous_table: None,
+            next_table: None,
+        },
+    })
+}
+
+fn collect_panel_band_indices(elements: &[ContentElement], table: &ClusterTable) -> Option<Vec<usize>> {
+    let start_idx = *table.consumed_block_indices.iter().min()?;
+    let end_idx = *table.consumed_block_indices.iter().max()?;
+    let page_number = table.table_border.bbox.page_number;
+    let table_top = table.table_border.bbox.top_y;
+    let table_bottom = table.table_border.bbox.bottom_y;
+    let row_pitch =
+        (table.table_border.bbox.height() / table.table_border.num_rows.max(1) as f64).max(10.0);
+
+    let mut indices = Vec::new();
+    let mut cursor = start_idx;
+    while let Some(prev_idx) = cursor.checked_sub(1) {
+        let elem = elements.get(prev_idx)?;
+        if !is_panel_text_candidate(elem) || elem.bbox().page_number != page_number {
+            break;
+        }
+        let gap = elem.bbox().bottom_y - table_top;
+        if !(-row_pitch..=row_pitch * 6.0).contains(&gap) {
+            break;
+        }
+        indices.push(prev_idx);
+        cursor = prev_idx;
+        if indices.len() >= 12 {
+            break;
+        }
+    }
+    indices.reverse();
+    indices.extend(table.consumed_block_indices.iter().copied());
+
+    for next_idx in end_idx + 1..elements.len() {
+        let elem = &elements[next_idx];
+        if !is_panel_text_candidate(elem) || elem.bbox().page_number != page_number {
+            break;
+        }
+        let gap = table_bottom - elem.bbox().top_y;
+        if !(-row_pitch..=row_pitch * 3.0).contains(&gap) {
+            break;
+        }
+        indices.push(next_idx);
+        if indices.len() >= table.consumed_block_indices.len() + 4 {
+            break;
+        }
+    }
+
+    indices.sort_unstable();
+    indices.dedup();
+    Some(indices)
+}
+
+fn is_panel_text_candidate(elem: &ContentElement) -> bool {
+    matches!(elem, ContentElement::TextBlock(_) | ContentElement::TextLine(_))
+}
+
+fn derive_panel_slot_ranges(
+    elements: &[ContentElement],
+    band_indices: &[usize],
+    table: &TableBorder,
+) -> Option<Vec<(f64, f64)>> {
+    let first_left = *table.x_coordinates.first()?;
+    let first_right = *table.x_coordinates.get(1)?;
+    let first_width = (first_right - first_left).max(1.0);
+
+    let mut external_stub_left = f64::INFINITY;
+    let mut external_stub_right = f64::NEG_INFINITY;
+    let mut stub_right = f64::NEG_INFINITY;
+    let mut first_data_left = f64::INFINITY;
+
+    for idx in band_indices {
+        let elem = &elements[*idx];
+        let bbox = elem.bbox();
+        if bbox.right_x <= first_left + first_width * 0.08
+            && bbox.left_x >= first_left - first_width * 0.9
+            && bbox.width() <= first_width * 0.35
+        {
+            external_stub_left = external_stub_left.min(bbox.left_x);
+            external_stub_right = external_stub_right.max(bbox.right_x);
+        }
+        if bbox.right_x <= first_left || bbox.left_x >= first_right {
+            continue;
+        }
+        if bbox.left_x <= first_left + first_width * 0.18
+            && bbox.width() <= first_width * 0.26
+            && bbox.center_x() <= first_left + first_width * 0.22
+        {
+            stub_right = stub_right.max(bbox.right_x);
+        }
+
+        for line in extract_panel_lines(elem) {
+            for chunk in line.chunks {
+                if chunk.bbox.left_x >= first_right || chunk.bbox.right_x <= first_left {
+                    continue;
+                }
+                if chunk.bbox.left_x > first_left + first_width * 0.22 {
+                    first_data_left = first_data_left.min(chunk.bbox.left_x);
+                }
+            }
+        }
+    }
+
+    if external_stub_right.is_finite() {
+        let gap = first_left - external_stub_right;
+        if gap >= 4.0 {
+            let mut slots = vec![(external_stub_left, first_left)];
+            for pair in table.x_coordinates.windows(2) {
+                slots.push((pair[0], pair[1]));
+            }
+            return Some(slots);
+        }
+    }
+
+    if !stub_right.is_finite() || !first_data_left.is_finite() {
+        return None;
+    }
+
+    let split = (stub_right + first_data_left) / 2.0;
+    if split <= first_left + first_width * 0.10 || split >= first_right - first_width * 0.15 {
+        return None;
+    }
+
+    let mut slots = vec![(first_left, split), (split, first_right)];
+    for pair in table.x_coordinates.windows(2).skip(1) {
+        slots.push((pair[0], pair[1]));
+    }
+    Some(slots)
+}
+
+fn reconstruct_panel_rows(
+    elements: &[ContentElement],
+    band_indices: &[usize],
+    slot_ranges: &[(f64, f64)],
+) -> Vec<PanelRow> {
+    let mut rows: Vec<PanelRow> = Vec::new();
+
+    for idx in band_indices {
+        for line in extract_panel_lines(&elements[*idx]) {
+            let fragments = split_panel_fragments(&line, slot_ranges);
+            if fragments.is_empty() {
+                continue;
+            }
+            let filled = fragments.len();
+            let row_center = line.bbox.center_y();
+            let tolerance = line.font_size.max(8.0) * 0.8;
+            let target = rows
+                .iter()
+                .position(|row| (row.bbox.center_y() - row_center).abs() <= tolerance);
+
+            if filled == 1 && line.bbox.width() > (slot_ranges.last().unwrap().1 - slot_ranges[0].0) * 0.65 {
+                continue;
+            }
+
+            if let Some(row_idx) = target {
+                let row = &mut rows[row_idx];
+                row.bbox = row.bbox.union(&line.bbox);
+                for fragment in fragments {
+                    append_panel_cell(&mut row.cells[fragment.slot_idx], &fragment.text);
+                }
+            } else {
+                let mut cells = vec![String::new(); slot_ranges.len()];
+                for fragment in fragments {
+                    append_panel_cell(&mut cells[fragment.slot_idx], &fragment.text);
+                }
+                rows.push(PanelRow {
+                    bbox: line.bbox.clone(),
+                    cells,
+                });
+            }
+        }
+    }
+
+    rows.sort_by(|a, b| {
+        b.bbox
+            .top_y
+            .partial_cmp(&a.bbox.top_y)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    rows.into_iter()
+        .filter(|row| {
+            let filled = row.cells.iter().filter(|cell| !cell.trim().is_empty()).count();
+            filled >= 2 || row.cells.first().is_some_and(|cell| !cell.trim().is_empty())
+        })
+        .collect()
+}
+
+fn merge_panel_stub_companion_rows(rows: &mut Vec<PanelRow>) {
+    let mut merged: Vec<PanelRow> = Vec::with_capacity(rows.len());
+    let mut idx = 0usize;
+    while idx < rows.len() {
+        if idx + 1 < rows.len() && should_merge_panel_stub_companions(&rows[idx], &rows[idx + 1]) {
+            merged.push(combine_panel_rows(&rows[idx], &rows[idx + 1]));
+            idx += 2;
+            continue;
+        }
+        merged.push(rows[idx].clone());
+        idx += 1;
+    }
+    *rows = merged;
+}
+
+fn merge_panel_continuation_rows(rows: &mut Vec<PanelRow>) {
+    let mut merged: Vec<PanelRow> = Vec::with_capacity(rows.len());
+    for row in rows.drain(..) {
+        let empty_stub = row.cells.first().is_some_and(|cell| cell.trim().is_empty());
+        let filled_data = row.cells.iter().skip(1).filter(|cell| !cell.trim().is_empty()).count();
+        if empty_stub && filled_data >= 1 {
+            if let Some(prev) = merged.last_mut() {
+                let gap = prev.bbox.bottom_y - row.bbox.top_y;
+                let max_gap = prev.bbox.height().max(row.bbox.height()).max(8.0) * 0.75;
+                if prev.cells.first().is_some_and(|cell| !cell.trim().is_empty())
+                    && (-2.0..=max_gap).contains(&gap)
+                {
+                    prev.bbox = prev.bbox.union(&row.bbox);
+                    for (dst, src) in prev.cells.iter_mut().zip(row.cells.iter()) {
+                        append_panel_cell(dst, src);
+                    }
+                    continue;
+                }
+            }
+        }
+        merged.push(row);
+    }
+    *rows = merged;
+}
+
+fn should_merge_panel_stub_companions(upper: &PanelRow, lower: &PanelRow) -> bool {
+    let upper_stub = upper.cells.first().is_some_and(|cell| !cell.trim().is_empty());
+    let lower_stub = lower.cells.first().is_some_and(|cell| !cell.trim().is_empty());
+    let upper_data = upper.cells.iter().skip(1).filter(|cell| !cell.trim().is_empty()).count();
+    let lower_data = lower.cells.iter().skip(1).filter(|cell| !cell.trim().is_empty()).count();
+
+    let complementary = (upper_stub && upper_data == 0 && !lower_stub && lower_data >= 2)
+        || (!upper_stub && upper_data >= 2 && lower_stub && lower_data == 0);
+    if !complementary {
+        return false;
+    }
+
+    let gap = upper.bbox.bottom_y - lower.bbox.top_y;
+    let max_gap = upper.bbox.height().max(lower.bbox.height()).max(8.0) * 0.75;
+    (-2.0..=max_gap).contains(&gap)
+}
+
+fn combine_panel_rows(upper: &PanelRow, lower: &PanelRow) -> PanelRow {
+    let mut cells = vec![String::new(); upper.cells.len().max(lower.cells.len())];
+    for (idx, dst) in cells.iter_mut().enumerate() {
+        if let Some(src) = upper.cells.get(idx) {
+            append_panel_cell(dst, src);
+        }
+        if let Some(src) = lower.cells.get(idx) {
+            append_panel_cell(dst, src);
+        }
+    }
+    PanelRow {
+        bbox: upper.bbox.union(&lower.bbox),
+        cells,
+    }
+}
+
+fn build_panel_y_coordinates(rows: &[PanelRow]) -> Vec<f64> {
+    let mut y_coords = Vec::with_capacity(rows.len() + 1);
+    y_coords.push(rows.first().map(|row| row.bbox.top_y).unwrap_or(0.0));
+    for pair in rows.windows(2) {
+        y_coords.push((pair[0].bbox.bottom_y + pair[1].bbox.top_y) / 2.0);
+    }
+    y_coords.push(rows.last().map(|row| row.bbox.bottom_y).unwrap_or(0.0));
+    y_coords
+}
+
+fn extract_panel_lines(elem: &ContentElement) -> Vec<PanelLine> {
+    match elem {
+        ContentElement::TextBlock(block) => block
+            .text_lines
+            .iter()
+            .map(|line| PanelLine {
+                bbox: line.bbox.clone(),
+                baseline: line.base_line,
+                font_size: line.font_size.max(1.0),
+                chunks: line.text_chunks.clone(),
+            })
+            .collect(),
+        ContentElement::TextLine(line) => vec![PanelLine {
+            bbox: line.bbox.clone(),
+            baseline: line.base_line,
+            font_size: line.font_size.max(1.0),
+            chunks: line.text_chunks.clone(),
+        }],
+        _ => Vec::new(),
+    }
+}
+
+fn split_panel_fragments(line: &PanelLine, slot_ranges: &[(f64, f64)]) -> Vec<PanelFragment> {
+    let mut groups: Vec<(usize, Vec<crate::models::chunks::TextChunk>, BoundingBox)> = Vec::new();
+
+    for chunk in line
+        .chunks
+        .iter()
+        .filter(|chunk| !chunk.value.trim().is_empty())
+        .cloned()
+    {
+        let slot_idx = assign_panel_slot(&chunk.bbox, slot_ranges);
+        if let Some((prev_slot, prev_chunks, prev_bbox)) = groups.last_mut() {
+            let gap = chunk.bbox.left_x - prev_bbox.right_x;
+            if *prev_slot == slot_idx && gap <= chunk.font_size.max(6.0) * 2.4 {
+                *prev_bbox = prev_bbox.union(&chunk.bbox);
+                prev_chunks.push(chunk);
+                continue;
+            }
+        }
+        groups.push((slot_idx, vec![chunk.clone()], chunk.bbox.clone()));
+    }
+
+    groups
+        .into_iter()
+        .filter_map(|(slot_idx, chunks, bbox)| {
+            let text = crate::models::text::TextLine::concatenate_chunks(&chunks);
+            let trimmed = text.trim();
+            (!trimmed.is_empty()).then(|| PanelFragment {
+                slot_idx,
+                bbox,
+                text: trimmed.to_string(),
+            })
+        })
+        .collect()
+}
+
+fn assign_panel_slot(bbox: &BoundingBox, slot_ranges: &[(f64, f64)]) -> usize {
+    let mut best_idx = 0usize;
+    let mut best_score = f64::NEG_INFINITY;
+    let center_x = bbox.center_x();
+
+    for (idx, (left, right)) in slot_ranges.iter().enumerate() {
+        let overlap = (bbox.right_x.min(*right) - bbox.left_x.max(*left)).max(0.0);
+        let score = if overlap > 0.0 {
+            overlap / bbox.width().max(1.0)
+        } else {
+            -(center_x - ((*left + *right) / 2.0)).abs()
+        };
+        if score > best_score {
+            best_score = score;
+            best_idx = idx;
+        }
+    }
+
+    best_idx
+}
+
+fn append_panel_cell(target: &mut String, fragment: &str) {
+    let trimmed = fragment.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if !target.is_empty() {
+        target.push(' ');
+    }
+    target.push_str(trimmed);
+}
+
 fn cell_text(cell: &TableBorderCell) -> String {
     cell.content
         .iter()
@@ -2840,6 +3343,86 @@ mod tests {
             .filter(|e| matches!(e, ContentElement::TableBorder(_)))
             .count();
         assert_eq!(table_count, 1, "Expected column-major key/value table");
+    }
+
+    #[test]
+    fn test_three_column_panel_table_is_rebuilt_with_left_stub_column() {
+        let page = 1u32;
+        let fs = 10.0;
+
+        let result = detect_cluster_tables(vec![
+            make_context_block(page, 380.0, "Context above the panel"),
+            make_block_with_line(make_line(page, 336.0, fs, &[(220.0, 250.0, "OCR")])),
+            make_block_with_line(make_line(
+                page,
+                336.0,
+                fs,
+                &[(420.0, 520.0, "Recommendation")],
+            )),
+            make_block_with_line(make_line(
+                page,
+                336.0,
+                fs,
+                &[(650.0, 850.0, "Product semantic search")],
+            )),
+            make_block_with_line(make_line(page, 312.0, fs, &[(72.0, 110.0, "Pack")])),
+            make_block_with_line(make_line(
+                page,
+                312.0,
+                fs,
+                &[(145.0, 340.0, "Character recognition")],
+            )),
+            make_block_with_line(make_line(
+                page,
+                312.0,
+                fs,
+                &[(390.0, 620.0, "Best-product recommendation")],
+            )),
+            make_block_with_line(make_line(
+                page,
+                312.0,
+                fs,
+                &[(650.0, 910.0, "Semantic product search")],
+            )),
+            make_block_with_line(make_line(
+                page,
+                286.0,
+                fs,
+                &[
+                    (145.0, 360.0, "Application text extraction"),
+                    (390.0, 625.0, "Application next-item prediction"),
+                    (650.0, 910.0, "Application search to DB"),
+                ],
+            )),
+            make_block_with_line(make_line(page, 272.0, fs, &[(72.0, 138.0, "Application")])),
+            make_block_with_line(make_line(
+                page,
+                248.0,
+                fs,
+                &[
+                    (145.0, 360.0, "Highlight OCR competition"),
+                    (390.0, 625.0, "Highlight Kaggle medal"),
+                    (650.0, 910.0, "Highlight KLUE benchmark"),
+                ],
+            )),
+            make_block_with_line(make_line(page, 234.0, fs, &[(72.0, 120.0, "Highlight")])),
+            make_context_block(page, 190.0, "Context below the panel"),
+        ]);
+
+        let Some(ContentElement::TableBorder(tb)) = result
+            .iter()
+            .find(|e| matches!(e, ContentElement::TableBorder(_)))
+        else {
+            panic!("Expected panel table");
+        };
+
+        assert_eq!(tb.num_columns, 4);
+        assert!(tb.rows.len() >= 4);
+        assert_eq!(cell_text(&tb.rows[0].cells[0]), "");
+        assert_eq!(cell_text(&tb.rows[0].cells[1]), "OCR");
+        assert_eq!(cell_text(&tb.rows[1].cells[0]), "Pack");
+        assert!(cell_text(&tb.rows[2].cells[0]).contains("Application"));
+        assert!(cell_text(&tb.rows[3].cells[0]).contains("Highlight"));
     }
 
     #[test]
