@@ -11,11 +11,12 @@
 #     EDGEPARSE_PREFIX=myproject ./wasm-test.sh build all
 #
 # Usage:
-#   ./wasm-test.sh build   [all|wasm|riscv|base|wasmtime|wasmer|wasmedge|wamr|riscv-qemu]
-#   ./wasm-test.sh test    [all|wasmtime|wasmer|wasmedge|wamr|riscv-qemu]
+#   ./wasm-test.sh build   [all|wasm|riscv|base|wasmtime|wasmer|wasmedge|wamr|wasix|riscv-qemu|spike|libriscv|rvvm|ckb-vm]
+#   ./wasm-test.sh test    [all|experimental|wasmtime|wasmer|wasmedge|wamr|wasix|riscv-qemu|spike|libriscv|rvvm|ckb-vm]
 #   ./wasm-test.sh status
+#   ./wasm-test.sh run     <runtime>
 #   ./wasm-test.sh log     <runtime>
-#   ./wasm-test.sh rmi     [all|<image>]
+#   ./wasm-test.sh rmi     [all|<target>]
 #   ./wasm-test.sh clean
 #   ./wasm-test.sh help
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -47,9 +48,16 @@ IMG_LIBRISCV="${PREFIX}-riscv-libriscv"
 IMG_RVVM="${PREFIX}-riscv-rvvm"
 IMG_CKB_VM="${PREFIX}-riscv-ckb-vm"
 
-ALL_WASM_RUNTIMES="wasmtime wasmer wasmedge wamr wasix"
-ALL_RISCV_RUNTIMES="riscv-qemu spike libriscv rvvm ckb-vm"
-ALL_RUNNERS="${ALL_WASM_RUNTIMES} ${ALL_RISCV_RUNTIMES}"
+# Stable runtimes — all tests pass (8/8 green)
+STABLE_WASM_RUNTIMES="wasmtime wasmer wasmedge wamr wasix"
+STABLE_RISCV_RUNTIMES="riscv-qemu"
+STABLE_RUNNERS="${STABLE_WASM_RUNTIMES} ${STABLE_RISCV_RUNTIMES}"
+
+# Experimental runtimes — partial/no test pass (WIP, incompatible, or upstream broken)
+EXPERIMENTAL_RUNTIMES="spike libriscv rvvm ckb-vm"
+
+# Combined (used for build/rmi/status, NOT for default test)
+ALL_RUNNERS="${STABLE_RUNNERS} ${EXPERIMENTAL_RUNTIMES}"
 ALL_IMAGES="${IMG_BUILD_WASM} ${IMG_BUILD_WASIX} ${IMG_BUILD_RISCV} ${IMG_BASE} ${IMG_WASMTIME} ${IMG_WASMER} ${IMG_WASMEDGE} ${IMG_WAMR} ${IMG_WASIX} ${IMG_RISCV_QEMU} ${IMG_SPIKE} ${IMG_LIBRISCV} ${IMG_RVVM} ${IMG_CKB_VM}"
 
 # ── Colours ───────────────────────────────────────────────────────────────────
@@ -69,9 +77,10 @@ dim()  { echo -e "${DIM}$*${RESET}"; }
 # ── Helpers ───────────────────────────────────────────────────────────────────
 image_name_for() {
     case "$1" in
-        wasm)        echo "${IMG_BUILD_WASM}" ;;
-        wasix)       echo "${IMG_WASIX}" ;;
-        riscv)       echo "${IMG_BUILD_RISCV}" ;;
+        wasm)         echo "${IMG_BUILD_WASM}" ;;
+        wasix)        echo "${IMG_WASIX}" ;;
+        wasix-build)  echo "${IMG_BUILD_WASIX}" ;;
+        riscv)        echo "${IMG_BUILD_RISCV}" ;;
         base)        echo "${IMG_BASE}" ;;
         wasmtime)    echo "${IMG_WASMTIME}" ;;
         wasmer)      echo "${IMG_WASMER}" ;;
@@ -189,23 +198,22 @@ cmd_build() {
     case "${target}" in
         all)
             build_wasm
-            build_wasix
             build_riscv
             build_base
             for rt in ${ALL_RUNNERS}; do
                 build_runner "${rt}"
             done
             ;;
-        wasm)       build_wasm ;;
-        wasix-bin)  build_wasix ;;
-        riscv)      build_riscv ;;
-        base)       build_base ;;
+        wasm)          build_wasm ;;
+        wasix-build)   build_wasix ;;
+        riscv)         build_riscv ;;
+        base)          build_base ;;
         wasmtime|wasmer|wasmedge|wamr|wasix|riscv-qemu|spike|libriscv|rvvm|ckb-vm)
             build_runner "${target}"
             ;;
         *)
             err "Unknown build target: ${target}"
-            echo "Valid: all wasm wasix-bin riscv base wasmtime wasmer wasmedge wamr wasix riscv-qemu spike libriscv rvvm ckb-vm"
+            echo "Valid: all wasm wasix-build riscv base wasmtime wasmer wasmedge wamr wasix riscv-qemu spike libriscv rvvm ckb-vm"
             exit 1
             ;;
     esac
@@ -224,11 +232,17 @@ run_test() {
 
     log "Testing with ${runtime}..."
     echo ""
-    docker run --rm \
+    # Capture exit code without triggering set -e (which would abort the
+    # entire script on first container failure, preventing test aggregation)
+    local exit_code=0
+    if docker run --rm \
         --name "${PREFIX}-test-${runtime}" \
         "${img}" \
-        "${runtime}"
-    local exit_code=$?
+        "${runtime}"; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
     echo ""
     return ${exit_code}
 }
@@ -239,11 +253,11 @@ cmd_test() {
     local passed=0
     local targets
 
-    if [ "${target}" = "all" ]; then
-        targets="${ALL_RUNNERS}"
-    else
-        targets="${target}"
-    fi
+    case "${target}" in
+        all)            targets="${STABLE_RUNNERS}" ;;
+        experimental)   targets="${EXPERIMENTAL_RUNTIMES}" ;;
+        *)              targets="${target}" ;;
+    esac
 
     for rt in ${targets}; do
         if run_test "${rt}"; then
@@ -327,7 +341,10 @@ cmd_clean() {
     log "Cleaning build artifacts and images..."
 
     # Stop and remove any running test containers
-    docker ps -q --filter "name=${PREFIX}-test-" 2>/dev/null | xargs -r docker rm -f 2>/dev/null || true
+    # Note: avoid xargs -r (GNU-only, fails on macOS/BSD)
+    local containers
+    containers=$(docker ps -q --filter "name=${PREFIX}-test-" 2>/dev/null)
+    [ -n "${containers}" ] && docker rm -f ${containers} 2>/dev/null || true
 
     # Remove images
     cmd_rmi all
@@ -378,23 +395,35 @@ BANNER
     echo "  help              This help screen"
     echo ""
     echo -e "${BOLD}Build Targets:${RESET}"
-    echo "  all         Build everything (default)"
-    echo "  wasm        Build WASM binary only (wasm32-wasip1)"
-    echo "  riscv       Build RISC-V binary only (riscv64gc)"
-    echo "  base        Build shared runner base image"
-    echo "  wasmtime    Build Wasmtime runner"
-    echo "  wasmer      Build Wasmer runner"
-    echo "  wasmedge    Build WasmEdge runner"
-    echo "  wamr        Build WAMR/iwasm runner"
-    echo "  riscv-qemu  Build RISC-V QEMU runner"
+    echo "  all          Build everything (default)"
+    echo "  wasm         Build WASM binary only (wasm32-wasip1)"
+    echo "  wasix-build  Build WASIX binary (wasm32-wasmer-wasi)"
+    echo "  riscv        Build RISC-V binary only (riscv64gc)"
+    echo "  base         Build shared runner base image"
+    echo "  wasmtime     Build Wasmtime runner"
+    echo "  wasmer       Build Wasmer runner"
+    echo "  wasmedge     Build WasmEdge runner"
+    echo "  wamr         Build WAMR/iwasm runner"
+    echo "  wasix        Build WASIX runner"
+    echo "  riscv-qemu   Build RISC-V QEMU runner"
+    echo "  spike        Build Spike + pk runner"
+    echo "  libriscv     Build libriscv runner"
+    echo "  rvvm         Build RVVM runner (experimental)"
+    echo "  ckb-vm       Build CKB-VM runner (experimental)"
     echo ""
     echo -e "${BOLD}Test Targets:${RESET}"
-    echo "  all         Test all runtimes (default)"
-    echo "  wasmtime    Test with Wasmtime"
-    echo "  wasmer      Test with Wasmer"
-    echo "  wasmedge    Test with WasmEdge"
-    echo "  wamr        Test with WAMR/iwasm"
-    echo "  riscv-qemu  Test with RISC-V QEMU"
+    echo "  all            Test stable runtimes only (default)"
+    echo "  experimental   Test experimental/WIP runtimes"
+    echo "  wasmtime       Test with Wasmtime"
+    echo "  wasmer         Test with Wasmer"
+    echo "  wasmedge       Test with WasmEdge"
+    echo "  wamr           Test with WAMR/iwasm"
+    echo "  wasix          Test with WASIX on Wasmer"
+    echo "  riscv-qemu     Test with RISC-V QEMU"
+    echo "  spike          Test with Spike + pk (WIP)"
+    echo "  libriscv       Test with libriscv (WIP)"
+    echo "  rvvm           Test with RVVM (incompatible)"
+    echo "  ckb-vm         Test with CKB-VM (upstream broken)"
     echo ""
     echo -e "${BOLD}Environment:${RESET}"
     echo "  EDGEPARSE_PREFIX  Docker artifact prefix (default: edgeparse)"

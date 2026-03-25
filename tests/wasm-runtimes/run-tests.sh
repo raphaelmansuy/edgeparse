@@ -26,7 +26,8 @@ RUNTIME="${1:-unknown}"
 PASS=0
 FAIL=0
 SKIP=0
-TOTAL=0
+TESTS=0
+ASSERTIONS=0
 
 log_header() {
     echo -e "\n${BOLD}${CYAN}═══════════════════════════════════════════════════════════${RESET}"
@@ -35,28 +36,31 @@ log_header() {
 }
 
 log_test() {
-    TOTAL=$((TOTAL + 1))
-    echo -e "${DIM}[${TOTAL}]${RESET} ${BOLD}$1${RESET}"
+    TESTS=$((TESTS + 1))
+    echo -e "${DIM}[${TESTS}]${RESET} ${BOLD}$1${RESET}"
 }
 
 log_pass() {
     PASS=$((PASS + 1))
+    ASSERTIONS=$((ASSERTIONS + 1))
     echo -e "  ${GREEN}PASS${RESET} $1"
 }
 
 log_fail() {
     FAIL=$((FAIL + 1))
+    ASSERTIONS=$((ASSERTIONS + 1))
     echo -e "  ${RED}FAIL${RESET} $1"
 }
 
 log_skip() {
     SKIP=$((SKIP + 1))
+    ASSERTIONS=$((ASSERTIONS + 1))
     echo -e "  ${YELLOW}SKIP${RESET} $1"
 }
 
 log_summary() {
     echo -e "\n${BOLD}───────────────────────────────────────────────────────────${RESET}"
-    echo -e "${BOLD}Results:${RESET} ${GREEN}${PASS} passed${RESET}, ${RED}${FAIL} failed${RESET}, ${YELLOW}${SKIP} skipped${RESET} / ${TOTAL} total"
+    echo -e "${BOLD}Results:${RESET} ${GREEN}${PASS} passed${RESET}, ${RED}${FAIL} failed${RESET}, ${YELLOW}${SKIP} skipped${RESET} (${ASSERTIONS} assertions across ${TESTS} tests)"
     echo -e "${BOLD}Runtime:${RESET} ${RUNTIME}"
     echo -e "${BOLD}───────────────────────────────────────────────────────────${RESET}"
 }
@@ -66,11 +70,12 @@ log_summary() {
 build_run_cmd() {
     local wasm_or_bin="$1"
     shift
-    # NOTE: Do NOT use "--" to separate runtime flags from wasm args.
-    # Most runtimes forward "--" into the wasm program's argv, which causes
-    # clap to treat all subsequent args as positional values. Instead, place
-    # wasm program args directly after the .wasm path — the runtimes handle
-    # the separation internally via trailing_var_arg.
+    # NOTE: "--" handling is runtime-specific:
+    # - wasmtime/wasmedge/wamr: do NOT use "--" (they forward it into argv,
+    #   causing clap to treat subsequent args as positional values)
+    # - wasmer/wasix: MUST use "--" (wasmer intercepts flags like -f/-h)
+    # - libriscv: MUST use "--" (rvlinux intercepts -f for fuel, -h for help)
+    # - ckb-vm: MUST use "--" (ckb-debugger has its own flags)
     case "${RUNTIME}" in
         wasmtime)
             # wasmtime: trailing args after .wasm are passed to the program;
@@ -84,7 +89,7 @@ build_run_cmd() {
             ;;
         wasmedge)
             # wasmedge: --dir guest_path:host_path
-            echo "wasmedge --dir /:/  ${wasm_or_bin} $*"
+            echo "wasmedge --dir /:/ ${wasm_or_bin} $*"
             ;;
         wamr)
             # iwasm: --dir=path preopens a directory
@@ -185,6 +190,7 @@ fi
 # TEST 3: Convert sample PDF to JSON
 # ─────────────────────────────────────────────────────────────────────────────
 log_test "Convert sample.pdf → JSON"
+rm -f /test/output/sample.json
 run_cmd=$(build_run_cmd "${BINARY}" "-f json -o /test/output -q /test/fixtures/sample.pdf")
 if eval "${run_cmd}" > /test/output/json_stdout.txt 2>&1; then
     if [ -f "/test/output/sample.json" ]; then
