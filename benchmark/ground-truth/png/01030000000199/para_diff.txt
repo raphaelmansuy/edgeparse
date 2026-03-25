@@ -1,0 +1,190 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000199) ===
+
+[001] !!!
+  GT  : # Base Model Performance Evaluation of Upstage OCR Pack
+  EP  : Overview of OCR Pack
+
+[002] !!!
+  GT  : ## Overview of OCR Pack
+  EP  : Base Model Performance Evaluation of Upstage OCR Pack
+
+[003] !!!
+  GT  : ### Upstage universal OCR model E2E performance evaluation¹
+  EP  : Upstage universal OCR model E2E performance
+
+[004] !!!
+  GT  : | Company | Scene (Photographed document image) | Document (Scanned document image) | |---------|-----------------------
+  EP  : Upstage universal OCR model performance details: Document
+
+[005] !!!
+  GT  : ### Upstage universal OCR model performance details: Document criteria
+  EP  : evaluation1 criteria
+
+[006] !!!
+  GT  : | Metric | Company A | Company B | upstage | |---------|--------------|--------------|---------| | OCR-Recall³ | 73.2 | 
+  EP  : 73.2
+
+[007] !!!
+  GT  : ---
+  EP  : 100
+
+[008] !!!
+  GT  : ¹ Recall: Percentage of what the OCR model predicted to be True from those that were actually True ² Precision: Percenta
+  EP  : OCR-Recall 7
+
+[009] !!!
+  GT  : ---
+  EP  : 3
+
+[010] !!!
+  GT  : ¹ Performance based on universal model, additional performance improvement is possible by implementing specialized model
+  EP  : 94.2
+
+[011] !!!
+  GT  : (MISSING)
+  EP  : 94.14
+
+[012] !!!
+  GT  : (MISSING)
+  EP  : 95 11
+
+[013] !!!
+  GT  : (MISSING)
+  EP  : 95.5
+
+[014] !!!
+  GT  : (MISSING)
+  EP  : 5
+
+[015] !!!
+  GT  : (MISSING)
+  EP  : 90 89.0
+
+[016] !!!
+  GT  : (MISSING)
+  EP  : 92.4
+
+[017] !!!
+  GT  : (MISSING)
+  EP  : OCR-Precision
+
+[018] !!!
+  GT  : (MISSING)
+  EP  : 4 90.69 85 96.8
+
+[019] !!!
+  GT  : (MISSING)
+  EP  : 4
+
+[020] !!!
+  GT  : (MISSING)
+  EP  : 82.07
+
+[021] !!!
+  GT  : (MISSING)
+  EP  : 9
+
+[022] !!!
+  GT  : (MISSING)
+  EP  : 80.41
+
+[023] !!!
+  GT  : (MISSING)
+  EP  : 80
+
+[024] !!!
+  GT  : (MISSING)
+  EP  : 80.4
+
+[025] !!!
+  GT  : (MISSING)
+  EP  : 5
+
+[026] !!!
+  GT  : (MISSING)
+  EP  : 75.66 1
+
+[027] !!!
+  GT  : (MISSING)
+  EP  : OCR-F1
+
+[028] !!!
+  GT  : (MISSING)
+  EP  : 92.
+
+[029] !!!
+  GT  : (MISSING)
+  EP  : 75
+
+[030] !!!
+  GT  : (MISSING)
+  EP  : 4 95.5
+
+[031] !!!
+  GT  : (MISSING)
+  EP  : 70.23
+
+[032] !!!
+  GT  : (MISSING)
+  EP  : Company A
+
+[033] !!!
+  GT  : (MISSING)
+  EP  : 70
+
+[034] !!!
+  GT  : (MISSING)
+  EP  : Company B
+
+[035] !!!
+  GT  : (MISSING)
+  EP  : Parsing-F1 68.0
+
+[036] !!!
+  GT  : (MISSING)
+  EP  : 65
+
+[037] !!!
+  GT  : (MISSING)
+  EP  : 9 82.65
+
+[038] !!!
+  GT  : (MISSING)
+  EP  : Company Company
+
+[039] !!!
+  GT  : (MISSING)
+  EP  : # Company
+
+[040] !!!
+  GT  : (MISSING)
+  EP  : # Company
+
+[041] !!!
+  GT  : (MISSING)
+  EP  : A 2 2 2 2 B A B Scene (Photographed document image) Document (Scanned document image) 65 70 75 80 85 90 95 100
+
+[042] !!!
+  GT  : (MISSING)
+  EP  : # 3 Recall: Percentage of what the OCR model predicted to be True from those that were actually True
+
+[043] !!!
+  GT  : (MISSING)
+  EP  : 1 Performance based on universal model, additional performance improvement is possible by implementing specialized 4 Pre
+
+[044] !!!
+  GT  : (MISSING)
+  EP  : models according to business requirements 5 F1: Harmonic mean value of Recall and Precision
+
+[045] !!!
+  GT  : (MISSING)
+  EP  : 2 A: Universal model of global leading AI company / B: Universal model of leading AI company in Korea, 2022. 5 Test crit
+
+[046] !!!
+  GT  : (MISSING)
+  EP  : # 6. Parsing-F1: Comparison of parsing model F1 of both companies for business registration document
+
+[047] !!!
+  GT  : (MISSING)
+  EP  : form. Company A is excluded from comparison due to the absence of the document parsing model.
+

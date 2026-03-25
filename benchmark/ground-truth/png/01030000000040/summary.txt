@@ -1,0 +1,16 @@
+Document: 01030000000040
+Scores:
+  id                             = 01030000000040
+  pbf                            = 0.8333
+  teds                           = 0.0000
+  nid                            = 0.9526
+  overall                        = 0.4844
+
+Ground-truth paragraphs : 9
+EdgeParse paragraphs    : 14
+GT word count           : 415
+EdgeParse word count    : 395
+
+GT file    : /Users/raphaelmansuy/Github/03-working/edgeparse/benchmark/ground-truth/markdown/01030000000040.md
+Pred file  : /Users/raphaelmansuy/Github/03-working/edgeparse/benchmark/prediction/edgeparse/markdown/01030000000040.md
+PDF        : /Users/raphaelmansuy/Github/03-working/edgeparse/benchmark/pdfs/01030000000040.pdf

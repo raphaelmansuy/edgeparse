@@ -146,6 +146,57 @@ METRIC_INFO = {
             ("Quality over speed", "Docling / Marker"),
         ],
     },
+    "tqs": {
+        "name": "TQS — Text Content Quality",
+        "short": "TQS",
+        "description": (
+            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4). "
+            "Measures how accurately the extracted text matches the ground truth "
+            "after stripping Markdown formatting."
+        ),
+        "higher_better": True,
+        "why": (
+            "Structure metrics (NID, TEDS, MHS) tell you if the document is "
+            "organized correctly, but not whether the actual words are right. "
+            "TQS catches OCR errors, missing paragraphs, and hallucinated content "
+            "that would mislead LLMs during RAG retrieval."
+        ),
+        "when": [
+            ("Scanned / image-based PDFs", "Docling / Marker"),
+            ("Text-heavy research papers", "EdgeParse / PyMuPDF4LLM"),
+            ("High content fidelity required", "Check CER + WER too"),
+        ],
+    },
+    "rouge1": {
+        "name": "ROUGE-1",
+        "short": "ROUGE-1",
+        "description": "ROUGE-1 F1: unigram overlap between extracted and ground-truth text.",
+        "higher_better": True, "why": "", "when": [],
+    },
+    "rougeL": {
+        "name": "ROUGE-L",
+        "short": "ROUGE-L",
+        "description": "ROUGE-L F1: Longest Common Subsequence — order-aware recall.",
+        "higher_better": True, "why": "", "when": [],
+    },
+    "bleu4": {
+        "name": "BLEU-4",
+        "short": "BLEU-4",
+        "description": "BLEU-4 with +1 smoothing: 4-gram precision measuring fluency.",
+        "higher_better": True, "why": "", "when": [],
+    },
+    "cer": {
+        "name": "CER",
+        "short": "CER",
+        "description": "Character Error Rate: Levenshtein(chars)/len(ref). Lower is better.",
+        "higher_better": False, "why": "", "when": [],
+    },
+    "wer": {
+        "name": "WER",
+        "short": "WER",
+        "description": "Word Error Rate: Levenshtein(words)/len(ref_words). Lower is better.",
+        "higher_better": False, "why": "", "when": [],
+    },
 }
 
 
@@ -327,9 +378,9 @@ def _svg_grouped_bar_chart(
 
     Inspired by the opendataloader.org benchmark visual comparison.
     """
-    metrics = ["nid", "teds", "mhs", "td_f1"]
+    metrics = ["nid", "teds", "mhs", "td_f1", "tqs"]
     metric_labels = {
-        "nid": "NID", "teds": "TEDS", "mhs": "MHS", "td_f1": "TD F1",
+        "nid": "NID", "teds": "TEDS", "mhs": "MHS", "td_f1": "TD F1", "tqs": "TQS",
     }
     n_metrics = len(metrics)
     n_engines = len(engines)
@@ -431,8 +482,8 @@ def _svg_radar_chart(
     width: int = 520,
 ) -> str:
     """Generate an accessible SVG radar/spider chart comparing engines."""
-    metrics = ["nid", "teds", "mhs", "td_f1"]
-    metric_labels = ["NID", "TEDS", "MHS", "TD F1"]
+    metrics = ["nid", "teds", "mhs", "td_f1", "tqs"]
+    metric_labels = ["NID", "TEDS", "MHS", "TD F1", "TQS"]
     n_metrics = len(metrics)
     cx, cy = width // 2, width // 2 + 10
     r = width // 2 - 90
@@ -530,7 +581,7 @@ def _svg_overall_chart(
     data = [(e, overall_scores.get(e)) for e in engines]
     return _svg_bar_chart(
         "Overall Score", data, higher_better=True, width=width,
-        description="Average of NID + TEDS + MHS",
+        description="Average of NID + TEDS + MHS + TQS (text quality)",
         engine_colors=engine_colors,
     )
 
@@ -832,6 +883,7 @@ def generate_html_report(
     # Extract metric data
     metric_data: Dict[str, Dict[str, Optional[float]]] = {
         "nid": {}, "teds": {}, "mhs": {}, "td_f1": {}, "speed": {}, "overall": {},
+        "tqs": {}, "rouge1": {}, "rougeL": {}, "bleu4": {}, "cer": {}, "wer": {},
     }
     for eng in engines:
         d = results[eng]
@@ -844,15 +896,21 @@ def generate_html_report(
         metric_data["td_f1"][eng] = td.get("f1")
         metric_data["speed"][eng] = spd.get("elapsed_per_doc")
         metric_data["overall"][eng] = scores.get("overall_mean")
+        metric_data["tqs"][eng] = scores.get("text_quality_score_mean")
+        metric_data["rouge1"][eng] = scores.get("rouge1_mean")
+        metric_data["rougeL"][eng] = scores.get("rougeL_mean")
+        metric_data["bleu4"][eng] = scores.get("bleu4_mean")
+        metric_data["cer"][eng] = scores.get("cer_mean")
+        metric_data["wer"][eng] = scores.get("wer_mean")
 
     # Compute ranks
     ranks: Dict[str, Dict[str, int]] = {}
-    for mk in ["nid", "teds", "mhs", "td_f1", "overall"]:
+    for mk in ["nid", "teds", "mhs", "td_f1", "overall", "tqs", "rouge1", "rougeL", "bleu4"]:
         vals = [(e, metric_data[mk].get(e)) for e in engines]
         ranks[mk] = _compute_ranks(vals, True)
-    ranks["speed"] = _compute_ranks(
-        [(e, metric_data["speed"].get(e)) for e in engines], False
-    )
+    for mk in ["speed", "cer", "wer"]:
+        vals = [(e, metric_data[mk].get(e)) for e in engines]
+        ranks[mk] = _compute_ranks(vals, False)
 
     # Get metadata from first result
     first_data = next(iter(results.values()))
@@ -902,6 +960,7 @@ def generate_html_report(
                  '<th scope="col">NID</th>'
                  '<th scope="col">TEDS</th>'
                  '<th scope="col">MHS</th>'
+                 '<th scope="col">TQS</th>'
                  '<th scope="col">TD F1</th>'
                  '<th scope="col">s/doc</th>'
                  '<th scope="col">Overall</th>'
@@ -914,7 +973,7 @@ def generate_html_report(
     for eng in sorted_engines:
         ov_r = ranks.get("overall", {}).get(eng, 99)
         row = f'<tr><td><strong>{_esc(_get_display_name(eng))}</strong></td>'
-        for mk in ["nid", "teds", "mhs", "td_f1"]:
+        for mk in ["nid", "teds", "mhs", "tqs", "td_f1"]:
             val = metric_data[mk].get(eng)
             r = ranks[mk].get(eng, 99)
             cls = _rank_class(r)
@@ -949,10 +1008,25 @@ def generate_html_report(
     grouped_chart = _svg_grouped_bar_chart(engines, metric_data, engine_colors, width=900)
     parts.append(f'<div class="chart-container">{grouped_chart}</div>')
 
-    # Individual metric bar charts (2-col grid)
+    # Individual metric bar charts (2-col grid) — structural metrics
     parts.append('<div class="charts-grid">')
     for mk, info in [("nid", METRIC_INFO["nid"]), ("teds", METRIC_INFO["teds"]),
                      ("mhs", METRIC_INFO["mhs"]), ("td_f1", METRIC_INFO["td_f1"])]:
+        data = [(e, metric_data[mk].get(e)) for e in engines]
+        chart = _svg_bar_chart(
+            info["name"], data, info["higher_better"],
+            width=500, bar_height=32,
+            description=info["description"][:80],
+            engine_colors=engine_colors,
+        )
+        parts.append(f'<div class="chart-container">{chart}</div>')
+    parts.append("</div>")
+
+    # Text quality metric bar charts (2-col grid)
+    parts.append('<h3 style="margin:1.5rem 0 0.75rem">Text Content Quality</h3>')
+    parts.append('<div class="charts-grid">')
+    for mk, info in [("tqs", METRIC_INFO["tqs"]), ("rouge1", METRIC_INFO["rouge1"]),
+                     ("rougeL", METRIC_INFO["rougeL"]), ("bleu4", METRIC_INFO["bleu4"])]:
         data = [(e, metric_data[mk].get(e)) for e in engines]
         chart = _svg_bar_chart(
             info["name"], data, info["higher_better"],
@@ -986,7 +1060,7 @@ def generate_html_report(
 
     # ── Verdict ───────────────────────────────────────────────────────────────
     win_counts: Dict[str, int] = {e: 0 for e in engines}
-    for mk in ["nid", "teds", "mhs", "td_f1", "speed"]:
+    for mk in ["nid", "teds", "mhs", "td_f1", "tqs", "speed"]:
         for eng, r in ranks[mk].items():
             if r == 1:
                 win_counts[eng] += 1
@@ -995,7 +1069,7 @@ def generate_html_report(
     winner_wins = win_counts[winner]
 
     parts.append('<div class="verdict" role="status" aria-live="polite">')
-    parts.append(f'  <h3>{_esc(_get_display_name(winner))} wins {winner_wins}/5 metrics</h3>')
+    parts.append(f'  <h3>{_esc(_get_display_name(winner))} wins {winner_wins}/6 metrics</h3>')
     parts.append('  <p class="detail">')
     others = [(e, c) for e, c in win_counts.items() if e != winner and c > 0]
     if others:

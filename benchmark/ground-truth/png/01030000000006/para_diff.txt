@@ -1,0 +1,14 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000006) ===
+
+[001] OK 
+  GT  : # Chuj Country
+  EP  : # Chuj Country
+
+[002] !!!
+  GT  : *Image of a trail in the Yolcultac forest*
+  EP  : Figure 1.15. On the trail in the Yolcultac ( “center of the brushland”) forest, municipio of Nentón. May 1965, at the en
+
+[003] !!!
+  GT  : **FIGURE 1.15.** On the trail in the Yolcultac (*yol k’ultak*, “center of the brushland”) forest, municipio of Nentón. M
+  EP  : (MISSING)
+

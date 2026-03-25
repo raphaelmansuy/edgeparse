@@ -1,0 +1,288 @@
+"""Text-content quality metrics for PDF-to-Markdown evaluation.
+
+Computes BLEU-4, ROUGE-1/2/L, CER, WER, and F1-token from plain-text
+representations of the ground-truth and predicted Markdown.
+
+All metrics operate on normalised plain text (Markdown syntax stripped,
+whitespace collapsed, lowercased) so that cosmetic formatting differences
+do not inflate or deflate content-accuracy scores.
+
+Metric summary
+--------------
+bleu4        BLEU-4 with +1 smoothing  [0–1]  higher is better
+rouge1       ROUGE-1 F1               [0–1]  higher is better
+rouge2       ROUGE-2 F1               [0–1]  higher is better
+rougeL       ROUGE-L F1 (LCS-based)  [0–1]  higher is better
+cer          Character Error Rate     [0–∞]  lower is better
+wer          Word Error Rate          [0–∞]  lower is better
+f1_token     Bag-of-words F1          [0–1]  higher is better
+text_quality_score  mean(rouge1, rougeL, bleu4)  [0–1]  higher is better
+"""
+
+from __future__ import annotations
+
+import math
+import re
+from collections import Counter
+from typing import Dict, List, Optional, Tuple
+
+from rapidfuzz.distance import Levenshtein
+
+
+# ─── Text normalisation ────────────────────────────────────────────────────────
+
+_CODE_BLOCK_RE   = re.compile(r"```[\s\S]*?```")
+_INLINE_CODE_RE  = re.compile(r"`[^`]*`")
+_HTML_TAG_RE     = re.compile(r"<[^>]+>")
+_HEADING_RE      = re.compile(r"^#{1,6}\s+", re.MULTILINE)
+_BOLD_ITALIC_RE  = re.compile(r"\*{1,3}([\s\S]*?)\*{1,3}")
+_UNDERSCORE_RE   = re.compile(r"_{1,3}([\s\S]*?)_{1,3}")
+_LINK_RE         = re.compile(r"!\[([^\]]*)\]\([^)]*\)")  # images first
+_IMAGE_RE        = re.compile(r"\[([^\]]*)\]\([^)]*\)")   # then links
+_MATH_BLOCK_RE   = re.compile(r"\$\$[\s\S]*?\$\$")
+_MATH_INLINE_RE  = re.compile(r"\$[^$\n]+\$")
+_TABLE_PIPE_RE   = re.compile(r"\|")
+_TABLE_SEP_RE    = re.compile(r"^[\s|:\-]+$", re.MULTILINE)
+_WHITESPACE_RE   = re.compile(r"\s+")
+_WORD_RE         = re.compile(r"\w+", re.UNICODE)
+
+
+def strip_markdown(text: str) -> str:
+    """Remove Markdown / HTML formatting; return lowercased plain text."""
+    # Fenced code blocks
+    text = _CODE_BLOCK_RE.sub(" ", text)
+    # Inline code
+    text = _INLINE_CODE_RE.sub(" ", text)
+    # HTML tags
+    text = _HTML_TAG_RE.sub(" ", text)
+    # Display math before inline math
+    text = _MATH_BLOCK_RE.sub(" ", text)
+    text = _MATH_INLINE_RE.sub(" ", text)
+    # Headings — strip the `#` marker, keep the heading text
+    text = _HEADING_RE.sub("", text)
+    # Bold / italic — keep inner text
+    while _BOLD_ITALIC_RE.search(text):
+        text = _BOLD_ITALIC_RE.sub(r"\1", text)
+    while _UNDERSCORE_RE.search(text):
+        text = _UNDERSCORE_RE.sub(r"\1", text)
+    # Images → alt text; links → link text
+    text = _LINK_RE.sub(r"\1", text)
+    text = _IMAGE_RE.sub(r"\1", text)
+    # Table separators and pipes
+    text = _TABLE_SEP_RE.sub(" ", text)
+    text = _TABLE_PIPE_RE.sub(" ", text)
+    # Collapse whitespace and lowercase
+    text = _WHITESPACE_RE.sub(" ", text).strip().lower()
+    return text
+
+
+def _tokenize(text: str) -> List[str]:
+    """Return list of word tokens (Unicode-aware)."""
+    return _WORD_RE.findall(text)
+
+
+# ─── BLEU-4 ───────────────────────────────────────────────────────────────────
+
+def _count_ngrams(tokens: List[str], n: int) -> Counter:
+    return Counter(tuple(tokens[i : i + n]) for i in range(max(len(tokens) - n + 1, 0)))
+
+
+def _bleu4(ref_tokens: List[str], hyp_tokens: List[str]) -> float:
+    """Corpus-level BLEU-4 with +1 (Chen-Cherry) smoothing.
+
+    Returns 0.0 on empty inputs; never raises.
+    """
+    if not ref_tokens or not hyp_tokens:
+        return 0.0
+
+    # Brevity penalty
+    r, c = len(ref_tokens), len(hyp_tokens)
+    bp = 1.0 if c >= r else math.exp(1.0 - r / c)
+
+    log_avg = 0.0
+    for n in range(1, 5):
+        ref_ng = _count_ngrams(ref_tokens, n)
+        hyp_ng = _count_ngrams(hyp_tokens, n)
+
+        match = sum(min(cnt, ref_ng.get(ng, 0)) for ng, cnt in hyp_ng.items())
+        total = max(len(hyp_tokens) - n + 1, 0)
+
+        # +1 smoothing prevents log(0)
+        log_avg += math.log((match + 1) / (total + 1)) / 4
+
+    return float(bp * math.exp(log_avg))
+
+
+# ─── ROUGE-1 / ROUGE-2 ────────────────────────────────────────────────────────
+
+def _rouge_n_f1(ref_tokens: List[str], hyp_tokens: List[str], n: int) -> float:
+    """ROUGE-N F1 (uses unigrams for n=1, bigrams for n=2, etc.)."""
+    ref_ng = _count_ngrams(ref_tokens, n)
+    hyp_ng = _count_ngrams(hyp_tokens, n)
+
+    if not ref_ng:
+        return 0.0
+
+    match = sum(min(cnt, ref_ng.get(ng, 0)) for ng, cnt in hyp_ng.items())
+
+    ref_total = sum(ref_ng.values())
+    hyp_total = sum(hyp_ng.values())
+
+    if hyp_total == 0 or ref_total == 0:
+        return 0.0
+
+    precision = match / hyp_total
+    recall    = match / ref_total
+
+    if precision + recall == 0.0:
+        return 0.0
+    return 2.0 * precision * recall / (precision + recall)
+
+
+# ─── ROUGE-L (LCS-based) ─────────────────────────────────────────────────────
+
+def _lcs_len(a: List[str], b: List[str]) -> int:
+    """Length of the Longest Common Subsequence of two token lists."""
+    m, n = len(a), len(b)
+    # Use two-row DP to keep memory linear
+    prev: List[int] = [0] * (n + 1)
+    for i in range(m):
+        curr: List[int] = [0] * (n + 1)
+        for j in range(n):
+            curr[j + 1] = prev[j] + 1 if a[i] == b[j] else max(prev[j + 1], curr[j])
+        prev = curr
+    return prev[n]
+
+
+def _rouge_l_f1(ref_tokens: List[str], hyp_tokens: List[str]) -> float:
+    """ROUGE-L F1 based on Longest Common Subsequence."""
+    if not ref_tokens or not hyp_tokens:
+        return 0.0
+
+    lcs = _lcs_len(ref_tokens, hyp_tokens)
+    precision = lcs / len(hyp_tokens)
+    recall    = lcs / len(ref_tokens)
+
+    if precision + recall == 0.0:
+        return 0.0
+    return 2.0 * precision * recall / (precision + recall)
+
+
+# ─── CER / WER ────────────────────────────────────────────────────────────────
+
+def _cer(gt_plain: str, pred_plain: str) -> Optional[float]:
+    """Character Error Rate = Levenshtein(chars) / len(reference).
+
+    Capped at 2.0 to keep outliers from dominating averages.
+    Returns None when the reference is empty.
+    """
+    if not gt_plain:
+        return None
+    dist = Levenshtein.distance(gt_plain, pred_plain)
+    return min(dist / len(gt_plain), 2.0)
+
+
+def _wer(gt_plain: str, pred_plain: str) -> Optional[float]:
+    """Word Error Rate = Levenshtein(words) / len(reference_words).
+
+    Capped at 2.0. Returns None when the reference has no words.
+    """
+    ref_words = gt_plain.split()
+    hyp_words = pred_plain.split()
+    if not ref_words:
+        return None
+    dist = Levenshtein.distance(ref_words, hyp_words)
+    return min(dist / len(ref_words), 2.0)
+
+
+# ─── F1-token (bag-of-words) ──────────────────────────────────────────────────
+
+def _f1_token(ref_tokens: List[str], hyp_tokens: List[str]) -> float:
+    """Bag-of-words token F1 (unordered unigram precision × recall harmonic mean).
+
+    Equivalent to ROUGE-1 but computed from Counter directly.
+    Handles multisets correctly (shared tokens counted up to their min frequency).
+    """
+    if not ref_tokens and not hyp_tokens:
+        return 1.0
+    if not ref_tokens or not hyp_tokens:
+        return 0.0
+
+    ref_c = Counter(ref_tokens)
+    hyp_c = Counter(hyp_tokens)
+    common = sum((ref_c & hyp_c).values())
+
+    precision = common / len(hyp_tokens)
+    recall    = common / len(ref_tokens)
+
+    if precision + recall == 0.0:
+        return 0.0
+    return 2.0 * precision * recall / (precision + recall)
+
+
+# ─── Public API ───────────────────────────────────────────────────────────────
+
+def evaluate_text_quality(
+    gt: Optional[str],
+    pred: Optional[str],
+) -> Dict[str, Optional[float]]:
+    """Compute text-content quality metrics between GT and prediction Markdown.
+
+    Both inputs are normalised (MD stripped, lowercased) before metric
+    computation so that formatting differences do not affect the scores.
+
+    Parameters
+    ----------
+    gt:   Ground-truth Markdown string.
+    pred: Predicted Markdown string.
+
+    Returns
+    -------
+    dict with keys:
+        bleu4              BLEU-4 with smoothing         [0–1]  ↑ better
+        rouge1             ROUGE-1 F1                    [0–1]  ↑ better
+        rouge2             ROUGE-2 F1                    [0–1]  ↑ better
+        rougeL             ROUGE-L F1                    [0–1]  ↑ better
+        cer                Character Error Rate          [0–2]  ↓ better
+        wer                Word Error Rate               [0–2]  ↓ better
+        f1_token           Bag-of-words token F1         [0–1]  ↑ better
+        text_quality_score mean(rouge1, rougeL, bleu4)  [0–1]  ↑ better
+    """
+    gt_plain   = strip_markdown(gt   or "")
+    pred_plain = strip_markdown(pred or "")
+
+    _null: Dict[str, Optional[float]] = {
+        "bleu4": None, "rouge1": None, "rouge2": None, "rougeL": None,
+        "cer": None, "wer": None, "f1_token": None, "text_quality_score": None,
+    }
+
+    if not gt_plain:
+        return _null
+
+    ref_tokens = _tokenize(gt_plain)
+    hyp_tokens = _tokenize(pred_plain)
+
+    bleu4  = _bleu4(ref_tokens, hyp_tokens)
+    rouge1 = _rouge_n_f1(ref_tokens, hyp_tokens, 1)
+    rouge2 = _rouge_n_f1(ref_tokens, hyp_tokens, 2)
+    rouge_l = _rouge_l_f1(ref_tokens, hyp_tokens)
+    cer    = _cer(gt_plain, pred_plain)
+    wer    = _wer(gt_plain, pred_plain)
+    f1_tok = _f1_token(ref_tokens, hyp_tokens)
+
+    # Composite: mean of the three most discriminating [0–1] higher-is-better
+    # metrics: ROUGE-1 (recall/precision balance), ROUGE-L (order-aware),
+    # BLEU-4 (n-gram precision fluency).
+    quality_parts = [v for v in (rouge1, rouge_l, bleu4) if v is not None]
+    text_quality_score = sum(quality_parts) / len(quality_parts) if quality_parts else None
+
+    return {
+        "bleu4":              bleu4,
+        "rouge1":             rouge1,
+        "rouge2":             rouge2,
+        "rougeL":             rouge_l,
+        "cer":                cer,
+        "wer":                wer,
+        "f1_token":           f1_tok,
+        "text_quality_score": text_quality_score,
+    }

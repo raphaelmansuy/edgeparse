@@ -1,0 +1,58 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000040) ===
+
+[001] OK 
+  GT  : Thailand, Philippines and Indonesia in particular, identifying known experts at the national, subnational and community 
+  EP  : Thailand, Philippines and Indonesia in particular, identifying known experts at the national, subnational and community 
+
+[002] OK 
+  GT  : The survey was made available in English, Bahasa, Thai and Tagalog. We used the Qualtrics platform to facilitate the eas
+  EP  : The survey was made available in English, Bahasa, Thai and Tagalog. We used the Qualtrics platform to facilitate the eas
+
+[003] OK 
+  GT  : The platform allows for the easy migration of data into various statistical packages, including STATA, the main statisti
+  EP  : The platform allows for the easy migration of data into various statistical packages, including STATA, the main statisti
+
+[004] OK 
+  GT  : It is important to note the limitations of this six-month study. Although the survey was disseminated among all member s
+  EP  : It is important to note the limitations of this six-month study. Although the survey was disseminated among all member s
+
+[005] OK 
+  GT  : This is with the exception of Myanmar. Given the current political circumstances and challenges posed by COVID-19, on to
+  EP  : This is with the exception of Myanmar. Given the current political circumstances and challenges posed by COVID-19, on to
+
+[006] !!!
+  GT  : ---
+  EP  : Figure 1: Age by gender of respondents
+
+[007] !!!
+  GT  : ### Figure 1: Age by gender of respondents
+  EP  : OVER 50
+
+[008] !!!
+  GT  : | Age Group | Male | Female | |:---|:---:|:---:| | OVER 50 |  |  | | 41-50 |  |  | | 31-40 |  |  | | 25-30 |  |  |
+  EP  : 41-50
+
+[009] !!!
+  GT  : *Gender Analysis of Violent Extremism and the Impact of COVID-19 on Peace and Security in ASEAN*
+  EP  : 31-40
+
+[010] !!!
+  GT  : (MISSING)
+  EP  : 25-30
+
+[011] !!!
+  GT  : (MISSING)
+  EP  : Male Female
+
+[012] !!!
+  GT  : (MISSING)
+  EP  : 0 5 10
+
+[013] !!!
+  GT  : (MISSING)
+  EP  : 15 20
+
+[014] !!!
+  GT  : (MISSING)
+  EP  : Gender Analysis of Violent Extremism and the Impact of COVID-19 on Peace and Security in ASEAN
+

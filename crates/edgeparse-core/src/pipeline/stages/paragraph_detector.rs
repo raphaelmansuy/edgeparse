@@ -16,7 +16,8 @@ const MERGE_PROBABILITY: f64 = 0.75;
 const FONT_SIZE_TOLERANCE: f64 = 0.15;
 
 /// Maximum vertical gap (as multiple of font size) to merge blocks.
-const MAX_GAP_FACTOR: f64 = 2.5;
+/// OODA-1: Reduced from 2.5 → 2.0 to avoid merging blocks with large gaps.
+const MAX_GAP_FACTOR: f64 = 2.0;
 
 /// Maximum width ratio of the first line to subsequent lines to consider it
 /// a potential heading line for font-based splitting.
@@ -143,7 +144,9 @@ fn should_merge(a: &TextBlock, b: &TextBlock) -> bool {
     // the block's right margin in justified text, it ends a paragraph.
     // This prevents the paragraph_detector from re-merging blocks that the
     // text_block_grouper correctly split at paragraph boundaries.
-    if a.text_lines.len() >= 3 {
+    // OODA-2: Lowered line count guard from >=3 to >=2 to extend to shorter blocks.
+    // OODA-3: Reduced threshold multiplier from 2.0 to 1.5 to catch more paragraph endings.
+    if a.text_lines.len() >= 2 {
         let a_right = a
             .text_lines
             .iter()
@@ -172,7 +175,7 @@ fn should_merge(a: &TextBlock, b: &TextBlock) -> bool {
                     || trimmed.ends_with('"')
                     || trimmed.ends_with('\u{201D}');
                 let is_real_sentence_end = last_chars >= 20 || ends_sentence;
-                if short_gap > a.font_size.max(1.0) * 2.0
+                if short_gap > a.font_size.max(1.0) * 1.5
                     && !ends_hyphen
                     && is_real_sentence_end
                     && !looks_like_lowercase_block_continuation(b)
@@ -183,7 +186,48 @@ fn should_merge(a: &TextBlock, b: &TextBlock) -> bool {
         }
     }
 
+    // OODA-4: Geometric first-line indentation detection.
+    // In LaTeX/Word documents, new paragraphs often start with an indented first
+    // line (\parindent). If block B's first line is significantly more indented
+    // (larger left_x) than B's body text left margin, B is starting a new paragraph.
+    // This signal is otherwise invisible to the Jaccard overlap check because
+    // indented lines still share most of the horizontal extent with body lines.
+    if block_first_line_is_indented(b) {
+        let last_text = a.text_lines.last().map(|l| l.value()).unwrap_or_default();
+        let trimmed = last_text.trim_end();
+        let last_ends_hyphen = trimmed.ends_with('-')
+            || trimmed.ends_with('\u{00AD}')
+            || trimmed.ends_with('\u{2010}');
+        if !last_ends_hyphen {
+            return false;
+        }
+    }
+
     true
+}
+
+/// Geometric check: detect if a TextBlock starts with a first-line indentation
+/// pattern — i.e., the first line is significantly more indented (larger left_x)
+/// than the median left_x of the body text (lines 1..n).
+///
+/// This is the principal paragraph-boundary signal in LaTeX documents with
+/// \parindent > 0. The threshold is 0.8× font_size to avoid triggering on
+/// typical PDF coordinate noise (≤ 2pt).
+fn block_first_line_is_indented(block: &TextBlock) -> bool {
+    if block.text_lines.len() < 2 {
+        return false;
+    }
+    let first_left = block.text_lines[0].bbox.left_x;
+    let mut body_lefts: Vec<f64> = block.text_lines[1..]
+        .iter()
+        .map(|l| l.bbox.left_x)
+        .collect();
+    body_lefts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let body_left = body_lefts[body_lefts.len() / 2]; // median
+    let font_size = block.font_size.max(1.0);
+    // The indentation must exceed 0.8× font_size (typically 8–12pt) to
+    // distinguish true paragraph indents from PDF rendering noise.
+    first_left > body_left + font_size * 0.8
 }
 
 fn should_merge_parenthetical_heading_stack(a: &TextBlock, b: &TextBlock) -> bool {

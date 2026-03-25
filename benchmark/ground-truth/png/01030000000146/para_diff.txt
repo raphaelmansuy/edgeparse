@@ -1,0 +1,62 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000146) ===
+
+[001] !!!
+  GT  : # Reference frameworks:
+  EP  : organizations to navigate successfully the global digital economy. Finally each of the identified competences, within th
+
+[002] !!!
+  GT  : - **GreenComp – *The European Sustainability Competence Framework***(1), responds to the growing need for people to impr
+  EP  : # Reference frameworks:
+
+[003] !!!
+  GT  : *GreenComp* is a reference framework for sustainability competences. It provides a common ground to learners and guidanc
+  EP  : ⮚ GreenComp – “The European Sustainability Competence Framework”(1), responds to
+
+[004] !!!
+  GT  : *Green-Comp* is the result of a robust research methodology that has involved a large and diverse group of experts and s
+  EP  : the growing need for people to improve and develop the knowledge, skills and attitudes to live, work and act in a sustai
+
+[005] !!!
+  GT  : *GreenComp* consists of 12 competences organised into the four main areas below:
+  EP  : GreenComp is a reference framework for sustainability competences. It provides a common ground to learners and guidance 
+
+[006] !!!
+  GT  : | Area | Competence | |:---|:---| | **1. Embodying sustainability values** | 1.1 Valuing sustainability<br>1.2 Supportin
+  EP  : Green- Comp is the result of a robust research methodology that has involved a large and diverse group of experts and st
+
+[007] !!!
+  GT  : This project has been funded with the support of the European Commission. This publication reflects the views only of th
+  EP  : GreenComp consists of 12 competences organised into the four main areas below:
+
+[008] !!!
+  GT  : **Project No.:** 2021-2-FR02-KA220-YOU-000048126
+  EP  : Area
+
+[009] !!!
+  GT  : (MISSING)
+  EP  : Competence
+
+[010] !!!
+  GT  : (MISSING)
+  EP  : 1. Embodying sustainability values
+
+[011] !!!
+  GT  : (MISSING)
+  EP  : 2. Embracing complexity in sustainability
+
+[012] !!!
+  GT  : (MISSING)
+  EP  : # 3. Envisioning sustainable futures
+
+[013] !!!
+  GT  : (MISSING)
+  EP  : 1.1 Valuing sustainability 1.2 Supporting fairness 1.3 Promoting nature 2.1 Systems thinking 2.2 Critical thinking 2.3 P
+
+[014] !!!
+  GT  : (MISSING)
+  EP  : This project has been funded with the support of the European Commission. This publication reflects the views only of th
+
+[015] !!!
+  GT  : (MISSING)
+  EP  : Project No: : 2021-2-FR02-KA220-YOU-000048126
+

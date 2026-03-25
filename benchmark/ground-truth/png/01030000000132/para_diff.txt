@@ -1,0 +1,50 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000132) ===
+
+[001] OK 
+  GT  : # Fish species on IUCN Red List
+  EP  : # Fish species on IUCN Red List
+
+[002] !!!
+  GT  : | Fish species on IUCN Red List | Scientific name | |:------------------------------|:----------------| | Potosi Pupfish
+  EP  : Cyprinodon alvarezi La Palma Pupfish Cyprinodon longidorsalis
+
+[003] !!!
+  GT  : *Table 6.1: Four fish species on IUCN Red List "Extinct in the Wild" held in public aquariums.*
+  EP  : Potosi Pupfish
+
+[004] !!!
+  GT  : ---
+  EP  : Butterfly Splitfin Ameca splendens Golden Skiffia
+
+[005] !!!
+  GT  : Public aquariums, because of their in-house expertise, can act quickly to collect and breed rare fish. Actions to preven
+  EP  : Skiffia francesae
+
+[006] !!!
+  GT  : The breeding colonies of the Butterfly Splitfin (Figure 6.3) at the London Zoo and elsewhere serve as ark populations es
+  EP  : Table 6.1: Four fish species on IUCN Red List "Extinct in the Wild" held in public aquariums.
+
+[007] !!!
+  GT  : The Banggai Cardinalfish (*Pterapogon kauderni*), a small, endangered tropical cardinalfish in the family Apogonidae, is
+  EP  : Public aquariums, because of their inhouse expertise, can act quickly to collect and breed rare fish. Actions to prevent
+
+[008] !!!
+  GT  : *Figure 6.3: Photo of the critically endangered Butterfly Splitfin (*Ameca splendens*).*
+  EP  : Topminnows in a behind-the-scenes Figure 6.3: Photo of the critically endangered Butterfly Splitfin (Ameca spendens).
+
+[009] !!!
+  GT  : *Figure 6.4: Lake Sturgeon (*Acipenser fulvescens*).*
+  EP  : The breeding colonies of the Butterfly Splitfin (Figure 6.3) at the London Zoo and elsewhere serve as ark populations es
+
+[010] !!!
+  GT  : (MISSING)
+  EP  : Figure 6.4: Lake Sturgeon (Acipenser fulvescens).
+
+[011] !!!
+  GT  : (MISSING)
+  EP  : The Banggai Cardinalfish (Pterapogon kauderni), a small, endangered tropical cardinalfish in the family Apogonidae, is n
+
+[012] !!!
+  GT  : (MISSING)
+  EP  : 132 | Public Aquariums and Their Role in Education, Science, and Conservation
+

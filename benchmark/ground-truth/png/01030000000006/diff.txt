@@ -1,0 +1,15 @@
+=== GROUND TRUTH (01030000000006) ===
+
+# Chuj Country
+
+*Image of a trail in the Yolcultac forest*
+
+**FIGURE 1.15.** On the trail in the Yolcultac (*yol k’ultak*, “center of the brushland”) forest, municipio of Nentón. May 1965, at the end of the dry season. Photo by the author.
+
+
+=== EDGEPARSE OUTPUT (01030000000006) ===
+
+# Chuj Country
+
+Figure 1.15. On the trail in the Yolcultac ( “center of the brushland”) forest, municipio of Nentón. May 1965, at the end of the dry season. Photo by the author. yol k’ultak,
+

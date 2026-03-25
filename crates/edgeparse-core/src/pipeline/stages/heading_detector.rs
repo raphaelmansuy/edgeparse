@@ -36,8 +36,13 @@ const FONT_SIZE_RARITY_BOOST: f64 = 0.5;
 /// Maximum boost from font weight rarity.
 const FONT_WEIGHT_RARITY_BOOST: f64 = 0.3;
 
-/// Body text font size mode search range (reference: 10.0–13.0).
-const FONT_SIZE_DOMINANT_MIN: f64 = 10.0;
+/// Body text font size mode search range.
+/// Lowered min to 8.0 to handle academic documents where body text is
+/// often 8.5–10pt (e.g., journal articles, textbooks).  The original
+/// reference value was 10.0–13.0, which incorrectly promoted the
+/// heading font as the "body mode" when body text was < 10pt, causing
+/// the rarity boost to always return 0 and headings to fail detection.
+const FONT_SIZE_DOMINANT_MIN: f64 = 8.0;
 const FONT_SIZE_DOMINANT_MAX: f64 = 13.0;
 
 /// Heading candidate font size range (reference: 10.0–32.0).
@@ -399,7 +404,7 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
 
         let probability = base_prob + size_rarity + weight_rarity;
 
-        if probability > HEADING_PROBABILITY {
+        if probability >= HEADING_PROBABILITY {
             promoted.insert((page_idx, elem_idx));
             let style = TextStyle {
                 font_size,

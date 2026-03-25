@@ -1,0 +1,34 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000045) ===
+
+[001] !!!
+  GT  : ## Table: The number of accredited observers as of 28 April 2022
+  EP  : Civil Society Engagement election integrity. The registration of local election observers runs until 25 May, and the NEC
+
+[002] !!!
+  GT  : | No. | Name of organization                                              | Number of accredited observers | |:---:|----
+  EP  : Table: The number of accredited observers as of 28 April 15
+
+[003] !!!
+  GT  : [15](https://www.nec.gov.kh/khmer/content/5524)
+  EP  : | No. Name of organization | No. Name of organization | Number of accredited | | --- | --- | --- | | 1 Union of Youth Fe
+
+[004] !!!
+  GT  : (MISSING)
+  EP  : (UYFC)
+
+[005] !!!
+  GT  : (MISSING)
+  EP  : Cambodia
+
+[006] !!!
+  GT  : (MISSING)
+  EP  : Volunteer
+
+[007] !!!
+  GT  : (MISSING)
+  EP  : Organization
+
+[008] !!!
+  GT  : (MISSING)
+  EP  : 15 https://www.nec.gov.kh/khmer/content/5524
+

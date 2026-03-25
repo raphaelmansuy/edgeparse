@@ -398,10 +398,21 @@ def run_comparison(
         spd = data.get("speed", {})
         summary[eng] = {
             "display_name": display_name(eng),
+            # Structural metrics
             "nid": scores.get("nid_mean"),
             "teds": scores.get("teds_mean"),
             "mhs": scores.get("mhs_mean"),
             "paragraph_boundary_f1": scores.get("paragraph_boundary_f1_mean"),
+            # Text content quality metrics
+            "text_quality_score": scores.get("text_quality_score_mean"),
+            "rouge1": scores.get("rouge1_mean"),
+            "rouge2": scores.get("rouge2_mean"),
+            "rougeL": scores.get("rougeL_mean"),
+            "bleu4": scores.get("bleu4_mean"),
+            "f1_token": scores.get("f1_token_mean"),
+            "cer": scores.get("cer_mean"),
+            "wer": scores.get("wer_mean"),
+            # Composite + auxiliary
             "overall": scores.get("overall_mean"),
             "table_detection_f1": td.get("f1"),
             "speed_per_doc": spd.get("elapsed_per_doc"),

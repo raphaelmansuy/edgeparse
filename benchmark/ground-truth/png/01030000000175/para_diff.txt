@@ -1,0 +1,22 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000175) ===
+
+[001] !!!
+  GT  : radiation at other wavelengths, as shown in [Figure 1](#). Just as you can catch more rain with a garbage can than with 
+  EP  : radiation at other wavelengths, as shown in (Figure 1). Just as you can catch more rain with a garbage can than with a c
+
+[002] !!!
+  GT  : # Orion Region at Different Wavelengths
+  EP  : # Orion Region at Different Wavelengths.
+
+[003] !!!
+  GT  : | (a) | (b) | (c) | | :---: | :---: | :---: | |  |  |  |
+  EP  : Figure 1. The same part of the sky looks different when observed with instruments that are sensitive to different bands 
+
+[004] !!!
+  GT  : **Figure 1.** The same part of the sky looks different when observed with instruments that are sensitive to different ba
+  EP  : 276 | Chapter 6 Astronomical Instruments Section 6.1: Telescopes
+
+[005] !!!
+  GT  : 276 | Chapter 6 Astronomical Instruments Section 6.1: Telescopes
+  EP  : (MISSING)
+

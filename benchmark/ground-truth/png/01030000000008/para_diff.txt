@@ -1,0 +1,70 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000008) ===
+
+[001] OK 
+  GT  : # Circulating Things, Circulating Stereotypes
+  EP  : # Circulating Things, Circulating Stereotypes
+
+[002] OK 
+  GT  : indicates the use of balsam, which is “indigenous in various parts of Arabia,” as an ingredient in the “Myrabolan comfit
+  EP  : indicates the use of balsam, which is “indigenous in various parts of Arabia,” as an ingredient in the “Myrabolan comfit
+
+[003] !!!
+  GT  : Coffee is another staple thing customarily associated with the area. In his *Dictionary*, Johnson indicates the Arabic o
+  EP  : Coffee is another staple thing customarily associated with the area. In his Dictionary, Johnson indicates the Arabic ori
+
+[004] !!!
+  GT  : | Footnote | Citation | | --- | --- | | 25 | Wiliam Beckford, *An Arabian Tale, from an Unpublished Manuscript: With Not
+  EP  : 25 Wiliam Beckford, An Arabian Tale, from an Unpublished Manuscript: With Notes Critical and Explanatory
+
+[005] !!!
+  GT  : FIGURE 4.2 William Hogarth, *Taste in High Life* [graphic]. PRINT MADE BY ISAAC MILLS AFTER WILLIAM HOGARTH’S PAINTING, 
+  EP  : (London: Printed for J. Johnson, 1786), 165. 26 For the association between coffee and wine, see Ralph
+
+[006] !!!
+  GT  : Turks ... [and] by the Merchants of Mogul, Persia, and several places on the coast of Ethiopia.[30] From here, coffee sp
+  EP  : S. Hattox, Coffee and Coffeehouses: The Origins of a Social Beverage in the Medieval Middle East (Seattle: University of
+
+[007] !!!
+  GT  : Arabian medicines were also much sought-after in the Western world. As indicated by Beawes, “from Arabia, Medicinal drug
+  EP  : 27 A Collection of Voyages and Travels, 1:440.
+
+[008] !!!
+  GT  : | Footnote | Citation | | --- | --- | | 30 | Beawes, *Lex Mercatoria Rediviva*, 791. | | 31 | Again, the custom of readi
+  EP  : 28 Coffee was customarily used as a mild painkiller during the eighteenth century. Poet Alexander Pope, for instance, us
+
+[009] !!!
+  GT  : (MISSING)
+  EP  : 29 Pope,
+
+[010] !!!
+  GT  : (MISSING)
+  EP  : The Rape of the Lock, 69.
+
+[011] !!!
+  GT  : (MISSING)
+  EP  : Figure 4.2 William Hogarth, Taste in High Life [graphic]. Print made by isaac mills after William Hogarth’s painting, wi
+
+[012] !!!
+  GT  : (MISSING)
+  EP  : Turks … [and] by the Merchants of Mogul, Persia, and several places on the coast of Ehiopia.”30 From here, coffee spread
+
+[013] !!!
+  GT  : (MISSING)
+  EP  : Arabian medicines were also much sought-after in the Western world. As indicated by Beawes, “from Arabia, Medicinal drug
+
+[014] !!!
+  GT  : (MISSING)
+  EP  : Lex Mercatoria Rediviva, 791.
+
+[015] !!!
+  GT  : (MISSING)
+  EP  : 31 Again, the custom of reading one’s fortune in coffee grounds is of Turkish provenance, not Arabic. Such mistaken attr
+
+[016] !!!
+  GT  : (MISSING)
+  EP  : 32 Beawes, 33 M.M.,
+
+[017] !!!
+  GT  : (MISSING)
+  EP  : Lex Mercatoria Rediviva, 792. Pharmacopoia Reformata: Or, An Essay for a Reformation of the London Pharmacopoia, by a Se
+

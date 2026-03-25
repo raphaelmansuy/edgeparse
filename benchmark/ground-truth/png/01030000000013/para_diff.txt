@@ -1,0 +1,46 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000013) ===
+
+[001] !!!
+  GT  : # Al-Sadu Symbols and Social Significance
+  EP  : Figure 8.7a–c A gazelle horn used in al-Sadu weaving.
+
+[002] !!!
+  GT  : Perhaps the main reason for the uniqueness of *al-Sadu* weaving is that it was never mass-produced for export in the sam
+  EP  : # 4 Al-Sadu Symbols and Social Significance
+
+[003] !!!
+  GT  : The natural environment of the nomadic tribe can be seen in *al-Sadu* designs, which contain symbols that reflect astron
+  EP  : Perhaps the main reason for the uniqueness of al-Sadu weaving is that it was never mass-produced for export in the same 
+
+[004] !!!
+  GT  : ---
+  EP  : Al-Ogayyel and Oskay
+
+[005] !!!
+  GT  : **Figure 8.8**: Symbol of stars in contemporary *al-Sadu* weaving by Leila Yaser.
+  EP  : Figure 8.8 Symbol of stars in contemporary al-Sadu weaving by Leila Yaser. objects—such as kilims, clothes, bags, blanke
+
+[006] !!!
+  GT  : ---
+  EP  : The natural environment of the nomadic tribe can be seen in al-Sadu designs, which contain symbols that reflect astronom
+
+[007] !!!
+  GT  : > 24 For more details on the symbols that appear in *al-Sadu* weavings, see also Altaf Salem Al-Ali Al-Sabah, *Ibjad: Or
+  EP  : 24 For more details on the symbols that appear in al-Sadu weavings, see also Altaf Salem Al-Ali Al-Sabah, Ibjad:
+
+[008] !!!
+  GT  : (MISSING)
+  EP  : Ornate Tent Dividers and Weavings of the Kuwait Desert
+
+[009] !!!
+  GT  : (MISSING)
+  EP  : (Kuwait: Al Sadu Society, 2006); Khawla Mohamed Abdel and Aziez Al Manai, Al Sadu (Doha: National Museum of Qatar, 2013)
+
+[010] !!!
+  GT  : (MISSING)
+  EP  : 25 Khawlah M. Manna, Al-Sadu in Qatar: Traditional Technical Values and Techniques (Doha: Qatar Museums
+
+[011] !!!
+  GT  : (MISSING)
+  EP  : Authority, Qatar National Museum, 2013), 99–100.
+

@@ -1,0 +1,38 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000076) ===
+
+[001] !!!
+  GT  : # Figures from the Document
+  EP  : Figure 1.6. Alien temporary work permits, Thailand 140000 120000 100000 80000 60000 40000 20000
+
+[002] !!!
+  GT  : ## Figure 1.6. Alien temporary work permits, Thailand *Bar chart showing permits from January 2019 to January 2022*
+  EP  : 09999990000001111112 201 201 201 201 201 201 202 202 202 202 202 202 202 202 202 202 202 202 202 1/ 3/ 5/ 7/ 9/ 11/ 1/ 3
+
+[003] !!!
+  GT  : *Source: Department of Employment, Thailand (2022)*
+  EP  : 00000
+
+[004] !!!
+  GT  : ## Figure 1.7. Non-citizen population in Malaysia (in thousands) | Year | Population (thousands) | |:-----|:------------
+  EP  : 00000 0
+
+[005] !!!
+  GT  : *Source: Department of Statistics, Malaysia (2022). Figure for 2021 is an estimate.*
+  EP  : Figure 1.7. Non-citizen population in Malaysia (in thousands) 3,323 3,500 3,288 3,230 3,140 2,907 3,000 2,693 2,500 2,00
+
+[006] !!!
+  GT  : ## Figure 1.8. Singapore foreign workforce stock (in thousands) | Year | Workforce Stock (thousands) | |:-----|:--------
+  EP  : 2016 2017 2018 2019 2020 2021 Source: Department of Statistics, Malaysia (2022). Figure for 2021 is an estimate.
+
+[007] !!!
+  GT  : *Source: Compilation by Manpower Research & Statistics Department (Ministry of Manpower, Singapore, 2022)*
+  EP  : Figure 1.8. Singapore foreign workforce stock (in thousands) 1,427 1,450 1,393 1,386 1,400 1,368 1,350 1,300 1,232 1,250
+
+[008] !!!
+  GT  : *ASEAN Migration Outlook*
+  EP  : 2016 (Dec) 2017 (Dec) 2018 (Dec) 2019 (Dec) 2020 (Dec) 2021 (Dec) Source: Compilation by Manpower Research & Statistics 
+
+[009] !!!
+  GT  : (MISSING)
+  EP  : ASEAN Migration Outlook 19
+

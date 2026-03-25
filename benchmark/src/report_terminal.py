@@ -113,6 +113,95 @@ METRIC_INFO = {
             "Markdown generation. Lower is better. Measured single-threaded on CPU."
         ),
     },
+    # ── Text-content quality metrics ──────────────────────────────────────────
+    "bleu4": {
+        "name": "BLEU-4 — N-gram Precision",
+        "short": "BLEU-4",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "BLEU-4 with +1 smoothing: measures 4-gram precision of extracted "
+            "words against the ground truth. Penalises missing or fabricated "
+            "content, hallucinations, and wrong word order. Higher is better."
+        ),
+    },
+    "rouge1": {
+        "name": "ROUGE-1 — Unigram F1",
+        "short": "ROUGE-1",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "ROUGE-1 F1: harmonic mean of unigram precision and recall. "
+            "Captures whether all content words are present in the output. "
+            "Insensitive to word order — use ROUGE-L for order awareness."
+        ),
+    },
+    "rouge2": {
+        "name": "ROUGE-2 — Bigram F1",
+        "short": "ROUGE-2",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "ROUGE-2 F1: bigram-level precision/recall. Measures local word "
+            "ordering and phrase preservation. Higher scores indicate the "
+            "extracted text faithfully reproduces two-word sequences from GT."
+        ),
+    },
+    "rougeL": {
+        "name": "ROUGE-L — LCS F1",
+        "short": "ROUGE-L",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "ROUGE-L F1 based on Longest Common Subsequence. Order-aware: "
+            "rewards correct global reading order even when local phrasing "
+            "differs. Best single metric for document extraction fidelity."
+        ),
+    },
+    "cer": {
+        "name": "CER — Character Error Rate",
+        "short": "CER",
+        "unit": "[0–2]",
+        "higher_better": False,
+        "description": (
+            "Character Error Rate = Levenshtein(chars) / len(reference). "
+            "Standard OCR benchmark metric (ICDAR). Measures character-level "
+            "accuracy including OCR errors. Lower is better; 0.0 is perfect."
+        ),
+    },
+    "wer": {
+        "name": "WER — Word Error Rate",
+        "short": "WER",
+        "unit": "[0–2]",
+        "higher_better": False,
+        "description": (
+            "Word Error Rate = Levenshtein(words) / len(reference_words). "
+            "Standard ASR/OCR metric. Counts word insertions, deletions, and "
+            "substitutions relative to reference length. Lower is better."
+        ),
+    },
+    "f1_token": {
+        "name": "F1-token — Bag-of-Words F1",
+        "short": "F1-token",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "Token-level bag-of-words F1: harmonic mean of token precision and "
+            "recall using multiset intersection. More lenient than ROUGE-L "
+            "because it ignores word order — useful for benchmarking word coverage."
+        ),
+    },
+    "text_quality_score": {
+        "name": "TQS — Text Quality Score",
+        "short": "TQS",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4). Composite "
+            "of the three most discriminating content-accuracy metrics. "
+            "Higher is better; missing content and wrong words both reduce TQS."
+        ),
+    },
 }
 
 
@@ -196,6 +285,15 @@ def print_single_report(eval_data: dict, engine_name: str = "edgeparse") -> None
     total_elapsed = speed.get("total_elapsed")
     document_count = speed.get("document_count")
     processor = speed.get("processor", "")
+    # Text quality
+    bleu4              = scores.get("bleu4_mean")
+    rouge1             = scores.get("rouge1_mean")
+    rouge2             = scores.get("rouge2_mean")
+    rouge_l            = scores.get("rougeL_mean")
+    cer                = scores.get("cer_mean")
+    wer                = scores.get("wer_mean")
+    f1_token           = scores.get("f1_token_mean")
+    text_quality_score = scores.get("text_quality_score_mean")
 
     from engine_registry import display_name
     disp_name = display_name(engine_name)
@@ -219,7 +317,7 @@ def print_single_report(eval_data: dict, engine_name: str = "edgeparse") -> None
     print(f"  {BOLD}{UNDERLINE}What We Measure{RESET}  {DIM}(source: opendataloader.org/docs/benchmark){RESET}")
     print()
 
-    # Score cards
+    # Score cards — structural metrics
     metrics = [
         ("nid",  nid),
         ("teds", teds),
@@ -235,6 +333,35 @@ def print_single_report(eval_data: dict, engine_name: str = "edgeparse") -> None
         print(f"  {BOLD}{info['name']:<30}{RESET} {score_str}  {bar}")
         print(f"  {DIM}{info['description'][:100]}{RESET}")
         print()
+
+    # Score cards — text content quality metrics
+    print(f"  {BOLD}{UNDERLINE}Text Content Quality{RESET}  {DIM}(BLEU / ROUGE / CER / WER — plain-text comparison){RESET}")
+    print()
+    text_metrics = [
+        ("text_quality_score", text_quality_score),
+        ("rouge1",  rouge1),
+        ("rouge2",  rouge2),
+        ("rougeL",  rouge_l),
+        ("bleu4",   bleu4),
+        ("f1_token", f1_token),
+    ]
+    for key, value in text_metrics:
+        info = METRIC_INFO[key]
+        score_str = _score_color(value, key)
+        bar = _score_bar(value, 25) if value is not None else ""
+        print(f"  {BOLD}{info['name']:<30}{RESET} {score_str}  {bar}")
+        print(f"  {DIM}{info['description'][:100]}{RESET}")
+        print()
+
+    # Error rate metrics (lower is better — no bar, separate display)
+    print(f"  {BOLD}Error Rates{RESET}  {DIM}(lower is better){RESET}")
+    for key, value, label in [("cer", cer, "CER"), ("wer", wer, "WER")]:
+        if value is not None:
+            er_color = GREEN if value < 0.15 else (YELLOW if value < 0.40 else RED)
+            print(f"  {BOLD}{METRIC_INFO[key]['name']:<30}{RESET} {er_color}{value:.4f}{RESET}  {DIM}{METRIC_INFO[key]['description'][:80]}{RESET}")
+        else:
+            print(f"  {BOLD}{METRIC_INFO[key]['name']:<30}{RESET} {DIM}N/A{RESET}")
+    print()
 
     # Speed
     spd_info = METRIC_INFO["speed"]
@@ -323,7 +450,7 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
     # Metric explanations
     print(f"  {BOLD}{UNDERLINE}Metrics Explained{RESET}")
     print()
-    for key in ["nid", "teds", "mhs", "paragraph_boundary_f1", "speed"]:
+    for key in ["nid", "teds", "mhs", "paragraph_boundary_f1", "text_quality_score", "speed"]:
         info = METRIC_INFO[key]
         direction = f"{GREEN}↑ higher is better{RESET}" if info["higher_better"] else f"{CYAN}↓ lower is better{RESET}"
         print(f"  {BOLD}{info['short']:.<25}{RESET} {direction}")
@@ -337,16 +464,19 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
 
     # Column widths
     name_w = max(len(display_name(e)) for e in engines) + 2
-    col_w = 10
+    col_w = 8
 
     # Header row
-    header = f"  {'Engine':<{name_w}} {'NID':>{col_w}} {'TEDS':>{col_w}} {'MHS':>{col_w}} {'PBF':>{col_w}} {'TD F1':>{col_w}} {'s/doc':>{col_w}} {'Overall':>{col_w}}"
+    header = (f"  {'Engine':<{name_w}} "
+              f"{'NID':>{col_w}} {'TEDS':>{col_w}} {'MHS':>{col_w}} {'PBF':>{col_w}} "
+              f"{'TQS':>{col_w}} {'TD F1':>{col_w}} {'s/doc':>{col_w}} {'Overall':>{col_w}}")
     print(f"{BOLD}{header}{RESET}")
     print(SEP)
 
     # Collect values for ranking
     metric_values: Dict[str, List] = {
-        "nid": [], "teds": [], "mhs": [], "pbf": [], "td_f1": [], "speed": [], "overall": []
+        "nid": [], "teds": [], "mhs": [], "pbf": [],
+        "tqs": [], "td_f1": [], "speed": [], "overall": []
     }
     for eng in engines:
         d = results[eng]
@@ -357,6 +487,7 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
         metric_values["teds"].append((eng, scores.get("teds_mean")))
         metric_values["mhs"].append((eng, scores.get("mhs_mean")))
         metric_values["pbf"].append((eng, scores.get("paragraph_boundary_f1_mean")))
+        metric_values["tqs"].append((eng, scores.get("text_quality_score_mean")))
         metric_values["td_f1"].append((eng, td.get("f1")))
         metric_values["speed"].append((eng, spd.get("elapsed_per_doc")))
         metric_values["overall"].append((eng, scores.get("overall_mean")))
@@ -372,6 +503,7 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
         "teds": _rank(metric_values["teds"], True),
         "mhs": _rank(metric_values["mhs"], True),
         "pbf": _rank(metric_values["pbf"], True),
+        "tqs": _rank(metric_values["tqs"], True),
         "td_f1": _rank(metric_values["td_f1"], True),
         "speed": _rank(metric_values["speed"], False),
         "overall": _rank(metric_values["overall"], True),
@@ -388,6 +520,7 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
         teds = scores.get("teds_mean")
         mhs = scores.get("mhs_mean")
         pbf = scores.get("paragraph_boundary_f1_mean")
+        tqs = scores.get("text_quality_score_mean")
         f1 = td.get("f1")
         ep = spd.get("elapsed_per_doc")
         overall = scores.get("overall_mean")
@@ -420,6 +553,7 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
                f"{_cell(teds, 'teds')} "
                f"{_cell(mhs, 'mhs')} "
                f"{_cell(pbf, 'pbf')} "
+               f"{_cell(tqs, 'tqs')} "
                f"{_cell(f1, 'td_f1')} "
                f"{_speed_cell(ep)} "
                f"{_cell(overall, 'overall')}")
@@ -432,8 +566,13 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
     print(f"  {BOLD}Visual Comparison{RESET}")
     print()
 
-    for metric_key, label in [("nid", "NID (Reading Order)"), ("teds", "TEDS (Tables)"),
-                               ("mhs", "MHS (Headings)"), ("pbf", "PBF (Paragraph Boundaries)")]:
+    for metric_key, label in [
+        ("nid",  "NID (Reading Order)"),
+        ("teds", "TEDS (Tables)"),
+        ("mhs",  "MHS (Headings)"),
+        ("pbf",  "PBF (Paragraph Boundaries)"),
+        ("tqs",  "TQS (Text Content Quality)"),
+    ]:
         print(f"  {BOLD}{label}{RESET}")
         entries = metric_values[metric_key]
         entries_sorted = sorted(
@@ -469,14 +608,14 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
     print(SEP_DOUBLE)
     # Count wins per engine
     win_counts: Dict[str, int] = {e: 0 for e in engines}
-    for metric_key in ["nid", "teds", "mhs", "td_f1", "speed"]:
+    for metric_key in ["nid", "teds", "mhs", "tqs", "td_f1", "speed"]:
         for eng, rank in ranks[metric_key].items():
             if rank == 1:
                 win_counts[eng] += 1
 
     winner = max(win_counts, key=win_counts.get)
     winner_wins = win_counts[winner]
-    total_metrics = 5
+    total_metrics = 6
 
     print(f"  {BOLD}Verdict:{RESET}  {GREEN}{BOLD}{display_name(winner)}{RESET}"
           f" wins {winner_wins}/{total_metrics} metrics.")

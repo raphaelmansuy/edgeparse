@@ -1,0 +1,30 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000067) ===
+
+[001] !!!
+  GT  : # 6.2 Waste Management
+  EP  : very much interested to know more about plastics as well as the plastics types that can be reused or recycled. Almost al
+
+[002] !!!
+  GT  : ### a. Waste Management Fee Collection At the Barangay level, only 5 respondents barangays - Sampaloc II, H-2, Salitran-
+  EP  : # 6.2 Waste Management
+
+[003] !!!
+  GT  : ### b. Waste Management Budget Majority of the respondents (44%) do not know the budget allocation of their LGUs for was
+  EP  : - a. Waste Management Fee Collection. At the Barangay level, only 5 respondent  barangays - Sampaloc II, H-2, Salitran-I
+
+[004] !!!
+  GT  : *Figure 20*
+  EP  : that their budget allocation is below 5% of their LGU budget. Only 8% of respondents replied that their budget allocatio
+
+[005] !!!
+  GT  : *Figure 20. Percentage of LGU Budget Allocated for Waste Management*
+  EP  : 44%
+
+[006] !!!
+  GT  : ### c. Waste Collection and Segregation For 70% of the respondents, wastes are collected by the city government. 35% res
+  EP  : 12%
+
+[007] !!!
+  GT  : (MISSING)
+  EP  : 8% 32% Below 5% of the LGU budget 5% to below 10% 10% to below 20% 20% and over No Allocation I don’t know Figure 20. Pe
+

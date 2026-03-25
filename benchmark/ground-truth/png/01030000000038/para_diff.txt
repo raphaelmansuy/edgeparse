@@ -1,0 +1,186 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000038) ===
+
+[001] !!!
+  GT  : # Figure 6.1.1: Will they fire more staff in the next 2 months - across survey phases (%)
+  EP  : Figure 6.1.1: Will they fire more staff in the next 2 months - across survey phases (%)
+
+[002] !!!
+  GT  : |                         | July 2020 | October 2020 | January 2021 | |-------------------------|-----------|-----------
+  EP  : 18
+
+[003] !!!
+  GT  : # Figure 6.1.2: Will they fire more staff in the next 2 months – across sectors and survey phases (%)
+  EP  : 80 1
+
+[004] !!!
+  GT  : | Sector                  | July 2020 | October 2020 | January 2021 | |-------------------------|-----------|-----------
+  EP  : 45
+
+[005] !!!
+  GT  : |                         | July 2020 | October 2020 | January 2021 | |-------------------------|-----------|-----------
+  EP  : 60
+
+[006] !!!
+  GT  : # 6.2. Expectations for Re-Hiring Employees
+  EP  : 5
+
+[007] !!!
+  GT  : In July 2020, 81% of the MSMEs that had laid off employees expected to re-hire all of them when the situation improved. 
+  EP  : 40 81 73
+
+[008] !!!
+  GT  : *5. The question on re-hiring was asked to those who had laid-off employees since the last survey. In the latter two sur
+  EP  : 51
+
+[009] !!!
+  GT  : (MISSING)
+  EP  : 20
+
+[010] !!!
+  GT  : (MISSING)
+  EP  : 0
+
+[011] !!!
+  GT  : (MISSING)
+  EP  : July 2020
+
+[012] !!!
+  GT  : (MISSING)
+  EP  : October 2020
+
+[013] !!!
+  GT  : (MISSING)
+  EP  : Will not terminate employment
+
+[014] !!!
+  GT  : (MISSING)
+  EP  : Will terminate employment
+
+[015] !!!
+  GT  : (MISSING)
+  EP  : 26
+
+[016] !!!
+  GT  : (MISSING)
+  EP  : 1
+
+[017] !!!
+  GT  : (MISSING)
+  EP  : January 2021
+
+[018] !!!
+  GT  : (MISSING)
+  EP  : Don’t know
+
+[019] !!!
+  GT  : (MISSING)
+  EP  : Figure 6.1.2: Will they fire more staff in the next 2 months – across sectors and survey phases (%)
+
+[020] !!!
+  GT  : (MISSING)
+  EP  : 100
+
+[021] !!!
+  GT  : (MISSING)
+  EP  : 6 9
+
+[022] !!!
+  GT  : (MISSING)
+  EP  : 16
+
+[023] !!!
+  GT  : (MISSING)
+  EP  : 26
+
+[024] !!!
+  GT  : (MISSING)
+  EP  : 32 2
+
+[025] !!!
+  GT  : (MISSING)
+  EP  : 80
+
+[026] !!!
+  GT  : (MISSING)
+  EP  : 45
+
+[027] !!!
+  GT  : (MISSING)
+  EP  : 2 59
+
+[028] !!!
+  GT  : (MISSING)
+  EP  : 59
+
+[029] !!!
+  GT  : (MISSING)
+  EP  : 62
+
+[030] !!!
+  GT  : (MISSING)
+  EP  : 8
+
+[031] !!!
+  GT  : (MISSING)
+  EP  : 60
+
+[032] !!!
+  GT  : (MISSING)
+  EP  : 91
+
+[033] !!!
+  GT  : (MISSING)
+  EP  : 94
+
+[034] !!!
+  GT  : (MISSING)
+  EP  : 82
+
+[035] !!!
+  GT  : (MISSING)
+  EP  : 40
+
+[036] !!!
+  GT  : (MISSING)
+  EP  : 1
+
+[037] !!!
+  GT  : (MISSING)
+  EP  : 71
+
+[038] !!!
+  GT  : (MISSING)
+  EP  : 59
+
+[039] !!!
+  GT  : (MISSING)
+  EP  : 55
+
+[040] !!!
+  GT  : (MISSING)
+  EP  : 41 41
+
+[041] !!!
+  GT  : (MISSING)
+  EP  : 20 37
+
+[042] !!!
+  GT  : (MISSING)
+  EP  : 0
+
+[043] !!!
+  GT  : (MISSING)
+  EP  : | Jul 2020 | Oct 2020 Tourism Will not terminate employment | Jan 2021 Will not terminate employment | Jul 2020 Handicra
+
+[044] !!!
+  GT  : (MISSING)
+  EP  : they had no plans to re-hire and another 36% said they didn’t know whether they would re-hire or not. In In July 2020, 8
+
+[045] !!!
+  GT  : (MISSING)
+  EP  : # 6.2. Expectations for Re-Hiring Employees
+
+[046] !!!
+  GT  : (MISSING)
+  EP  : 5. The question on re-hiring was asked to those who had laid-off employees since the last survey. In the latter two surv
+

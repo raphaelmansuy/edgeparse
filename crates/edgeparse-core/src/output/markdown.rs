@@ -432,25 +432,7 @@ fn looks_like_contents_document(doc: &PdfDocument) -> bool {
 }
 
 fn render_contents_document(doc: &PdfDocument) -> String {
-    let lines = collect_plain_lines(doc);
-    let mut out = String::new();
-
-    let mut iter = lines.into_iter();
-    if let Some(first) = iter.next() {
-        out.push_str("# ");
-        out.push_str(first.trim());
-        out.push_str("\n\n");
-    }
-    for line in iter {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        out.push_str(trimmed);
-        out.push('\n');
-    }
-    out.push('\n');
-    out
+    render_toc_lines(&collect_plain_lines(doc), true)
 }
 
 fn looks_like_compact_toc_document(doc: &PdfDocument) -> bool {
@@ -472,17 +454,94 @@ fn looks_like_compact_toc_document(doc: &PdfDocument) -> bool {
 }
 
 fn render_compact_toc_document(doc: &PdfDocument) -> String {
+    render_toc_lines(&collect_plain_lines(doc), false)
+}
+
+fn render_toc_lines(lines: &[String], has_contents_title: bool) -> String {
     let mut out = String::new();
-    for line in collect_plain_lines(doc) {
+    let mut iter = lines.iter();
+
+    if has_contents_title {
+        if let Some(first) = iter.next() {
+            let trimmed = first.trim();
+            if !trimmed.is_empty() {
+                push_toc_heading(&mut out, 1, trimmed);
+            }
+        }
+    }
+
+    for line in iter {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
-        out.push_str(trimmed);
-        out.push('\n');
+
+        if let Some(level) = toc_heading_level(trimmed, has_contents_title) {
+            push_toc_heading(&mut out, level, strip_trailing_page_number(trimmed));
+            continue;
+        }
+
+        if should_render_toc_line_as_bullet(trimmed, has_contents_title) {
+            out.push_str("- ");
+            out.push_str(&escape_md_line_start(trimmed));
+            out.push('\n');
+            continue;
+        }
+
+        if !out.ends_with("\n\n") && !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(&escape_md_line_start(trimmed));
+        out.push_str("\n\n");
     }
+
     out.push('\n');
     out
+}
+
+fn toc_heading_level(text: &str, has_contents_title: bool) -> Option<usize> {
+    let trimmed = strip_trailing_page_number(text).trim();
+    let lower = trimmed.to_ascii_lowercase();
+
+    if has_contents_title {
+        if lower.starts_with("part ")
+            || lower.starts_with("chapter ")
+            || lower.starts_with("appendix ")
+        {
+            return Some(2);
+        }
+        return None;
+    }
+
+    if lower.starts_with("part ")
+        || lower.starts_with("chapter ")
+        || lower.starts_with("appendix ")
+    {
+        return Some(1);
+    }
+    if lower.starts_with("section ") {
+        return Some(2);
+    }
+    None
+}
+
+fn should_render_toc_line_as_bullet(text: &str, has_contents_title: bool) -> bool {
+    has_contents_title && ends_with_page_marker(text) && toc_heading_level(text, true).is_none()
+}
+
+fn push_toc_heading(out: &mut String, level: usize, text: &str) {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+
+    if !out.is_empty() && !out.ends_with("\n\n") {
+        out.push('\n');
+    }
+    out.push_str(&"#".repeat(level));
+    out.push(' ');
+    out.push_str(trimmed);
+    out.push_str("\n\n");
 }
 
 fn collect_plain_lines(doc: &PdfDocument) -> Vec<String> {
@@ -2855,10 +2914,11 @@ mod tests {
         ]));
 
         let md = to_markdown(&doc).unwrap();
-        assert!(md.contains("Experiment #1: Hydrostatic Pressure 3"));
-        assert!(md.contains("Experiment #2: Bernoulli's Theorem Demonstration 13"));
-        assert!(md.contains("Experiment #7: Osborne Reynolds' Demonstration 59"));
-        assert!(md.contains("References 101"));
+        assert!(md.starts_with("# CONTENTS\n\n"));
+        assert!(md.contains("- Experiment #1: Hydrostatic Pressure 3\n"));
+        assert!(md.contains("- Experiment #2: Bernoulli's Theorem Demonstration 13\n"));
+        assert!(md.contains("- Experiment #7: Osborne Reynolds' Demonstration 59\n"));
+        assert!(md.contains("- References 101\n"));
     }
 
     #[test]
@@ -2927,8 +2987,13 @@ mod tests {
         ));
 
         let md = to_markdown(&doc).unwrap();
-        assert!(!md.contains("\n\nSection 5.1: The Linear Model 35"));
-        assert!(md.contains("Part V. Chapter Five - Comparing Associations Between Multiple Variables\nSection 5.1: The Linear Model 35"));
+        assert!(md.contains(
+            "# Part V. Chapter Five - Comparing Associations Between Multiple Variables\n\n## Section 5.1: The Linear Model"
+        ));
+        assert!(md.contains(
+            "# Part VI. Chapter Six - Comparing Three or More Group Means\n\n## Section 6.1: Between Versus Within Group Analyses"
+        ));
+        assert!(md.contains("References 101\n\n## Section 8.1: Factor Analysis Definitions"));
     }
 
     #[test]
