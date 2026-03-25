@@ -17,7 +17,8 @@ cer          Character Error Rate         [0–∞]  lower is better
 wer          Word Error Rate              [0–∞]  lower is better
 f1_token     Bag-of-words F1              [0–1]  higher is better
 word_fragmentation_score  OCR split-word fidelity  [0–1]  higher is better
-text_quality_score  mean(rouge1, rougeL, bleu4, word_fragmentation_score)  [0–1]  higher is better
+word_boundary_integrity_score  Preserves whole-word boundaries  [0–1]  higher is better
+text_quality_score  mean(rouge1, rougeL, bleu4, word_fragmentation_score, word_boundary_integrity_score)  [0–1]  higher is better
 """
 
 from __future__ import annotations
@@ -279,6 +280,62 @@ def _word_fragmentation_score(ref_tokens: List[str], hyp_tokens: List[str]) -> O
     return max(0.0, 1.0 - penalty)
 
 
+def _word_boundary_integrity_score(
+    ref_tokens: List[str],
+    hyp_tokens: List[str],
+) -> Optional[float]:
+    """Score whether long reference words survive as intact units.
+
+    This complements ``_word_fragmentation_score`` by penalizing the number of
+    extra internal boundaries inserted into long alphabetic reference tokens.
+    For example, ``ownership`` is correct, while ``ow ne r ship`` incurs three
+    spurious internal boundaries.
+    """
+    ref_long_words = Counter(
+        token for token in ref_tokens if token.isalpha() and len(token) >= 6
+    )
+    total_candidates = sum(ref_long_words.values())
+    if total_candidates == 0:
+        return None
+
+    hyp_long_words = Counter(
+        token for token in hyp_tokens if token.isalpha() and len(token) >= 6
+    )
+    intact_matches = 0
+    for token, ref_count in list(ref_long_words.items()):
+        if ref_count <= 0:
+            continue
+        intact = min(ref_count, hyp_long_words.get(token, 0))
+        if intact > 0:
+            intact_matches += intact
+            ref_long_words[token] -= intact
+
+    fragmented_credit = 0.0
+    i = 0
+    while i < len(hyp_tokens):
+        if not _is_fragment_token(hyp_tokens[i]):
+            i += 1
+            continue
+
+        joined = hyp_tokens[i]
+        matched = False
+        for j in range(i + 1, min(i + 6, len(hyp_tokens))):
+            if not _is_fragment_token(hyp_tokens[j]):
+                break
+            joined += hyp_tokens[j]
+            if len(joined) >= 6 and ref_long_words.get(joined, 0) > 0:
+                ref_long_words[joined] -= 1
+                fragmented_credit += 1.0 / (j - i + 1)
+                i = j + 1
+                matched = True
+                break
+
+        if not matched:
+            i += 1
+
+    return min((intact_matches + fragmented_credit) / total_candidates, 1.0)
+
+
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def evaluate_text_quality(
@@ -306,7 +363,8 @@ def evaluate_text_quality(
         wer                Word Error Rate               [0–2]  ↓ better
         f1_token           Bag-of-words token F1         [0–1]  ↑ better
         word_fragmentation_score OCR split-word fidelity [0–1]  ↑ better
-        text_quality_score mean(rouge1, rougeL, bleu4, word_fragmentation_score)  [0–1]  ↑ better
+        word_boundary_integrity_score Preserves whole-word boundaries [0–1]  ↑ better
+        text_quality_score mean(rouge1, rougeL, bleu4, word_fragmentation_score, word_boundary_integrity_score)  [0–1]  ↑ better
     """
     gt_plain   = strip_markdown(gt   or "")
     pred_plain = strip_markdown(pred or "")
@@ -315,6 +373,7 @@ def evaluate_text_quality(
         "bleu4": None, "rouge1": None, "rouge2": None, "rougeL": None,
         "cer": None, "wer": None, "f1_token": None,
         "word_fragmentation_score": None,
+        "word_boundary_integrity_score": None,
         "text_quality_score": None,
     }
 
@@ -332,10 +391,18 @@ def evaluate_text_quality(
     wer    = _wer(gt_plain, pred_plain)
     f1_tok = _f1_token(ref_tokens, hyp_tokens)
     word_fragmentation_score = _word_fragmentation_score(ref_tokens, hyp_tokens)
+    word_boundary_integrity_score = _word_boundary_integrity_score(ref_tokens, hyp_tokens)
 
     # Composite: content fidelity plus explicit split-word corruption penalty.
     quality_parts = [
-        v for v in (rouge1, rouge_l, bleu4, word_fragmentation_score)
+        v
+        for v in (
+            rouge1,
+            rouge_l,
+            bleu4,
+            word_fragmentation_score,
+            word_boundary_integrity_score,
+        )
         if v is not None
     ]
     text_quality_score = sum(quality_parts) / len(quality_parts) if quality_parts else None
@@ -349,5 +416,6 @@ def evaluate_text_quality(
         "wer":                wer,
         "f1_token":           f1_tok,
         "word_fragmentation_score": word_fragmentation_score,
+        "word_boundary_integrity_score": word_boundary_integrity_score,
         "text_quality_score": text_quality_score,
     }

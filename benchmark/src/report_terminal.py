@@ -136,6 +136,17 @@ METRIC_INFO = {
             "instead of being shattered into adjacent short fragments."
         ),
     },
+    "word_boundary_integrity_score": {
+        "name": "Word Boundary Integrity",
+        "short": "Boundary",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "Measures whether long reference words remain intact instead of "
+            "gaining artificial internal spaces. It penalizes boundary damage "
+            "even when most letters are still present."
+        ),
+    },
     "rouge1": {
         "name": "ROUGE-1 — Unigram F1",
         "short": "ROUGE-1",
@@ -208,9 +219,9 @@ METRIC_INFO = {
         "unit": "[0–1]",
         "higher_better": True,
         "description": (
-            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4). Composite "
-            "of the three most discriminating content-accuracy metrics. "
-            "Higher is better; missing content and wrong words both reduce TQS."
+            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4, fragmentation, "
+            "boundary integrity). Composite of lexical fidelity plus split-word "
+            "damage. Higher is better."
         ),
     },
 }
@@ -305,6 +316,7 @@ def print_single_report(eval_data: dict, engine_name: str = "edgeparse") -> None
     wer                = scores.get("wer_mean")
     f1_token           = scores.get("f1_token_mean")
     word_fragmentation_score = scores.get("word_fragmentation_score_mean")
+    word_boundary_integrity_score = scores.get("word_boundary_integrity_score_mean")
     text_quality_score = scores.get("text_quality_score_mean")
 
     from engine_registry import display_name
@@ -356,6 +368,7 @@ def print_single_report(eval_data: dict, engine_name: str = "edgeparse") -> None
         ("rougeL",  rouge_l),
         ("bleu4",   bleu4),
         ("word_fragmentation_score", word_fragmentation_score),
+        ("word_boundary_integrity_score", word_boundary_integrity_score),
         ("f1_token", f1_token),
     ]
     for key, value in text_metrics:

@@ -64,6 +64,7 @@ class DocumentScores:
     wer: Optional[float]
     f1_token: Optional[float]
     word_fragmentation_score: Optional[float]
+    word_boundary_integrity_score: Optional[float]
     text_quality_score: Optional[float]
     prediction_available: bool
 
@@ -96,6 +97,7 @@ class DocumentScores:
                 "wer": self.wer,
                 "f1_token": self.f1_token,
                 "word_fragmentation_score": self.word_fragmentation_score,
+                "word_boundary_integrity_score": self.word_boundary_integrity_score,
                 "text_quality_score": self.text_quality_score,
             },
             "prediction_available": self.prediction_available,
@@ -180,6 +182,7 @@ def _evaluate_single_document(
         wer=text_metrics["wer"],
         f1_token=text_metrics["f1_token"],
         word_fragmentation_score=text_metrics["word_fragmentation_score"],
+        word_boundary_integrity_score=text_metrics["word_boundary_integrity_score"],
         text_quality_score=text_metrics["text_quality_score"],
         prediction_available=prediction_available,
     )
@@ -248,6 +251,11 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
         for doc in documents
         if doc.word_fragmentation_score is not None
     ]
+    word_boundary_integrity_values = [
+        doc.word_boundary_integrity_score
+        for doc in documents
+        if doc.word_boundary_integrity_score is not None
+    ]
     text_quality_values  = [doc.text_quality_score for doc in documents if doc.text_quality_score is not None]
 
     overall_mean = _safe_mean(overall_values)
@@ -295,6 +303,7 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
             "wer_mean":                _safe_mean(wer_values),
             "f1_token_mean":           _safe_mean(f1_token_values),
             "word_fragmentation_score_mean": _safe_mean(word_fragmentation_values),
+            "word_boundary_integrity_score_mean": _safe_mean(word_boundary_integrity_values),
             "text_quality_score_mean": _safe_mean(text_quality_values),
         },
         "nid_count": len(nid_values),
@@ -330,7 +339,7 @@ def _logging_scores(
     logging.info(
         "engine=%s document=%s overall=%s nid=%s nid_s=%s teds=%s teds_s=%s "
         "mhs=%s mhs_s=%s pbf1=%s prose_bf1=%s "
-        "bleu4=%s rouge1=%s rougeL=%s cer=%s wer=%s f1_tok=%s tqs=%s",
+        "bleu4=%s rouge1=%s rougeL=%s cer=%s wer=%s f1_tok=%s frag=%s wbis=%s tqs=%s",
         engine_name,
         doc_id,
         _fmt(overall),
@@ -348,6 +357,8 @@ def _logging_scores(
         _fmt(scores.cer),
         _fmt(scores.wer),
         _fmt(scores.f1_token),
+        _fmt(scores.word_fragmentation_score),
+        _fmt(scores.word_boundary_integrity_score),
         _fmt(scores.text_quality_score),
     )
 
@@ -431,6 +442,7 @@ def _evaluate_engine_version(
         "wer",
         "f1_token",
         "word_fragmentation_score",
+        "word_boundary_integrity_score",
         "text_quality_score",
     ]
     with csv_path.open("w", encoding="utf-8", newline="") as csv_file:
@@ -457,6 +469,7 @@ def _evaluate_engine_version(
                 "wer":                _v(doc.wer),
                 "f1_token":           _v(doc.f1_token),
                 "word_fragmentation_score": _v(doc.word_fragmentation_score),
+                "word_boundary_integrity_score": _v(doc.word_boundary_integrity_score),
                 "text_quality_score": _v(doc.text_quality_score),
             }
             writer.writerow(row)

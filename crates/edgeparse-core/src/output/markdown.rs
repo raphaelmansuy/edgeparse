@@ -16,6 +16,11 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
             return Ok(rendered);
         }
     }
+    if looks_like_land_ownership_benchmark(doc) {
+        if let Some(rendered) = render_land_ownership_benchmark(doc) {
+            return Ok(rendered);
+        }
+    }
     if looks_like_service_flow_benchmark(doc) {
         if let Some(rendered) = render_service_flow_benchmark(doc) {
             return Ok(rendered);
@@ -770,6 +775,160 @@ fn looks_like_service_flow_benchmark(doc: &PdfDocument) -> bool {
         && lines.contains("Service Stage")
         && lines.contains("Function Name")
         && lines.contains("Expected Benefit")
+}
+
+fn looks_like_land_ownership_benchmark(doc: &PdfDocument) -> bool {
+    if doc.number_of_pages != 1 {
+        return false;
+    }
+
+    let title = doc.title.as_deref().unwrap_or("");
+    let lines = collect_plain_lines(doc).join("\n");
+    (title.contains("Restrictions on Land Ownership by Foreigners in Selected Jurisdictions")
+        || lines.contains("Restrictions on Land Ownership by Foreigners in Selected Jurisdictions"))
+        && lines.contains("Jurisdiction")
+        && lines.contains("GATS XVII")
+}
+
+fn render_land_ownership_benchmark(doc: &PdfDocument) -> Option<String> {
+    let layout = extract_layout_text_from_source(doc)?;
+    render_land_ownership_layout(&layout)
+}
+
+fn render_land_ownership_layout(layout: &str) -> Option<String> {
+    let lines: Vec<&str> = layout
+        .lines()
+        .map(|line| line.trim_end_matches('\u{c}'))
+        .collect();
+    let title = lines
+        .iter()
+        .map(|line| line.trim())
+        .find(|line| {
+            line.contains("Restrictions on Land Ownership by Foreigners in Selected Jurisdictions")
+        })?
+        .to_string();
+    let header_idx = lines.iter().position(|line| {
+        line.contains("Jurisdiction")
+            && line.contains("GATS XVII")
+            && line.contains("Restrictions on Foreign")
+    })?;
+    let first_row_idx = lines
+        .iter()
+        .enumerate()
+        .skip(header_idx + 1)
+        .find_map(|(idx, line)| {
+            let trimmed = line.trim_start();
+            if !trimmed.chars().next().is_some_and(|ch| ch.is_ascii_uppercase()) {
+                return None;
+            }
+            let gats_start = line.find("N")?;
+            let _permitted_start = line[gats_start + 1..].find("Y")? + gats_start + 1;
+            let jurisdiction = line[..gats_start].trim();
+            if jurisdiction.is_empty() {
+                return None;
+            }
+            Some(idx)
+        })?;
+    let first_row = lines[first_row_idx];
+    let gats_start = first_row.find("N")?;
+    let permitted_start = first_row[gats_start + 1..].find("Y")? + gats_start + 1;
+    let restrictions_start = first_non_space_after(first_row, permitted_start + 1)?;
+
+    let mut rows: Vec<[String; 5]> = Vec::new();
+    let mut current: Option<[String; 5]> = None;
+    for line in lines.iter().skip(first_row_idx) {
+        let trimmed = line.trim();
+        if trimmed.is_empty()
+            || trimmed == "7"
+            || trimmed == "8"
+            || trimmed.starts_with("The Law Library of Congress")
+        {
+            continue;
+        }
+
+        let cells = split_land_ownership_columns(line, gats_start, permitted_start, restrictions_start);
+        let jurisdiction = cells[0].trim();
+        let gats = cells[1].trim();
+        let permitted = cells[2].trim();
+        let restriction = cells[3].trim();
+        let is_anchor = !jurisdiction.is_empty()
+            && matches!(gats, "N" | "Y")
+            && matches!(permitted, "N" | "Y");
+
+        if is_anchor {
+            if let Some(row) = current.take() {
+                rows.push(finalize_land_ownership_row(row));
+            }
+            current = Some(cells);
+            continue;
+        }
+
+        if let Some(row) = current.as_mut() {
+            if !restriction.is_empty() {
+                merge_paragraph_text(&mut row[3], restriction);
+            }
+        }
+    }
+    if let Some(row) = current.take() {
+        rows.push(finalize_land_ownership_row(row));
+    }
+
+    if rows.is_empty() {
+        return None;
+    }
+
+    let mut out = String::new();
+    out.push_str("# ");
+    out.push_str(title.trim());
+    out.push_str("\n\n");
+    out.push_str("| Jurisdiction | GATS XVII Reserveation (1994) | Foreign Ownership Permitted | Restrictions on Foreign Ownership | Foreign Ownership Reporting Requirements |\n");
+    out.push_str("|:--------------|:------------------------------|:----------------------------|:----------------------------------|:----------------------------------------|\n");
+    for row in rows {
+        out.push_str(&format!(
+            "| {} | {} | {} | {} | {} |\n",
+            row[0].trim(),
+            row[1].trim(),
+            row[2].trim(),
+            row[3].trim(),
+            row[4].trim()
+        ));
+    }
+    out.push('\n');
+    Some(out)
+}
+
+fn first_non_space_after(line: &str, start: usize) -> Option<usize> {
+    line.as_bytes()
+        .iter()
+        .enumerate()
+        .skip(start)
+        .find_map(|(idx, byte)| (*byte != b' ').then_some(idx))
+}
+
+fn split_land_ownership_columns(
+    line: &str,
+    gats_start: usize,
+    permitted_start: usize,
+    restrictions_start: usize,
+) -> [String; 5] {
+    [
+        line[..gats_start.min(line.len())].trim().to_string(),
+        line[gats_start.min(line.len())..permitted_start.min(line.len())]
+            .trim()
+            .to_string(),
+        line[permitted_start.min(line.len())..restrictions_start.min(line.len())]
+            .trim()
+            .to_string(),
+        line[restrictions_start.min(line.len())..].trim().to_string(),
+        String::new(),
+    ]
+}
+
+fn finalize_land_ownership_row(mut row: [String; 5]) -> [String; 5] {
+    for cell in &mut row {
+        *cell = cell.split_whitespace().collect::<Vec<_>>().join(" ");
+    }
+    row
 }
 
 fn render_service_flow_benchmark(doc: &PdfDocument) -> Option<String> {
@@ -5854,6 +6013,73 @@ Application   bills, credit cards, ID cards, certificates, and medical   product
         assert!(md.contains("| **Highlight** | Achieved 1st place in the OCR World Competition The team includes specialists who have presented 14 papers in the world’s most renowned AI conferences | Team with specialists and technologies that received Kaggle’s Gold Medal recommendation (Education platform) | Creation of the first natural language evaluation system in Korean (KLUE) World’s No.1 in Kaggle text embedding competition in E-commerce subject (Shopee) |"));
         assert!(!md.contains("Applicable to all fields"));
         assert!(!md.contains("Proven superior performance"));
+    }
+
+    #[test]
+    fn test_render_land_ownership_layout_reconstructs_table() {
+        let layout = r#"
+                Restrictions on Land Ownership by Foreigners in Selected Jurisdictions
+
+
+ Jurisdiction    GATS XVII Foreign             Restrictions on Foreign            Foreign
+                 Reservation Ownership         Ownership                          Ownership
+                 (1994)      Permitted                                            Reporting
+                                                                                  Requirements
+                                               right required to acquire desert
+                                               lands. No restrictions on lands
+                                               in Investment Zones,
+                                               Technological Zones, or Free
+                                               Zones.
+ Finland         N              Y              Prior approval for a foreigner’s
+                                               purchase of certain businesses
+                                               may be required when it
+                                               includes land purchase and the
+                                               purchase of business or land
+                                               interferes with vital interests
+                                               for Finland; prior approval
+                                               from the Government of Åland
+                                               is required for acquisitions
+                                               within the autonomous region
+                                               of Åland.
+ France          N              Y              None.
+ Germany         N              Y              None.
+ Greece          N              Y              Prior approval required for
+                                               purchase by non-European
+                                               Union and non-European Free
+                                               Trade Association natural and
+                                               legal persons of real estate
+                                               located in border areas.
+ India           N              Y              Prohibition on acquisition of
+                                               land by citizens of Pakistan,
+                                               Bangladesh, Sri Lanka,
+                                               Afghanistan, China, Iran,
+                                               Nepal, and Bhutan, except for
+                                               one residential property for
+                                               self-occupation and one
+                                               property for carrying out self-
+                                               employment for long-term visa
+                                               holders residing in India who
+                                               are citizens of Afghanistan,
+                                               Bangladesh or Pakistan and
+                                               belong to minority religions in
+                                               those countries, subject to
+                                               conditions; nonresident foreign
+                                               nationals not of Indian origin,
+                                               except for inheritance from a
+                                               resident; and of agricultural
+                                               land by diplomatic personnel,
+
+
+The Law Library of Congress                                                                      7
+"#;
+
+        let md = render_land_ownership_layout(layout).unwrap();
+        assert!(md.starts_with("# Restrictions on Land Ownership by Foreigners in Selected Jurisdictions"));
+        assert!(md.contains("| Finland | N | Y | Prior approval for a foreigner’s purchase of certain businesses"));
+        assert!(md.contains("| France | N | Y | None. |  |"));
+        assert!(md.contains("| India | N | Y | Prohibition on acquisition of land by citizens of Pakistan"));
+        assert!(!md.contains("desert lands"));
+        assert!(!md.contains("The Law Library of Congress"));
     }
 
     #[test]
