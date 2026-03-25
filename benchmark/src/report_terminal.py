@@ -125,6 +125,17 @@ METRIC_INFO = {
             "content, hallucinations, and wrong word order. Higher is better."
         ),
     },
+    "word_fragmentation_score": {
+        "name": "Word Fragmentation Score",
+        "short": "Fragmentation",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "Measures OCR-style split-word corruption such as 'ow ne r ship' "
+            "for 'ownership'. High scores mean extracted words stay intact "
+            "instead of being shattered into adjacent short fragments."
+        ),
+    },
     "rouge1": {
         "name": "ROUGE-1 — Unigram F1",
         "short": "ROUGE-1",
@@ -293,6 +304,7 @@ def print_single_report(eval_data: dict, engine_name: str = "edgeparse") -> None
     cer                = scores.get("cer_mean")
     wer                = scores.get("wer_mean")
     f1_token           = scores.get("f1_token_mean")
+    word_fragmentation_score = scores.get("word_fragmentation_score_mean")
     text_quality_score = scores.get("text_quality_score_mean")
 
     from engine_registry import display_name
@@ -343,6 +355,7 @@ def print_single_report(eval_data: dict, engine_name: str = "edgeparse") -> None
         ("rouge2",  rouge2),
         ("rougeL",  rouge_l),
         ("bleu4",   bleu4),
+        ("word_fragmentation_score", word_fragmentation_score),
         ("f1_token", f1_token),
     ]
     for key, value in text_metrics:

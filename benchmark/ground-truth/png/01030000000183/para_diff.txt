@@ -42,101 +42,93 @@
 
 [011] !!!
   GT  : *Note:* - Compared to regular model, 20% increase
-  EP  : AWS Ready
+  EP  : Personalize
 
 [012] !!!
   GT  : (MISSING)
-  EP  : 0.882
+  EP  : AWS Ready
 
 [013] !!!
   GT  : (MISSING)
-  EP  : Personalize
+  EP  : AutoEncoder _RecVAE
 
 [014] !!!
   GT  : (MISSING)
-  EP  : AutoEncoder _RecVAE
+  EP  : 0.3278
 
 [015] !!!
   GT  : (MISSING)
-  EP  : 0.735
+  EP  : Attn-RecSys
 
 [016] !!!
   GT  : (MISSING)
-  EP  : 0.3278
+  EP  : AutoEncoder _CDAE
 
 [017] !!!
   GT  : (MISSING)
-  EP  : Attn-RecSys
+  EP  : Compared to regular model
 
 [018] !!!
   GT  : (MISSING)
-  EP  : AutoEncoder _CDAE
+  EP  : AutoEncoder _MultiVAE
 
 [019] !!!
   GT  : (MISSING)
-  EP  : Compared to regular model
+  EP  : 0.23496
 
 [020] !!!
   GT  : (MISSING)
-  EP  : AutoEncoder _MultiVAE
+  EP  : GNN_LightGCN
 
 [021] !!!
   GT  : (MISSING)
-  EP  : 0.23496
+  EP  : Personalize
 
 [022] !!!
   GT  : (MISSING)
-  EP  : GNN_LightGCN
+  EP  : 1.7X↑
 
 [023] !!!
   GT  : (MISSING)
-  EP  : Personalize
+  EP  : # CF_BPR
 
 [024] !!!
   GT  : (MISSING)
-  EP  : 1.7X↑
+  EP  : Traditional Statistical Model(IRT)
 
 [025] !!!
   GT  : (MISSING)
-  EP  : # CF_BPR
+  EP  : Statistic_ MostPop
 
 [026] !!!
   GT  : (MISSING)
-  EP  : Traditional Statistical Model(IRT)
+  EP  : DKT Model
 
 [027] !!!
   GT  : (MISSING)
-  EP  : Statistic_ MostPop
+  EP  : Current Service Recommendation
 
 [028] !!!
   GT  : (MISSING)
-  EP  : DKT Model
+  EP  : 0.159
 
 [029] !!!
   GT  : (MISSING)
-  EP  : Current Service Recommendation
+  EP  : 2.6X↑
 
 [030] !!!
   GT  : (MISSING)
-  EP  : 0.159
+  EP  : Statistic_ CotergoryPop
 
 [031] !!!
   GT  : (MISSING)
-  EP  : 2.6X↑
+  EP  : Algorithm
 
 [032] !!!
   GT  : (MISSING)
-  EP  : Statistic_ CotergoryPop
-
-[033] !!!
-  GT  : (MISSING)
   EP  : : Recall@10, accuracy : NDCG@10, Ranking
 
-[034] !!!
-  GT  : (MISSING)
-  EP  : Algorithm
-
-[035] !!!
+[033] !!!
   GT  : (MISSING)
   EP  : 20
 

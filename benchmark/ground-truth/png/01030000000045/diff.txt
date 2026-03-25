@@ -22,16 +22,16 @@ Civil Society Engagement election integrity. The registration of local election 
 
 Table: The number of accredited observers as of 28 April 15
 
-| No. Name of organization | No. Name of organization | Number of accredited |
+| No. | Name of organization | Number of accredited |
 | --- | --- | --- |
-| 1 Union of Youth Federations of Cambodia | 1 Union of Youth Federations of Cambodia | 17,266 |
-| 2 Cambodian Women for Peace and | 2 Cambodian Women for Peace and | 9,835 |
-| 3 Association of Democratic Students of | 3 Association of Democratic Students of | 711 |
-| 4 Association of Intellectual and Youth | 4 Association of Intellectual and Youth | 46 |
-| 5 Our Friends Association | 5 Our Friends Association | 27 |
-| 6 COMFREL | 6 COMFREL | 26 |
-| 7 Traditional and Modern Mental Health | 7 Traditional and Modern Mental Health | 15 |
-| Total | Total | 27,926 |
+| 1 | Union of Youth Federations of Cambodia | 17,266 |
+| 2 | Cambodian Women for Peace and | 9,835 |
+| 3 | Association of Democratic Students of | 711 |
+| 4 | Association of Intellectual and Youth | 46 |
+| 5 | Our Friends Association | 27 |
+| 6 | COMFREL | 26 |
+| 7 | Traditional and Modern Mental Health | 15 |
+|  | Total | 27,926 |
 
 (UYFC)
 

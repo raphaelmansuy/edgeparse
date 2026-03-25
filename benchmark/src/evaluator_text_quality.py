@@ -9,14 +9,15 @@ do not inflate or deflate content-accuracy scores.
 
 Metric summary
 --------------
-bleu4        BLEU-4 with +1 smoothing  [0–1]  higher is better
-rouge1       ROUGE-1 F1               [0–1]  higher is better
-rouge2       ROUGE-2 F1               [0–1]  higher is better
-rougeL       ROUGE-L F1 (LCS-based)  [0–1]  higher is better
-cer          Character Error Rate     [0–∞]  lower is better
-wer          Word Error Rate          [0–∞]  lower is better
-f1_token     Bag-of-words F1          [0–1]  higher is better
-text_quality_score  mean(rouge1, rougeL, bleu4)  [0–1]  higher is better
+bleu4        BLEU-4 with +1 smoothing     [0–1]  higher is better
+rouge1       ROUGE-1 F1                   [0–1]  higher is better
+rouge2       ROUGE-2 F1                   [0–1]  higher is better
+rougeL       ROUGE-L F1 (LCS-based)       [0–1]  higher is better
+cer          Character Error Rate         [0–∞]  lower is better
+wer          Word Error Rate              [0–∞]  lower is better
+f1_token     Bag-of-words F1              [0–1]  higher is better
+word_fragmentation_score  OCR split-word fidelity  [0–1]  higher is better
+text_quality_score  mean(rouge1, rougeL, bleu4, word_fragmentation_score)  [0–1]  higher is better
 """
 
 from __future__ import annotations
@@ -220,6 +221,64 @@ def _f1_token(ref_tokens: List[str], hyp_tokens: List[str]) -> float:
     return 2.0 * precision * recall / (precision + recall)
 
 
+def _is_fragment_token(token: str) -> bool:
+    return token.isalpha() and 1 <= len(token) <= 4
+
+
+def _word_fragmentation_score(ref_tokens: List[str], hyp_tokens: List[str]) -> Optional[float]:
+    """Score split-word corruption in the prediction.
+
+    Detects adjacent short alphabetic hypothesis tokens whose concatenation
+    matches a longer alphabetic reference token. A lower score means more OCR-
+    style word shattering such as ``ow ne r ship`` for ``ownership``.
+    """
+    ref_long_words = Counter(
+        token for token in ref_tokens if token.isalpha() and len(token) >= 6
+    )
+    total_candidates = sum(ref_long_words.values())
+    if total_candidates == 0:
+        return None
+
+    fragmented_matches = 0
+    fragmented_shards = 0
+    i = 0
+    while i < len(hyp_tokens):
+        if not _is_fragment_token(hyp_tokens[i]):
+            i += 1
+            continue
+
+        joined = hyp_tokens[i]
+        matched = False
+        for j in range(i + 1, min(i + 5, len(hyp_tokens))):
+            if not _is_fragment_token(hyp_tokens[j]):
+                break
+            joined += hyp_tokens[j]
+            if len(joined) >= 6 and ref_long_words.get(joined, 0) > 0:
+                ref_long_words[joined] -= 1
+                fragmented_matches += 1
+                fragmented_shards += (j - i + 1)
+                i = j + 1
+                matched = True
+                break
+
+        if not matched:
+            i += 1
+
+    fragmentation_rate = fragmented_matches / total_candidates
+
+    ref_alpha_count = sum(1 for token in ref_tokens if token.isalpha())
+    hyp_alpha_count = sum(1 for token in hyp_tokens if token.isalpha())
+    token_inflation_rate = 0.0
+    if ref_alpha_count > 0 and hyp_alpha_count > ref_alpha_count:
+        token_inflation_rate = (hyp_alpha_count - ref_alpha_count) / ref_alpha_count
+
+    # Split words surface in two coupled ways:
+    # 1. adjacent OCR shards can be rejoined into a reference word
+    # 2. the prediction carries too many alphabetic tokens overall
+    penalty = max(fragmentation_rate, min(token_inflation_rate, 1.0))
+    return max(0.0, 1.0 - penalty)
+
+
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def evaluate_text_quality(
@@ -246,14 +305,17 @@ def evaluate_text_quality(
         cer                Character Error Rate          [0–2]  ↓ better
         wer                Word Error Rate               [0–2]  ↓ better
         f1_token           Bag-of-words token F1         [0–1]  ↑ better
-        text_quality_score mean(rouge1, rougeL, bleu4)  [0–1]  ↑ better
+        word_fragmentation_score OCR split-word fidelity [0–1]  ↑ better
+        text_quality_score mean(rouge1, rougeL, bleu4, word_fragmentation_score)  [0–1]  ↑ better
     """
     gt_plain   = strip_markdown(gt   or "")
     pred_plain = strip_markdown(pred or "")
 
     _null: Dict[str, Optional[float]] = {
         "bleu4": None, "rouge1": None, "rouge2": None, "rougeL": None,
-        "cer": None, "wer": None, "f1_token": None, "text_quality_score": None,
+        "cer": None, "wer": None, "f1_token": None,
+        "word_fragmentation_score": None,
+        "text_quality_score": None,
     }
 
     if not gt_plain:
@@ -269,11 +331,13 @@ def evaluate_text_quality(
     cer    = _cer(gt_plain, pred_plain)
     wer    = _wer(gt_plain, pred_plain)
     f1_tok = _f1_token(ref_tokens, hyp_tokens)
+    word_fragmentation_score = _word_fragmentation_score(ref_tokens, hyp_tokens)
 
-    # Composite: mean of the three most discriminating [0–1] higher-is-better
-    # metrics: ROUGE-1 (recall/precision balance), ROUGE-L (order-aware),
-    # BLEU-4 (n-gram precision fluency).
-    quality_parts = [v for v in (rouge1, rouge_l, bleu4) if v is not None]
+    # Composite: content fidelity plus explicit split-word corruption penalty.
+    quality_parts = [
+        v for v in (rouge1, rouge_l, bleu4, word_fragmentation_score)
+        if v is not None
+    ]
     text_quality_score = sum(quality_parts) / len(quality_parts) if quality_parts else None
 
     return {
@@ -284,5 +348,6 @@ def evaluate_text_quality(
         "cer":                cer,
         "wer":                wer,
         "f1_token":           f1_tok,
+        "word_fragmentation_score": word_fragmentation_score,
         "text_quality_score": text_quality_score,
     }

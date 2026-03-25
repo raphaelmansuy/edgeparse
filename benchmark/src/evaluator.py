@@ -22,6 +22,7 @@ from pathlib import Path
 from statistics import fmean
 from typing import Any, Dict, Iterable, List, Optional, Set
 
+from evaluation_schema import CURRENT_EVALUATION_SCHEMA_VERSION
 from evaluator_heading_level import evaluate_heading_level
 from evaluator_paragraph import evaluate_paragraph_structure
 from evaluator_reading_order import evaluate_reading_order
@@ -62,6 +63,7 @@ class DocumentScores:
     cer: Optional[float]
     wer: Optional[float]
     f1_token: Optional[float]
+    word_fragmentation_score: Optional[float]
     text_quality_score: Optional[float]
     prediction_available: bool
 
@@ -93,6 +95,7 @@ class DocumentScores:
                 "cer": self.cer,
                 "wer": self.wer,
                 "f1_token": self.f1_token,
+                "word_fragmentation_score": self.word_fragmentation_score,
                 "text_quality_score": self.text_quality_score,
             },
             "prediction_available": self.prediction_available,
@@ -176,6 +179,7 @@ def _evaluate_single_document(
         cer=text_metrics["cer"],
         wer=text_metrics["wer"],
         f1_token=text_metrics["f1_token"],
+        word_fragmentation_score=text_metrics["word_fragmentation_score"],
         text_quality_score=text_metrics["text_quality_score"],
         prediction_available=prediction_available,
     )
@@ -239,6 +243,11 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
     cer_values           = [doc.cer                for doc in documents if doc.cer                is not None]
     wer_values           = [doc.wer                for doc in documents if doc.wer                is not None]
     f1_token_values      = [doc.f1_token           for doc in documents if doc.f1_token           is not None]
+    word_fragmentation_values = [
+        doc.word_fragmentation_score
+        for doc in documents
+        if doc.word_fragmentation_score is not None
+    ]
     text_quality_values  = [doc.text_quality_score for doc in documents if doc.text_quality_score is not None]
 
     overall_mean = _safe_mean(overall_values)
@@ -285,6 +294,7 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
             "cer_mean":                _safe_mean(cer_values),
             "wer_mean":                _safe_mean(wer_values),
             "f1_token_mean":           _safe_mean(f1_token_values),
+            "word_fragmentation_score_mean": _safe_mean(word_fragmentation_values),
             "text_quality_score_mean": _safe_mean(text_quality_values),
         },
         "nid_count": len(nid_values),
@@ -391,6 +401,7 @@ def _evaluate_engine_version(
 
     aggregated = _aggregate_document_scores(documents)
     payload = {
+        "schema_version": CURRENT_EVALUATION_SCHEMA_VERSION,
         "summary": summary_metadata,
         "metrics": aggregated,
         "documents": [doc.to_json() for doc in documents],
@@ -419,6 +430,7 @@ def _evaluate_engine_version(
         "cer",
         "wer",
         "f1_token",
+        "word_fragmentation_score",
         "text_quality_score",
     ]
     with csv_path.open("w", encoding="utf-8", newline="") as csv_file:
@@ -444,6 +456,7 @@ def _evaluate_engine_version(
                 "cer":                _v(doc.cer),
                 "wer":                _v(doc.wer),
                 "f1_token":           _v(doc.f1_token),
+                "word_fragmentation_score": _v(doc.word_fragmentation_score),
                 "text_quality_score": _v(doc.text_quality_score),
             }
             writer.writerow(row)

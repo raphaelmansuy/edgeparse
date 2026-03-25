@@ -170,7 +170,7 @@
 
 [043] !!!
   GT  : (MISSING)
-  EP  : | Jul 2020 | Oct 2020 Tourism Will not terminate employment | Jan 2021 Will not terminate employment | Jul 2020 Handicra
+  EP  : | Jul 2020 | Oct 2020 Tourism Will not terminate employment | Jan 2021 Will not terminate employment | Jul 2020 | Oct 20
 
 [044] !!!
   GT  : (MISSING)

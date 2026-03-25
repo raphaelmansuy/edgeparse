@@ -53,9 +53,12 @@ def run_benchmark(args: argparse.Namespace) -> dict:
     else:
         engine_name = "edgeparse"
 
-    # Step 1: Parse PDFs
-    logging.info("Starting PDF parsing with %s...", engine_name)
-    process_markdown(engine_name, str(input_dir), doc_id=args.doc_id)
+    # Step 1: Parse PDFs unless this is an evaluation refresh.
+    if args.skip_parse:
+        logging.info("Skipping PDF parsing for %s; refreshing evaluation only.", engine_name)
+    else:
+        logging.info("Starting PDF parsing with %s...", engine_name)
+        process_markdown(engine_name, str(input_dir), doc_id=args.doc_id)
 
     # Step 2: Run evaluation
     logging.info("Running evaluation...")
@@ -314,6 +317,11 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         type=str,
         default=None,
         help="Output path for HTML report (optional)",
+    )
+    parser.add_argument(
+        "--skip-parse",
+        action="store_true",
+        help="Refresh evaluation artifacts from existing prediction markdown without rerunning parser extraction",
     )
     return parser.parse_args(argv)
 

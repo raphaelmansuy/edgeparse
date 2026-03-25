@@ -150,7 +150,7 @@ METRIC_INFO = {
         "name": "TQS — Text Content Quality",
         "short": "TQS",
         "description": (
-            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4). "
+            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4, fragmentation score). "
             "Measures how accurately the extracted text matches the ground truth "
             "after stripping Markdown formatting."
         ),
@@ -183,6 +183,12 @@ METRIC_INFO = {
         "name": "BLEU-4",
         "short": "BLEU-4",
         "description": "BLEU-4 with +1 smoothing: 4-gram precision measuring fluency.",
+        "higher_better": True, "why": "", "when": [],
+    },
+    "frag": {
+        "name": "Word Fragmentation Score",
+        "short": "Fragmentation",
+        "description": "Penalizes OCR-style split words such as 'ow ne r ship' for 'ownership'.",
         "higher_better": True, "why": "", "when": [],
     },
     "cer": {
@@ -883,7 +889,7 @@ def generate_html_report(
     # Extract metric data
     metric_data: Dict[str, Dict[str, Optional[float]]] = {
         "nid": {}, "teds": {}, "mhs": {}, "td_f1": {}, "speed": {}, "overall": {},
-        "tqs": {}, "rouge1": {}, "rougeL": {}, "bleu4": {}, "cer": {}, "wer": {},
+        "tqs": {}, "rouge1": {}, "rougeL": {}, "bleu4": {}, "frag": {}, "cer": {}, "wer": {},
     }
     for eng in engines:
         d = results[eng]
@@ -900,12 +906,13 @@ def generate_html_report(
         metric_data["rouge1"][eng] = scores.get("rouge1_mean")
         metric_data["rougeL"][eng] = scores.get("rougeL_mean")
         metric_data["bleu4"][eng] = scores.get("bleu4_mean")
+        metric_data["frag"][eng] = scores.get("word_fragmentation_score_mean")
         metric_data["cer"][eng] = scores.get("cer_mean")
         metric_data["wer"][eng] = scores.get("wer_mean")
 
     # Compute ranks
     ranks: Dict[str, Dict[str, int]] = {}
-    for mk in ["nid", "teds", "mhs", "td_f1", "overall", "tqs", "rouge1", "rougeL", "bleu4"]:
+    for mk in ["nid", "teds", "mhs", "td_f1", "overall", "tqs", "rouge1", "rougeL", "bleu4", "frag"]:
         vals = [(e, metric_data[mk].get(e)) for e in engines]
         ranks[mk] = _compute_ranks(vals, True)
     for mk in ["speed", "cer", "wer"]:
@@ -1026,7 +1033,8 @@ def generate_html_report(
     parts.append('<h3 style="margin:1.5rem 0 0.75rem">Text Content Quality</h3>')
     parts.append('<div class="charts-grid">')
     for mk, info in [("tqs", METRIC_INFO["tqs"]), ("rouge1", METRIC_INFO["rouge1"]),
-                     ("rougeL", METRIC_INFO["rougeL"]), ("bleu4", METRIC_INFO["bleu4"])]:
+                     ("rougeL", METRIC_INFO["rougeL"]), ("bleu4", METRIC_INFO["bleu4"]),
+                     ("frag", METRIC_INFO["frag"])]:
         data = [(e, metric_data[mk].get(e)) for e in engines]
         chart = _svg_bar_chart(
             info["name"], data, info["higher_better"],

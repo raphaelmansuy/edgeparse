@@ -56,6 +56,7 @@ from engine_registry import (
     ENGINES, ENGINE_META, NON_OCR_ENGINES, OCR_ENGINES,
     available_engines, display_name,
 )
+from evaluation_schema import missing_evaluation_requirements
 from report_terminal import print_comparison_report, print_single_report
 from report_html import generate_html_report
 
@@ -100,7 +101,34 @@ def _load_result(engine: str) -> Optional[dict]:
     if not path.exists():
         return None
     with path.open(encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+
+    missing = missing_evaluation_requirements(data)
+    if missing:
+        print(
+            f"  {YELLOW}⚠ Stale evaluation for {display_name(engine)}; "
+            f"refreshing metrics-only output{RESET}"
+        )
+        cmd = [
+            sys.executable,
+            str(BENCH_DIR / "run.py"),
+            "--engine",
+            engine,
+            "--skip-parse",
+            "--log-level",
+            "WARNING",
+        ]
+        result = subprocess.run(cmd, cwd=str(BENCH_DIR))
+        if result.returncode == 0:
+            with path.open(encoding="utf-8") as f:
+                data = json.load(f)
+        else:
+            print(
+                f"  {RED}✗ Failed to refresh {display_name(engine)}; "
+                f"missing {', '.join(missing[:4])}"
+                f"{' ...' if len(missing) > 4 else ''}{RESET}"
+            )
+    return data
 
 
 def _run_engine(engine: str) -> bool:
@@ -409,6 +437,7 @@ def run_comparison(
             "rouge2": scores.get("rouge2_mean"),
             "rougeL": scores.get("rougeL_mean"),
             "bleu4": scores.get("bleu4_mean"),
+            "word_fragmentation_score": scores.get("word_fragmentation_score_mean"),
             "f1_token": scores.get("f1_token_mean"),
             "cer": scores.get("cer_mean"),
             "wer": scores.get("wer_mean"),

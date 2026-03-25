@@ -38,7 +38,7 @@ This is with the exception of Myanmar. Given the current political circumstances
 
 Figure 1: Age by gender of respondents
 
-OVER 50
+# OVER 50
 
 41-50
 

@@ -26,7 +26,7 @@
 
 [007] !!!
   GT  : ### Figure 1: Age by gender of respondents
-  EP  : OVER 50
+  EP  : # OVER 50
 
 [008] !!!
   GT  : | Age Group | Male | Female | |:---|:---:|:---:| | OVER 50 |  |  | | 41-50 |  |  | | 31-40 |  |  | | 25-30 |  |  |

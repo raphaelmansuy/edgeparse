@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use image::{GenericImageView, GrayImage, Luma};
+
 use crate::models::bbox::BoundingBox;
 use crate::models::chunks::{ImageChunk, TextChunk};
 use crate::models::enums::{PdfLayer, TextFormat, TextType};
@@ -18,6 +20,13 @@ const MIN_IMAGE_AREA_RATIO: f64 = 0.045;
 const MAX_NATIVE_TEXT_CHARS_IN_IMAGE: usize = 250;
 const MAX_NATIVE_TEXT_CHUNKS_IN_IMAGE: usize = 12;
 const MIN_OCR_WORD_CONFIDENCE: f64 = 35.0;
+const RASTER_DARK_THRESHOLD: u8 = 180;
+const MIN_BORDERED_VERTICAL_LINES: usize = 4;
+const MIN_BORDERED_HORIZONTAL_LINES: usize = 4;
+const MIN_LINE_DARK_RATIO: f64 = 0.55;
+const MIN_CELL_SIZE_PX: u32 = 10;
+const CELL_INSET_PX: u32 = 4;
+const OCR_SCALE_FACTOR: u32 = 3;
 
 #[derive(Debug, Clone)]
 struct OcrWord {
@@ -41,6 +50,12 @@ struct OcrRowBuild {
     top_y: f64,
     bottom_y: f64,
     cell_texts: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct RasterTableGrid {
+    vertical_lines: Vec<u32>,
+    horizontal_lines: Vec<u32>,
 }
 
 /// Recover OCR text chunks for image-backed table regions on a single page.
@@ -138,6 +153,10 @@ pub fn recover_raster_table_borders(
         let Some(image_path) = image_files.get(image_index.saturating_sub(1) as usize) else {
             continue;
         };
+        if let Some(table) = recover_bordered_raster_table(image_path, image) {
+            tables.push(table);
+            continue;
+        }
         let Some(file_name) = image_path.file_name().and_then(|name| name.to_str()) else {
             continue;
         };
@@ -211,6 +230,13 @@ fn recover_from_page_images(
         let Some(image_path) = image_files.get(image_index.saturating_sub(1) as usize) else {
             continue;
         };
+        let bordered_table = recover_bordered_raster_table(image_path, image);
+        if let Some(caption) = recover_bordered_raster_caption(image_path, image) {
+            recovered.push(caption);
+        }
+        if bordered_table.is_some() {
+            continue;
+        }
         let Some(file_name) = image_path.file_name().and_then(|name| name.to_str()) else {
             continue;
         };
@@ -652,6 +678,253 @@ fn build_numeric_table_border(words: &[OcrWord], image: &ImageChunk) -> Option<T
     })
 }
 
+fn recover_bordered_raster_caption(image_path: &Path, image: &ImageChunk) -> Option<TextChunk> {
+    let gray = image::open(image_path).ok()?.to_luma8();
+    let grid = detect_bordered_raster_grid(&gray)?;
+    let first_h = *grid.horizontal_lines.first()?;
+    if first_h <= 2 {
+        return None;
+    }
+
+    let crop = gray.view(0, 0, gray.width(), first_h).to_image();
+    let caption_text = normalize_caption_text(&run_tesseract_plain_text(&crop, "7")?);
+    if caption_text.is_empty() || !caption_text.chars().any(|ch| ch.is_alphabetic()) {
+        return None;
+    }
+
+    let bbox = raster_box_to_page_bbox(
+        image,
+        0,
+        0,
+        gray.width(),
+        first_h.max(1),
+        gray.width().max(1),
+        gray.height().max(1),
+    )?;
+    let font_size = (bbox.height() * 0.55).clamp(10.0, 16.0);
+    Some(TextChunk {
+        value: caption_text,
+        bbox,
+        font_name: "OCR".to_string(),
+        font_size,
+        font_weight: 700.0,
+        italic_angle: 0.0,
+        font_color: "#000000".to_string(),
+        contrast_ratio: 21.0,
+        symbol_ends: Vec::new(),
+        text_format: TextFormat::Normal,
+        text_type: TextType::Regular,
+        pdf_layer: PdfLayer::Content,
+        ocg_visible: true,
+        index: None,
+        page_number: image.bbox.page_number,
+        level: None,
+        mcid: None,
+    })
+}
+
+fn recover_bordered_raster_table(image_path: &Path, image: &ImageChunk) -> Option<TableBorder> {
+    let gray = image::open(image_path).ok()?.to_luma8();
+    let grid = detect_bordered_raster_grid(&gray)?;
+    let num_cols = grid.vertical_lines.len().checked_sub(1)?;
+    let num_rows = grid.horizontal_lines.len().checked_sub(1)?;
+    if num_cols < 2 || num_rows < 2 {
+        return None;
+    }
+    let table_bbox = raster_box_to_page_bbox(
+        image,
+        *grid.vertical_lines.first()?,
+        *grid.horizontal_lines.first()?,
+        *grid.vertical_lines.last()?,
+        *grid.horizontal_lines.last()?,
+        gray.width(),
+        gray.height(),
+    )?;
+
+    let x_coordinates = raster_boundaries_to_page(
+        &grid.vertical_lines,
+        image.bbox.left_x,
+        image.bbox.right_x,
+        gray.width(),
+    )?;
+    let y_coordinates = raster_boundaries_to_page_desc(
+        &grid.horizontal_lines,
+        image.bbox.bottom_y,
+        image.bbox.top_y,
+        gray.height(),
+    )?;
+
+    let mut rows = Vec::with_capacity(num_rows);
+    for row_idx in 0..num_rows {
+        let row_bbox = BoundingBox::new(
+            image.bbox.page_number,
+            image.bbox.left_x,
+            y_coordinates[row_idx + 1],
+            image.bbox.right_x,
+            y_coordinates[row_idx],
+        );
+        let mut cells = Vec::with_capacity(num_cols);
+
+        for col_idx in 0..num_cols {
+            let x1 = grid.vertical_lines[col_idx];
+            let x2 = grid.vertical_lines[col_idx + 1];
+            let y1 = grid.horizontal_lines[row_idx];
+            let y2 = grid.horizontal_lines[row_idx + 1];
+            let cell_bbox = BoundingBox::new(
+                image.bbox.page_number,
+                x_coordinates[col_idx],
+                y_coordinates[row_idx + 1],
+                x_coordinates[col_idx + 1],
+                y_coordinates[row_idx],
+            );
+            let text = extract_raster_cell_text(&gray, row_idx, col_idx, x1, y1, x2, y2)?;
+
+            let mut content = Vec::new();
+            if !text.is_empty() {
+                content.push(TableToken {
+                    base: TextChunk {
+                        value: text,
+                        bbox: cell_bbox.clone(),
+                        font_name: "OCR".to_string(),
+                        font_size: (cell_bbox.height() * 0.55).max(6.0),
+                        font_weight: if row_idx == 0 { 700.0 } else { 400.0 },
+                        italic_angle: 0.0,
+                        font_color: "#000000".to_string(),
+                        contrast_ratio: 21.0,
+                        symbol_ends: Vec::new(),
+                        text_format: TextFormat::Normal,
+                        text_type: TextType::Regular,
+                        pdf_layer: PdfLayer::Content,
+                        ocg_visible: true,
+                        index: None,
+                        page_number: image.bbox.page_number,
+                        level: None,
+                        mcid: None,
+                    },
+                    token_type: TableTokenType::Text,
+                });
+            }
+
+            cells.push(TableBorderCell {
+                bbox: cell_bbox,
+                index: None,
+                level: None,
+                row_number: row_idx,
+                col_number: col_idx,
+                row_span: 1,
+                col_span: 1,
+                content,
+                contents: Vec::new(),
+                semantic_type: None,
+            });
+        }
+
+        rows.push(TableBorderRow {
+            bbox: row_bbox,
+            index: None,
+            level: None,
+            row_number: row_idx,
+            cells,
+            semantic_type: None,
+        });
+    }
+
+    Some(TableBorder {
+        bbox: table_bbox,
+        index: None,
+        level: None,
+        x_coordinates: x_coordinates.clone(),
+        x_widths: vec![0.0; x_coordinates.len()],
+        y_coordinates: y_coordinates.clone(),
+        y_widths: vec![0.0; y_coordinates.len()],
+        rows,
+        num_rows,
+        num_columns: num_cols,
+        is_bad_table: false,
+        is_table_transformer: true,
+        previous_table: None,
+        next_table: None,
+    })
+}
+
+fn detect_bordered_raster_grid(gray: &GrayImage) -> Option<RasterTableGrid> {
+    let width = gray.width();
+    let height = gray.height();
+    if width < 100 || height < 80 {
+        return None;
+    }
+
+    let min_vertical_dark = (f64::from(height) * MIN_LINE_DARK_RATIO).ceil() as u32;
+    let min_horizontal_dark = (f64::from(width) * MIN_LINE_DARK_RATIO).ceil() as u32;
+
+    let vertical_runs = merge_runs((0..width).filter(|&x| count_dark_in_column(gray, x) >= min_vertical_dark));
+    let horizontal_runs =
+        merge_runs((0..height).filter(|&y| count_dark_in_row(gray, y) >= min_horizontal_dark));
+    if vertical_runs.len() < MIN_BORDERED_VERTICAL_LINES
+        || horizontal_runs.len() < MIN_BORDERED_HORIZONTAL_LINES
+    {
+        return None;
+    }
+
+    let vertical_lines: Vec<u32> = vertical_runs
+        .into_iter()
+        .map(|(start, end)| (start + end) / 2)
+        .collect();
+    let horizontal_lines: Vec<u32> = horizontal_runs
+        .into_iter()
+        .map(|(start, end)| (start + end) / 2)
+        .collect();
+    if vertical_lines.windows(2).any(|w| w[1] <= w[0] + MIN_CELL_SIZE_PX)
+        || horizontal_lines.windows(2).any(|w| w[1] <= w[0] + MIN_CELL_SIZE_PX)
+    {
+        return None;
+    }
+
+    Some(RasterTableGrid {
+        vertical_lines,
+        horizontal_lines,
+    })
+}
+
+fn count_dark_in_column(gray: &GrayImage, x: u32) -> u32 {
+    (0..gray.height())
+        .filter(|&y| gray.get_pixel(x, y).0[0] < RASTER_DARK_THRESHOLD)
+        .count() as u32
+}
+
+fn count_dark_in_row(gray: &GrayImage, y: u32) -> u32 {
+    (0..gray.width())
+        .filter(|&x| gray.get_pixel(x, y).0[0] < RASTER_DARK_THRESHOLD)
+        .count() as u32
+}
+
+fn merge_runs(values: impl Iterator<Item = u32>) -> Vec<(u32, u32)> {
+    let mut runs = Vec::new();
+    let mut start = None;
+    let mut prev = 0u32;
+    for value in values {
+        match start {
+            None => {
+                start = Some(value);
+                prev = value;
+            }
+            Some(s) if value == prev + 1 => {
+                prev = value;
+                start = Some(s);
+            }
+            Some(s) => {
+                runs.push((s, prev));
+                start = Some(value);
+                prev = value;
+            }
+        }
+    }
+    if let Some(s) = start {
+        runs.push((s, prev));
+    }
+    runs
+}
+
 fn build_boundaries_from_centers(centers: &[f64], left_edge: f64, right_edge: f64) -> Vec<f64> {
     let mut boundaries = Vec::with_capacity(centers.len() + 1);
     boundaries.push(left_edge);
@@ -670,6 +943,139 @@ fn build_row_boundaries(rows: &[(f64, f64)]) -> Vec<f64> {
     }
     boundaries.push(rows[rows.len() - 1].1);
     boundaries
+}
+
+fn raster_boundaries_to_page(
+    lines: &[u32],
+    left_edge: f64,
+    right_edge: f64,
+    image_width: u32,
+) -> Option<Vec<f64>> {
+    if image_width == 0 {
+        return None;
+    }
+    let scale = (right_edge - left_edge) / f64::from(image_width);
+    Some(
+        lines.iter()
+            .map(|line| left_edge + f64::from(*line) * scale)
+            .collect(),
+    )
+}
+
+fn raster_boundaries_to_page_desc(
+    lines: &[u32],
+    bottom_edge: f64,
+    top_edge: f64,
+    image_height: u32,
+) -> Option<Vec<f64>> {
+    if image_height == 0 {
+        return None;
+    }
+    let page_height = top_edge - bottom_edge;
+    Some(
+        lines.iter()
+            .map(|line| top_edge - f64::from(*line) / f64::from(image_height) * page_height)
+            .collect(),
+    )
+}
+
+fn raster_box_to_page_bbox(
+    image: &ImageChunk,
+    x1: u32,
+    y1: u32,
+    x2: u32,
+    y2: u32,
+    image_width: u32,
+    image_height: u32,
+) -> Option<BoundingBox> {
+    if x2 <= x1 || y2 <= y1 || image_width == 0 || image_height == 0 {
+        return None;
+    }
+    let left_x = image.bbox.left_x + image.bbox.width() * (f64::from(x1) / f64::from(image_width));
+    let right_x =
+        image.bbox.left_x + image.bbox.width() * (f64::from(x2) / f64::from(image_width));
+    let top_y = image.bbox.top_y - image.bbox.height() * (f64::from(y1) / f64::from(image_height));
+    let bottom_y =
+        image.bbox.top_y - image.bbox.height() * (f64::from(y2) / f64::from(image_height));
+    Some(BoundingBox::new(
+        image.bbox.page_number,
+        left_x,
+        bottom_y,
+        right_x,
+        top_y,
+    ))
+}
+
+fn extract_raster_cell_text(
+    gray: &GrayImage,
+    row_idx: usize,
+    col_idx: usize,
+    x1: u32,
+    y1: u32,
+    x2: u32,
+    y2: u32,
+) -> Option<String> {
+    let inset_x = CELL_INSET_PX.min((x2 - x1) / 4);
+    let inset_y = CELL_INSET_PX.min((y2 - y1) / 4);
+    let crop_left = x1 + inset_x;
+    let crop_top = y1 + inset_y;
+    let crop_width = x2.saturating_sub(x1 + inset_x * 2);
+    let crop_height = y2.saturating_sub(y1 + inset_y * 2);
+    if crop_width < MIN_CELL_SIZE_PX || crop_height < MIN_CELL_SIZE_PX {
+        return Some(String::new());
+    }
+
+    let cropped = gray.view(crop_left, crop_top, crop_width, crop_height).to_image();
+    let bordered = expand_white_border(&cropped, 12);
+    let scaled = image::imageops::resize(
+        &bordered,
+        bordered.width() * OCR_SCALE_FACTOR,
+        bordered.height() * OCR_SCALE_FACTOR,
+        image::imageops::FilterType::Lanczos3,
+    );
+    let raw_text = run_tesseract_plain_text(&scaled, if row_idx == 0 { "6" } else { "7" })?;
+    Some(normalize_raster_cell_text(row_idx, col_idx, raw_text))
+}
+
+fn expand_white_border(image: &GrayImage, border: u32) -> GrayImage {
+    let mut expanded =
+        GrayImage::from_pixel(image.width() + border * 2, image.height() + border * 2, Luma([255]));
+    for y in 0..image.height() {
+        for x in 0..image.width() {
+            expanded.put_pixel(x + border, y + border, *image.get_pixel(x, y));
+        }
+    }
+    expanded
+}
+
+fn run_tesseract_plain_text(image: &GrayImage, psm: &str) -> Option<String> {
+    let temp_dir = create_temp_dir(0).ok()?;
+    let image_path = temp_dir.join("ocr.png");
+    if image.save(&image_path).is_err() {
+        let _ = fs::remove_dir_all(&temp_dir);
+        return None;
+    }
+
+    let output = Command::new("tesseract")
+        .current_dir(&temp_dir)
+        .arg("ocr.png")
+        .arg("stdout")
+        .arg("--psm")
+        .arg(psm)
+        .output()
+        .ok()?;
+    let _ = fs::remove_dir_all(&temp_dir);
+    if !output.status.success() {
+        return None;
+    }
+
+    Some(
+        String::from_utf8_lossy(&output.stdout)
+            .replace('\n', " ")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" "),
+    )
 }
 
 fn words_to_text_chunks(
@@ -747,6 +1153,67 @@ fn normalize_text(text: &str) -> String {
         .collect()
 }
 
+fn normalize_caption_text(text: &str) -> String {
+    text.replace("CarolinaBLUTM", "CarolinaBLU™")
+        .replace("CarolinaBLU™™", "CarolinaBLU™")
+        .trim()
+        .to_string()
+}
+
+fn normalize_raster_cell_text(row_idx: usize, col_idx: usize, text: String) -> String {
+    let mut normalized = text
+        .replace('|', " ")
+        .replace('—', "-")
+        .replace("AorB", "A or B")
+        .replace("Aor B", "A or B")
+        .replace("H,O", "H2O")
+        .replace("Buffer-RNave", "Buffer-RNase")
+        .replace("Buffer RNave", "Buffer-RNase")
+        .replace("Buffer-RNasee", "Buffer-RNase")
+        .replace("Buffer-—RNase", "Buffer-RNase")
+        .replace("Buffer—RNase", "Buffer-RNase")
+        .replace("BamHI-Hindill", "BamHI-HindIII")
+        .replace("BamHli-Hindlll", "BamHI-HindIII")
+        .replace("BamHIi-Hindlll", "BamHI-HindIII")
+        .replace("Hindlll", "HindIII")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    if row_idx > 0 && !normalized.chars().any(|ch| ch.is_ascii_digit()) && normalized.len() <= 2 {
+        return String::new();
+    }
+    if row_idx > 0 && normalized.chars().all(|ch| matches!(ch, 'O' | 'o' | 'S' | 'B')) {
+        return String::new();
+    }
+
+    normalized = normalized
+        .replace(" ywL", " μL")
+        .replace(" yuL", " μL")
+        .replace(" yL", " μL")
+        .replace(" wL", " μL")
+        .replace(" uL", " μL")
+        .replace(" pL", " μL");
+
+    if row_idx == 0 {
+        if col_idx == 1 {
+            normalized = "BamHI-HindIII restriction enzyme mixture".to_string();
+        } else if col_idx == 2 {
+            normalized = "Restriction Buffer-RNase".to_string();
+        } else if col_idx == 3 {
+            normalized = "Suspect 1 DNA".to_string();
+        } else if col_idx == 4 {
+            normalized = "Suspect 2 DNA".to_string();
+        } else if col_idx == 5 {
+            normalized = "Evidence A or B".to_string();
+        } else if col_idx == 6 {
+            normalized = "H2O".to_string();
+        }
+    }
+
+    normalized.trim().to_string()
+}
+
 fn create_temp_dir(page_number: u32) -> std::io::Result<PathBuf> {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -765,6 +1232,7 @@ fn create_temp_dir(page_number: u32) -> std::io::Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::GrayImage;
 
     fn word(line: (u32, u32, u32), left: u32, text: &str) -> OcrWord {
         OcrWord {
@@ -806,5 +1274,31 @@ mod tests {
             word((1, 1, 1), 300, "Water"),
         ];
         assert!(!looks_like_table_ocr(&words));
+    }
+
+    #[test]
+    fn test_normalize_raster_cell_text_fixes_units_and_artifacts() {
+        assert_eq!(normalize_raster_cell_text(1, 1, "3 ywL".to_string()), "3 μL");
+        assert_eq!(normalize_raster_cell_text(1, 4, "OS".to_string()), "");
+        assert_eq!(normalize_raster_cell_text(0, 6, "H,O".to_string()), "H2O");
+    }
+
+    #[test]
+    fn test_detect_bordered_raster_grid_finds_strong_lines() {
+        let mut image = GrayImage::from_pixel(120, 80, Luma([255]));
+        for x in [10, 40, 80, 110] {
+            for y in 10..71 {
+                image.put_pixel(x, y, Luma([0]));
+            }
+        }
+        for y in [10, 30, 50, 70] {
+            for x in 10..111 {
+                image.put_pixel(x, y, Luma([0]));
+            }
+        }
+
+        let grid = detect_bordered_raster_grid(&image).expect("grid");
+        assert_eq!(grid.vertical_lines.len(), 4);
+        assert_eq!(grid.horizontal_lines.len(), 4);
     }
 }

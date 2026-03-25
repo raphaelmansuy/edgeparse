@@ -22,7 +22,7 @@
 
 [006] !!!
   GT  : (MISSING)
-  EP  : | 1 Cambodian People’s Party | 1 Cambodian People’s Party | 1,652 | 28,008 | 1,652 | 28,008 | 0 | | --- | --- | --- | --
+  EP  : | 1 | Cambodian People’s Party | 1,652 | 28,008 | 1,652 | 28,008 | 0 | | --- | --- | --- | --- | --- | --- | --- | | 2 |
 
 [007] !!!
   GT  : (MISSING)

@@ -57,7 +57,7 @@ Recommendation Pack: Track Record
 
 # 1.7~2.6 times that of competing models even when using commercial service data
 
-Comparison with Beauty Commerce Comparison with Beauty Commerce Comparison Case of Domestic Subscription Comparison Case of Domestic Subscription Education Content Platform PoC Case Education Content Platform PoC Case Recommendation Models Recommendation Models Platform Recommendation Model Platform Recommendation Model Comparison of prediction rates of correct/incorrect Comparison of prediction rates of correct/incorrect Recommendation model Hit Ratio comparison Recommendation model Hit Ratio comparison answers based on personalized questions answers based on personalized questions Comparison of quantitative evaluations among Comparison of quantitative evaluations among
+Comparison with Beauty Commerce Comparison with Beauty Commerce Comparison Case of Domestic Subscription Comparison Case of Domestic Subscription Education Content Platform PoC Case Education Content Platform PoC Case Recommendation Models Recommendation Models Platform Recommendation Model Platform Recommendation Model Comparison of prediction rates of correct/incorrect Comparison of prediction rates of correct/incorrect answers based on personalized questions answers based on personalized questions Recommendation model Hit Ratio comparison Recommendation model Hit Ratio comparison Comparison of quantitative evaluations among Comparison of quantitative evaluations among
 
 0.03
 
@@ -71,15 +71,11 @@ CustomerBERT
 
 Graph-RecSys
 
-AWS Ready
-
-0.882
-
 Personalize
 
-AutoEncoder _RecVAE
+AWS Ready
 
-0.735
+AutoEncoder _RecVAE
 
 0.3278
 
@@ -115,9 +111,9 @@ Current Service Recommendation
 
 Statistic_ CotergoryPop
 
-: Recall@10, accuracy : NDCG@10, Ranking
-
 Algorithm
+
+: Recall@10, accuracy : NDCG@10, Ranking
 
 20
 
