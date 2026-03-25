@@ -1,0 +1,60 @@
+# ─── Spike (riscv-isa-sim) Runner ───────────────────────────────────────────
+# Greg's AI coding buddy:
+#   Spike is the OFFICIAL RISC-V ISA reference simulator from riscv.org.
+#   When you want spec-compliance validation, Spike is the gold standard.
+#   We pair it with 'pk' (proxy kernel) which proxies Linux syscalls
+#   from the simulated RISC-V core to the host OS.
+#
+#   spike pk <binary> <args>  — runs user-mode RISC-V programs.
+#
+#   NOTE: The binary must be statically linked for pk to handle it.
+#   We build from source because distro packages are often stale.
+#
+#   docker build -f tests/wasm-runtimes/Dockerfile.runner.spike \
+#                -t edgeparse-riscv-spike .
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential git ca-certificates autoconf automake libtool \
+    device-tree-compiler pkg-config file \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build Spike (riscv-isa-sim)
+RUN git clone --depth 1 https://github.com/riscv-software-src/riscv-isa-sim /tmp/spike && \
+    cd /tmp/spike && \
+    mkdir build && cd build && \
+    ../configure --prefix=/usr/local && \
+    make -j"$(nproc)" && \
+    make install && \
+    rm -rf /tmp/spike
+
+# Build pk (proxy kernel) — needs the riscv64 cross-compiler
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc-riscv64-linux-gnu g++-riscv64-linux-gnu \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 https://github.com/riscv-software-src/riscv-pk /tmp/pk && \
+    cd /tmp/pk && \
+    mkdir build && cd build && \
+    ../configure --prefix=/usr/local --host=riscv64-linux-gnu \
+        --with-arch=rv64gc_zifencei && \
+    make -j"$(nproc)" && \
+    make install && \
+    rm -rf /tmp/pk
+
+# Verify
+RUN spike --help 2>&1 | head -1 || true
+
+WORKDIR /test
+
+COPY tests/fixtures/sample.pdf          /test/fixtures/
+COPY tests/wasm-runtimes/run-tests.sh   /test/
+RUN chmod +x /test/run-tests.sh
+
+# Copy pre-built RISC-V binary (statically linked)
+COPY tests/wasm-runtimes/.build/edgeparse-riscv64-static /test/edgeparse-riscv64
+
+ENTRYPOINT ["/test/run-tests.sh"]
+CMD ["spike"]

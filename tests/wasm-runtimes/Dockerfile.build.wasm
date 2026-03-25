@@ -1,0 +1,54 @@
+# ─── Reproducible WASM (WASI) Build ─────────────────────────────────────────
+# Greg's AI coding buddy:
+#   Builds edgeparse as a WASI Preview 1 binary (.wasm) that runs on
+#   any conformant runtime (wasmtime, wasmer, wasmedge, wamr).
+#
+#   The wasm32-wasip1 target compiles edgeparse-core without rayon/image/zip
+#   (those need native threads or JS glue). Pure PDF parsing still works —
+#   you just lose parallelism and image extraction.
+#
+# Usage:
+#   docker build -f tests/wasm-runtimes/Dockerfile.build.wasm \
+#                -t edgeparse-wasi-build .
+#   # Extract the binary:
+#   id=$(docker create edgeparse-wasi-build) && \
+#     docker cp "$id":/out/edgeparse.wasm tests/wasm-runtimes/.build/ && \
+#     docker rm "$id"
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM rust:1-slim-bookworm AS builder
+
+RUN rustup target add wasm32-wasip1
+
+WORKDIR /build
+
+# ── Cache cargo registry: copy manifests first ──────────────────────────────
+COPY Cargo.toml Cargo.lock ./
+COPY crates/edgeparse-core/Cargo.toml   crates/edgeparse-core/
+COPY crates/edgeparse-cli/Cargo.toml    crates/edgeparse-cli/
+COPY crates/pdf-cos/Cargo.toml          crates/pdf-cos/
+
+# Strip workspace members that don't compile for wasm32-wasip1
+# (pyo3, napi-rs, wasm-bindgen are browser-only / native-only)
+RUN sed -E -i \
+      '/"crates\/(edgeparse-python|edgeparse-node|edgeparse-wasm)"/d' \
+      Cargo.toml && \
+    mkdir -p crates/edgeparse-core/src crates/edgeparse-cli/src crates/pdf-cos/src && \
+    echo "fn main() {}" > crates/edgeparse-cli/src/main.rs && \
+    touch crates/edgeparse-core/src/lib.rs && \
+    touch crates/pdf-cos/src/lib.rs && \
+    cargo build --target wasm32-wasip1 --release \
+        -p edgeparse-cli --no-default-features 2>/dev/null || true
+    # ^^ dummy build warms the dep cache; may fail on empty libs — that's fine
+
+# ── Copy real source and build ──────────────────────────────────────────────
+COPY crates/ crates/
+RUN find crates/ -name '*.rs' -exec touch {} + && \
+    cargo build --target wasm32-wasip1 --release \
+        -p edgeparse-cli --no-default-features
+
+# ── Output stage — just the binary ──────────────────────────────────────────
+FROM scratch AS output
+COPY --from=builder \
+     /build/target/wasm32-wasip1/release/edgeparse.wasm \
+     /out/edgeparse.wasm

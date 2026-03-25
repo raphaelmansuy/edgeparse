@@ -1,0 +1,47 @@
+# ─── libriscv Runner ────────────────────────────────────────────────────────
+# Greg's AI coding buddy:
+#   libriscv — "the fastest RISC-V sandbox" (768+ stars).
+#   3-4ns function call overhead, binary translation, used in Godot.
+#   C++20 implementation with Linux syscall emulation built in.
+#
+#   The 'rvlinux' CLI tool loads an RV64GC ELF and emulates it
+#   with a lightweight Linux ABI layer — no kernel needed.
+#
+#   docker build -f tests/wasm-runtimes/Dockerfile.runner.libriscv \
+#                -t edgeparse-riscv-libriscv .
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git ca-certificates file \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build libriscv + rvlinux CLI from source (requires C++20)
+RUN git clone --depth 1 https://github.com/libriscv/libriscv /tmp/libriscv && \
+    cd /tmp/libriscv && \
+    cmake -B build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DRISCV_EXT_A=ON \
+        -DRISCV_EXT_C=ON \
+        -DRISCV_EXT_F=ON \
+        -DRISCV_BINARY_TRANSLATION=OFF \
+        -DFETCHCONTENT_UPDATES_DISCONNECTED=ON && \
+    cmake --build build --parallel "$(nproc)" --target rvlinux && \
+    cp build/rvlinux /usr/local/bin/ && \
+    rm -rf /tmp/libriscv
+
+# Verify
+RUN rvlinux --help 2>&1 | head -3 || true
+
+WORKDIR /test
+
+COPY tests/fixtures/sample.pdf          /test/fixtures/
+COPY tests/wasm-runtimes/run-tests.sh   /test/
+RUN chmod +x /test/run-tests.sh
+
+# Copy pre-built RISC-V binary (statically linked for sandbox compat)
+COPY tests/wasm-runtimes/.build/edgeparse-riscv64-static /test/edgeparse-riscv64
+
+ENTRYPOINT ["/test/run-tests.sh"]
+CMD ["libriscv"]
