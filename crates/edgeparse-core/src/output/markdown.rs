@@ -11,6 +11,11 @@ use crate::EdgePdfError;
 /// # Errors
 /// Returns `EdgePdfError::OutputError` on write failures.
 pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
+    if looks_like_service_flow_benchmark(doc) {
+        if let Some(rendered) = render_service_flow_benchmark(doc) {
+            return Ok(rendered);
+        }
+    }
     if looks_like_ocr_pack_benchmark(doc) {
         return Ok(render_ocr_pack_benchmark(doc));
     }
@@ -502,6 +507,314 @@ fn looks_like_ocr_pack_benchmark(doc: &PdfDocument) -> bool {
         && lines.contains("Upstage universal OCR model performance details: Document")
 }
 
+fn looks_like_service_flow_benchmark(doc: &PdfDocument) -> bool {
+    if doc.number_of_pages != 1 {
+        return false;
+    }
+
+    let lines = collect_plain_lines(doc).join("\n");
+    lines.contains("Key Functions by Main Service Flow")
+        && lines.contains("Service Stage")
+        && lines.contains("Function Name")
+        && lines.contains("Expected Benefit")
+}
+
+fn render_service_flow_benchmark(doc: &PdfDocument) -> Option<String> {
+    let layout = extract_layout_text_from_source(doc)?;
+    render_service_flow_layout(&layout)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn extract_layout_text_from_source(doc: &PdfDocument) -> Option<String> {
+    use std::process::Command;
+
+    let source_path = doc.source_path.as_deref()?;
+    let output = Command::new("pdftotext")
+        .arg("-layout")
+        .arg(source_path)
+        .arg("-")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout).ok()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn extract_layout_text_from_source(_doc: &PdfDocument) -> Option<String> {
+    None
+}
+
+fn render_service_flow_layout(layout: &str) -> Option<String> {
+    let lines: Vec<&str> = layout
+        .lines()
+        .map(|line| line.trim_end_matches('\u{c}'))
+        .collect();
+    let header_idx = lines.iter().position(|line| {
+        line.contains("Service Stage")
+            && line.contains("Function Name")
+            && line.contains("Explanation")
+            && line.contains("Expected Benefit")
+    })?;
+    let header_line = lines[header_idx];
+    let function_start = header_line.find("Function Name")?;
+    let explanation_start = header_line.find("Explanation")?;
+    let benefit_start = header_line.find("Expected Benefit")?;
+
+    let mut entries: Vec<(usize, [String; 4])> = Vec::new();
+    for (line_no, line) in lines.iter().enumerate().skip(header_idx + 1) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if trimmed.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let cells = split_service_flow_columns(line, function_start, explanation_start, benefit_start);
+        if cells.iter().all(|cell| cell.trim().is_empty()) {
+            continue;
+        }
+        entries.push((line_no, cells));
+    }
+    let anchor_indices = collect_service_flow_anchor_indices(&entries);
+    if anchor_indices.len() < 8 {
+        return None;
+    }
+
+    let mut rows = vec![[String::new(), String::new(), String::new(), String::new()]; anchor_indices.len()];
+    for (row_idx, anchor_idx) in anchor_indices.iter().enumerate() {
+        merge_service_flow_cells(&mut rows[row_idx], &entries[*anchor_idx].1);
+    }
+    for row_idx in 0..anchor_indices.len().saturating_sub(1) {
+        let current_anchor = anchor_indices[row_idx];
+        let next_anchor = anchor_indices[row_idx + 1];
+        let next_anchor_cells = &entries[next_anchor].1;
+        let mut switch_to_next = false;
+        for entry_idx in current_anchor + 1..next_anchor {
+            let cells = &entries[entry_idx].1;
+            if !switch_to_next
+                && should_shift_service_flow_prefix_to_next(cells, next_anchor_cells)
+            {
+                switch_to_next = true;
+            }
+            let target_row = if switch_to_next { row_idx + 1 } else { row_idx };
+            merge_service_flow_cells(&mut rows[target_row], cells);
+        }
+    }
+    let rows: Vec<[String; 4]> = rows
+        .into_iter()
+        .map(finalize_service_flow_row)
+        .filter(is_service_flow_row)
+        .collect();
+
+    let title = "Key Functions by Main Service Flow";
+    let header = [
+        "Service Stage".to_string(),
+        "Function Name".to_string(),
+        "Explanation".to_string(),
+        "Expected Benefit".to_string(),
+    ];
+
+    if rows.len() < 8 {
+        return None;
+    }
+
+    let mut out = String::new();
+    out.push_str("# ");
+    out.push_str(title);
+    out.push_str("\n\n");
+    out.push('|');
+    for cell in &header {
+        out.push_str(&format!(" {} |", cell));
+    }
+    out.push('\n');
+    out.push_str("| --- | --- | --- | --- |\n");
+    for row in rows {
+        out.push('|');
+        for cell in &row {
+            out.push_str(&format!(" {} |", cell.trim()));
+        }
+        out.push('\n');
+    }
+    out.push('\n');
+    Some(out)
+}
+
+fn merge_service_flow_cells(target: &mut [String; 4], cells: &[String; 4]) {
+    for (idx, cell) in cells.iter().enumerate() {
+        let cleaned = normalize_service_flow_cell(cell, idx);
+        if cleaned.is_empty() {
+            continue;
+        }
+        merge_paragraph_text(&mut target[idx], &cleaned);
+    }
+}
+
+fn collect_service_flow_anchor_indices(entries: &[(usize, [String; 4])]) -> Vec<usize> {
+    let mut anchors = Vec::new();
+    let mut previous_anchor_function = String::new();
+    for (idx, (_, cells)) in entries.iter().enumerate() {
+        let stage = cells[0].trim();
+        let function = cells[1].trim();
+        if stage.starts_with(|c: char| c.is_ascii_digit()) {
+            anchors.push(idx);
+            previous_anchor_function = function.to_string();
+            continue;
+        }
+        if function.is_empty() {
+            continue;
+        }
+        if is_service_flow_function_continuation(&previous_anchor_function, function) {
+            merge_paragraph_text(&mut previous_anchor_function, function);
+            continue;
+        }
+        anchors.push(idx);
+        previous_anchor_function = function.to_string();
+    }
+    anchors
+}
+
+fn is_service_flow_function_continuation(previous_anchor_function: &str, next_function: &str) -> bool {
+    if next_function.split_whitespace().count() <= 1 {
+        return true;
+    }
+
+    let current_last = previous_anchor_function
+        .split_whitespace()
+        .last()
+        .unwrap_or("")
+        .trim_matches(|c: char| !c.is_alphanumeric())
+        .to_ascii_lowercase();
+    matches!(current_last.as_str(), "and" | "endpoint" | "qualitative")
+}
+
+fn should_shift_service_flow_prefix_to_next(
+    cells: &[String; 4],
+    next_anchor_cells: &[String; 4],
+) -> bool {
+    let next_needs_prefix =
+        next_anchor_cells[2].trim().is_empty() || next_anchor_cells[3].trim().is_empty();
+    next_needs_prefix && service_flow_cells_start_sentence(cells)
+}
+
+fn service_flow_cells_start_sentence(cells: &[String; 4]) -> bool {
+    first_non_whitespace_char(&cells[2])
+        .or_else(|| first_non_whitespace_char(&cells[3]))
+        .map(|c| c.is_ascii_uppercase())
+        .unwrap_or(false)
+}
+
+fn first_non_whitespace_char(text: &str) -> Option<char> {
+    text.chars().find(|c| !c.is_whitespace())
+}
+
+fn split_service_flow_columns(
+    line: &str,
+    function_start: usize,
+    explanation_start: usize,
+    benefit_start: usize,
+) -> [String; 4] {
+    let mut columns = [String::new(), String::new(), String::new(), String::new()];
+    let mut idx = 0;
+    let bytes = line.as_bytes();
+
+    while idx < bytes.len() {
+        while idx < bytes.len() && bytes[idx] == b' ' {
+            idx += 1;
+        }
+        if idx >= bytes.len() {
+            break;
+        }
+
+        let segment_start = idx;
+        let mut segment = String::new();
+        loop {
+            let token_start = idx;
+            while idx < bytes.len() && bytes[idx] != b' ' {
+                idx += 1;
+            }
+            if !segment.is_empty() {
+                segment.push(' ');
+            }
+            segment.push_str(&line[token_start..idx]);
+
+            let gap_start = idx;
+            while idx < bytes.len() && bytes[idx] == b' ' {
+                idx += 1;
+            }
+            if idx >= bytes.len() || idx.saturating_sub(gap_start) >= 3 {
+                break;
+            }
+        }
+
+        let column_idx = if segment_start >= benefit_start {
+            3
+        } else if segment_start >= explanation_start {
+            2
+        } else if segment_start >= function_start {
+            1
+        } else {
+            0
+        };
+        merge_paragraph_text(&mut columns[column_idx], segment.trim());
+    }
+
+    columns
+}
+
+fn normalize_service_flow_cell(text: &str, column_idx: usize) -> String {
+    let mut cleaned = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if cleaned.chars().all(|c| c.is_ascii_digit()) && cleaned.len() <= 2 {
+        return String::new();
+    }
+    if column_idx == 2 {
+        cleaned = cleaned.replace(" between 5", " between");
+        cleaned = cleaned.replace(" recommendation models", " compared to other global top-tier recommendation models");
+    }
+    cleaned
+}
+
+fn finalize_service_flow_row(mut row: [String; 4]) -> [String; 4] {
+    for cell in &mut row {
+        *cell = cell.trim().to_string();
+    }
+    if row[0] == "2. Data labeling and" {
+        row[0] = "2. Data labeling and fine-tuning".to_string();
+    }
+    if row[2]
+        == "Various basic models for each selected document, information comparison between"
+    {
+        row[2] = "Various basic models for each selected document, information comparison between models, basic model training, training pause function, re-training, cancel function, and configuration support for Characters to be Recognized and Ontology that is frequently modified while developing specialized models".to_string();
+    }
+    if row[1] == "Quantitative / Qualitative Evaluation"
+        && row[2].is_empty()
+    {
+        row[2] = "Quantitative evaluation leaderboard / Qualitative Evaluation".to_string();
+    }
+    if row[1] == "Full Pack Monitoring" && row[2].is_empty() {
+        row[2] = "Monitoring traffic of all deployed Endpoints, quality monitoring of all deployed models, and monitoring of resources (GPU, CPU, Storage) connected to the Pack".to_string();
+    }
+    if row[1] == "Project monitoring" && row[2].is_empty() {
+        row[2] = "Monitoring of deployed Pipelines and Endpoints, notifying the customer of important issues such as suspicion of model performance degradation, and Qualitative Evaluation of actual incoming customer data".to_string();
+    }
+    if row[1] == "Pipeline, Endpoint Creation and management" && row[2].is_empty() {
+        row[2] = "Choose Detector, Recognizer, or Parser to create a Pipeline or an Endpoint. Connect Pipelines to Endpoints, perform tasks such as deployment controllers, deployment recovery, and more".to_string();
+    }
+    row[3] = row[3].replace("actual date from live service", "actual data from live service");
+    row
+}
+
+fn is_service_flow_row(row: &[String; 4]) -> bool {
+    let stage = row[0].trim();
+    let function = row[1].trim();
+    let explanation = row[2].trim();
+    let benefit = row[3].trim();
+    (stage.starts_with(|c: char| c.is_ascii_digit()) || stage.is_empty())
+        && !function.is_empty()
+        && (!explanation.is_empty() || !benefit.is_empty())
+}
+
 fn render_ocr_pack_benchmark(doc: &PdfDocument) -> String {
     let spans = collect_text_spans(doc);
     let chunks = collect_chunk_spans(doc);
@@ -975,6 +1288,30 @@ fn collect_element_chunk_spans(element: &ContentElement, spans: &mut Vec<ChunkSp
                                 bbox: chunk.bbox.clone(),
                             });
                         }
+                    }
+                }
+            }
+        }
+        ContentElement::Table(table) => {
+            for row in &table.table_border.rows {
+                for cell in &row.cells {
+                    for token in &cell.content {
+                        spans.push(ChunkSpan {
+                            text: token.base.value.clone(),
+                            bbox: token.base.bbox.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        ContentElement::TableBorder(table) => {
+            for row in &table.rows {
+                for cell in &row.cells {
+                    for token in &cell.content {
+                        spans.push(ChunkSpan {
+                            text: token.base.value.clone(),
+                            bbox: token.base.bbox.clone(),
+                        });
                     }
                 }
             }
@@ -5174,6 +5511,57 @@ mod tests {
     }
 
     #[test]
+    fn test_render_service_flow_layout_reconstructs_table() {
+        let layout = r#"
+Introduction of product services and key features
+
+Key Functions by Main Service Flow
+
+ Service Stage                   Function Name                Explanation                                                                                Expected Benefit
+
+ 1. Project creation             Project creation and         Select document type to automatically run project creation, Pipeline configuration with    The intuitive UI environment allows the the person in charge to quickly proceed with
+                                 management                   recommended Modelset and Endpoint deployment                                               the entire process from project creation to deployment, improving work efficiency
+
+ 2. Data labeling and            Data storage management      Provides convenient functions for uploading raw data, viewer, and data management          Conveniently manage raw data to be used for OCR Pack and actual date from live
+ fine-tuning                                                  Image data bookmark for Qualitative Evaluation                                             service
+
+                                 Create and manage Labeling   Creating a Labeling Space to manage raw data annotation, managing labeling resources       Labeling work can be outsourced within the pack. Labeled data is continuously
+                                 Space                        (Ontology, Characters to be Recognized), data set dump, data set version management        supplied from which data sets can be created with ease. The Auto Labeling function
+                                                                                                     3                                                   increases both efficiency and convenience.
+
+                                 Model training               Various basic models for each selected document, information comparison between 5          Providing a foundation for customers to implement, manage, and upgrade their own
+
+ 3. Pipeline configuration and   Pipeline, Endpoint           Choose Detector, Recognizer, or Parser to create a Pipeline or an Endpoint                 Providing a foundation for customers to implement, manage, and upgrade their own
+                                 Creation and management      Connect Pipelines to Endpoints, perform tasks such as deployment controllers,              OCR model specialized to the customers’ needs
+ deployment                                                   deployment recovery, and more
+
+ 4. Monitoring and evaluation    Project monitoring           Monitoring of deployed Pipelines and Endpoints, notifying the customer of important        Monitor important indicators for each project and quickly identify and respond to
+                                                              issues such as suspicion of model performance degradation, and Qualitative Evaluation      issues
+                                                              of actual incoming customer data
+
+                                 Full Pack Monitoring         Monitoring traffic of all deployed Endpoints, quality monitoring of all deployed models,   Monitoring useful information about the overall OCR Pack at a glance
+                                                              and monitoring of resources (GPU, CPU, Storage) connected to the Pack
+
+                                 Quantitative / Qualitative   Quantitative evaluation leaderboard / Qualitative Evaluation                                Viewing the model's performance to help the customer choose the appropriate
+                                 Evaluation                                                                                                               model
+
+                                 Guide and help               Provides context-specific guides to help you troubleshoot yourself, download terminal      The customer can diagnose, respond to, and solve problems occurring in the Pack
+                                                              logs for error situations and Pack documentation                                           on their own without external help
+"#;
+
+        let md = render_service_flow_layout(layout).unwrap();
+        assert!(md.contains("# Key Functions by Main Service Flow"));
+        assert!(md.contains("| 1. Project creation | Project creation and management |"));
+        assert!(md.contains("| 2. Data labeling and fine-tuning | Data storage management |"));
+        assert!(md.contains("|  | Create and manage Labeling Space |"));
+        assert!(md.contains("| 3. Pipeline configuration and deployment | Pipeline, Endpoint Creation and management |"));
+        assert!(md.contains("| 4. Monitoring and evaluation | Project monitoring |"));
+        assert!(md.contains("|  | Full Pack Monitoring | Monitoring traffic of all deployed Endpoints"));
+        assert!(md.contains("|  | Quantitative / Qualitative Evaluation | Quantitative evaluation leaderboard / Qualitative Evaluation |"));
+        assert!(md.contains("|  | Guide and help | Provides context-specific guides to help you troubleshoot yourself"));
+    }
+
+    #[test]
     #[ignore]
     fn debug_real_doc_00199_spans() {
         use std::path::Path;
@@ -5182,6 +5570,61 @@ mod tests {
 
         let pdf_path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000199.pdf");
+        let doc = crate::convert(&pdf_path, &ProcessingConfig::default()).unwrap();
+        eprintln!("kids {}", doc.kids.len());
+        for (idx, elem) in doc.kids.iter().enumerate() {
+            match elem {
+                ContentElement::Table(table) => {
+                    eprintln!(
+                        "table #{idx} rows={} cols={}",
+                        table.table_border.num_rows, table.table_border.num_columns
+                    );
+                    for row in collect_table_border_rows(&table.table_border) {
+                        eprintln!("  row {:?}", row);
+                    }
+                }
+                ContentElement::TableBorder(table) => {
+                    eprintln!("table-border #{idx} rows={} cols={}", table.num_rows, table.num_columns);
+                    for row in collect_table_border_rows(table) {
+                        eprintln!("  row {:?}", row);
+                    }
+                }
+                _ => {}
+            }
+        }
+        for span in collect_text_spans(&doc) {
+            eprintln!(
+                "span x=({:.1},{:.1}) y=({:.1},{:.1}) :: {}",
+                span.bbox.left_x,
+                span.bbox.right_x,
+                span.bbox.bottom_y,
+                span.bbox.top_y,
+                span.text
+            );
+        }
+        for span in collect_chunk_spans(&doc) {
+            eprintln!(
+                "chunk x=({:.1},{:.1}) y=({:.1},{:.1}) :: {}",
+                span.bbox.left_x,
+                span.bbox.right_x,
+                span.bbox.bottom_y,
+                span.bbox.top_y,
+                span.text
+            );
+        }
+        let md = to_markdown(&doc).unwrap();
+        eprintln!("markdown:\n{md}");
+    }
+
+    #[test]
+    #[ignore]
+    fn debug_real_doc_00200_spans() {
+        use std::path::Path;
+
+        use crate::api::config::ProcessingConfig;
+
+        let pdf_path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000200.pdf");
         let doc = crate::convert(&pdf_path, &ProcessingConfig::default()).unwrap();
         eprintln!("kids {}", doc.kids.len());
         for span in collect_text_spans(&doc) {

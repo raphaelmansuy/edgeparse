@@ -115,6 +115,7 @@ pub fn convert(
         .to_string();
 
     let mut doc = PdfDocument::new(file_name);
+    doc.source_path = Some(input_path.display().to_string());
     doc.number_of_pages = pages_map.len() as u32;
     doc.author = raw_doc.metadata.author;
     doc.title = raw_doc.metadata.title;
