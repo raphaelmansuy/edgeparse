@@ -170,6 +170,7 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
         &occupied_indices,
     ));
     let tables = augment_panel_cluster_tables(&elements, tables);
+    let tables = augment_grouped_header_cluster_tables(&elements, tables);
 
     if tables.is_empty() {
         return elements;
@@ -2077,6 +2078,16 @@ fn augment_panel_cluster_tables(
         .collect()
 }
 
+fn augment_grouped_header_cluster_tables(
+    elements: &[ContentElement],
+    tables: Vec<ClusterTable>,
+) -> Vec<ClusterTable> {
+    tables
+        .into_iter()
+        .map(|table| augment_grouped_header_cluster_table(elements, &table).unwrap_or(table))
+        .collect()
+}
+
 fn augment_panel_cluster_table(
     elements: &[ContentElement],
     table: &ClusterTable,
@@ -2191,6 +2202,186 @@ fn augment_panel_cluster_table(
             next_table: None,
         },
     })
+}
+
+fn augment_grouped_header_cluster_table(
+    elements: &[ContentElement],
+    table: &ClusterTable,
+) -> Option<ClusterTable> {
+    if table.table_border.num_columns < 3 || table.consumed_block_indices.is_empty() {
+        return None;
+    }
+
+    let header_indices = collect_grouped_header_band_indices(elements, table)?;
+    if header_indices.is_empty() {
+        return None;
+    }
+
+    let slot_ranges = table
+        .table_border
+        .x_coordinates
+        .windows(2)
+        .map(|pair| (pair[0], pair[1]))
+        .collect::<Vec<_>>();
+    if slot_ranges.len() != table.table_border.num_columns {
+        return None;
+    }
+
+    let header_rows = reconstruct_panel_rows(elements, &header_indices, &slot_ranges);
+    if header_rows.is_empty() || header_rows.len() > 3 {
+        return None;
+    }
+
+    let max_header_fill = header_rows
+        .iter()
+        .map(|row| row.cells.iter().filter(|cell| !cell.trim().is_empty()).count())
+        .max()
+        .unwrap_or(0);
+    if max_header_fill < 2 {
+        return None;
+    }
+
+    let existing_rows = grouped_table_rows(table);
+    if existing_rows.is_empty() {
+        return None;
+    }
+    if header_rows
+        .iter()
+        .any(|header| existing_rows.first().is_some_and(|row| row.cells == header.cells))
+    {
+        return None;
+    }
+
+    let mut rows = header_rows;
+    rows.extend(existing_rows);
+    let x_coords = table.table_border.x_coordinates.clone();
+    let y_coords = build_panel_y_coordinates(&rows);
+    let page_number = table.table_border.bbox.page_number;
+    let min_x = *x_coords.first()?;
+    let max_x = *x_coords.last()?;
+    let max_y = *y_coords.first()?;
+    let min_y = *y_coords.last()?;
+
+    let mut border_rows = Vec::with_capacity(rows.len());
+    for (row_idx, row) in rows.iter().enumerate() {
+        let row_top = y_coords[row_idx];
+        let row_bottom = y_coords[row_idx + 1];
+        let mut cells = Vec::with_capacity(slot_ranges.len());
+        for (col_idx, cell_text) in row.cells.iter().enumerate() {
+            let bbox = BoundingBox::new(
+                page_number,
+                slot_ranges[col_idx].0,
+                row_bottom,
+                slot_ranges[col_idx].1,
+                row_top,
+            );
+            let content = if cell_text.trim().is_empty() {
+                Vec::new()
+            } else {
+                vec![make_text_token(cell_text.trim(), &bbox)]
+            };
+            let contents = content
+                .iter()
+                .map(|token| ContentElement::TextChunk(token.base.clone()))
+                .collect();
+            cells.push(TableBorderCell {
+                bbox,
+                index: None,
+                level: None,
+                row_number: row_idx,
+                col_number: col_idx,
+                row_span: 1,
+                col_span: 1,
+                content,
+                contents,
+                semantic_type: None,
+            });
+        }
+        border_rows.push(TableBorderRow {
+            bbox: BoundingBox::new(page_number, min_x, row_bottom, max_x, row_top),
+            index: None,
+            level: None,
+            row_number: row_idx,
+            cells,
+            semantic_type: None,
+        });
+    }
+
+    let mut consumed = table.consumed_block_indices.clone();
+    consumed.extend(header_indices);
+    consumed.sort_unstable();
+    consumed.dedup();
+
+    Some(ClusterTable {
+        consumed_block_indices: consumed,
+        table_border: TableBorder {
+            bbox: BoundingBox::new(page_number, min_x, min_y, max_x, max_y),
+            index: None,
+            level: table.table_border.level.clone(),
+            x_coordinates: x_coords.clone(),
+            x_widths: vec![0.0; x_coords.len()],
+            y_coordinates: y_coords.clone(),
+            y_widths: vec![0.0; y_coords.len()],
+            rows: border_rows,
+            num_rows: rows.len(),
+            num_columns: slot_ranges.len(),
+            is_bad_table: false,
+            is_table_transformer: false,
+            previous_table: None,
+            next_table: None,
+        },
+    })
+}
+
+fn collect_grouped_header_band_indices(
+    elements: &[ContentElement],
+    table: &ClusterTable,
+) -> Option<Vec<usize>> {
+    let start_idx = *table.consumed_block_indices.iter().min()?;
+    let page_number = table.table_border.bbox.page_number;
+    let table_top = table.table_border.bbox.top_y;
+    let row_pitch =
+        (table.table_border.bbox.height() / table.table_border.num_rows.max(1) as f64).max(8.0);
+
+    let mut indices = Vec::new();
+    let mut cursor = start_idx;
+    while let Some(prev_idx) = cursor.checked_sub(1) {
+        let elem = elements.get(prev_idx)?;
+        if !is_panel_text_candidate(elem) || elem.bbox().page_number != page_number {
+            break;
+        }
+        let gap = elem.bbox().bottom_y - table_top;
+        if !(-row_pitch..=row_pitch * 3.5).contains(&gap) {
+            break;
+        }
+        indices.push(prev_idx);
+        cursor = prev_idx;
+        if indices.len() >= 6 {
+            break;
+        }
+    }
+    indices.reverse();
+    Some(indices)
+}
+
+fn grouped_table_rows(table: &ClusterTable) -> Vec<PanelRow> {
+    table
+        .table_border
+        .rows
+        .iter()
+        .map(|row| {
+            let mut cells = vec![String::new(); table.table_border.num_columns];
+            for cell in &row.cells {
+                if cell.col_number < cells.len() {
+                    cells[cell.col_number] = cell_text(cell);
+                }
+            }
+            PanelRow {
+                bbox: row.bbox.clone(),
+                cells,
+            }
+        })
+        .collect()
 }
 
 fn collect_panel_band_indices(elements: &[ContentElement], table: &ClusterTable) -> Option<Vec<usize>> {
@@ -2697,6 +2888,92 @@ mod tests {
 
     fn make_context_block(page: u32, baseline: f64, text: &str) -> ContentElement {
         make_block_with_line(make_line(page, baseline, 10.0, &[(20.0, 560.0, text)]))
+    }
+
+    fn make_cluster_table(
+        page: u32,
+        x_coords: &[f64],
+        row_tops: &[f64],
+        row_bottoms: &[f64],
+        rows: &[Vec<&str>],
+        consumed_block_indices: Vec<usize>,
+    ) -> ClusterTable {
+        let mut border_rows = Vec::new();
+        for (row_idx, cells) in rows.iter().enumerate() {
+            let row_top = row_tops[row_idx];
+            let row_bottom = row_bottoms[row_idx];
+            let mut border_cells = Vec::new();
+            for (col_idx, text) in cells.iter().enumerate() {
+                let bbox = BoundingBox::new(
+                    Some(page),
+                    x_coords[col_idx],
+                    row_bottom,
+                    x_coords[col_idx + 1],
+                    row_top,
+                );
+                let content = if text.trim().is_empty() {
+                    Vec::new()
+                } else {
+                    vec![make_text_token(text, &bbox)]
+                };
+                let contents = content
+                    .iter()
+                    .map(|token| ContentElement::TextChunk(token.base.clone()))
+                    .collect();
+                border_cells.push(TableBorderCell {
+                    bbox,
+                    index: None,
+                    level: None,
+                    row_number: row_idx,
+                    col_number: col_idx,
+                    row_span: 1,
+                    col_span: 1,
+                    content,
+                    contents,
+                    semantic_type: None,
+                });
+            }
+            border_rows.push(TableBorderRow {
+                bbox: BoundingBox::new(
+                    Some(page),
+                    x_coords[0],
+                    row_bottom,
+                    *x_coords.last().unwrap(),
+                    row_top,
+                ),
+                index: None,
+                level: None,
+                row_number: row_idx,
+                cells: border_cells,
+                semantic_type: None,
+            });
+        }
+
+        ClusterTable {
+            consumed_block_indices,
+            table_border: TableBorder {
+                bbox: BoundingBox::new(
+                    Some(page),
+                    x_coords[0],
+                    *row_bottoms.last().unwrap(),
+                    *x_coords.last().unwrap(),
+                    row_tops[0],
+                ),
+                index: None,
+                level: Some("1".to_string()),
+                x_coordinates: x_coords.to_vec(),
+                x_widths: vec![0.0; x_coords.len()],
+                y_coordinates: Vec::new(),
+                y_widths: Vec::new(),
+                rows: border_rows,
+                num_rows: rows.len(),
+                num_columns: x_coords.len() - 1,
+                is_bad_table: false,
+                is_table_transformer: false,
+                previous_table: None,
+                next_table: None,
+            },
+        }
     }
 
     #[test]
@@ -3426,6 +3703,119 @@ mod tests {
     }
 
     #[test]
+    fn test_grouped_headers_are_promoted_into_existing_cluster_table() {
+        let page = 1u32;
+        let fs = 10.0;
+        let elements = vec![
+            make_context_block(page, 380.0, "Context above the grouped table"),
+            make_block_with_line(make_line(page, 336.0, fs, &[(100.0, 130.0, "Properties")])),
+            make_block_with_line(make_line(
+                page,
+                336.0,
+                fs,
+                &[
+                    (165.0, 220.0, "Instruction"),
+                    (315.0, 366.0, "Training Datasets"),
+                    (402.0, 433.0, "Alignment"),
+                ],
+            )),
+            make_block_with_line(make_line(
+                page,
+                322.0,
+                fs,
+                &[
+                    (200.0, 250.0, "Alpaca-GPT4"),
+                    (250.0, 300.0, "OpenOrca"),
+                    (300.0, 360.0, "Synth. Math-Instruct"),
+                    (360.0, 410.0, "Orca DPO Pairs"),
+                    (410.0, 470.0, "Ultrafeedback Cleaned"),
+                    (470.0, 530.0, "Synth. Math-Alignment"),
+                ],
+            )),
+            make_block_with_line(make_line(
+                page,
+                300.0,
+                fs,
+                &[
+                    (95.0, 160.0, "Total # Samples"),
+                    (200.0, 230.0, "52K"),
+                    (250.0, 290.0, "2.91M"),
+                    (300.0, 340.0, "126K"),
+                    (360.0, 390.0, "12.9K"),
+                    (410.0, 450.0, "60.8K"),
+                    (470.0, 500.0, "126K"),
+                ],
+            )),
+            make_block_with_line(make_line(
+                page,
+                286.0,
+                fs,
+                &[
+                    (95.0, 185.0, "Maximum # Samples Used"),
+                    (200.0, 230.0, "52K"),
+                    (250.0, 290.0, "100K"),
+                    (300.0, 330.0, "52K"),
+                    (360.0, 390.0, "12.9K"),
+                    (410.0, 450.0, "60.8K"),
+                    (470.0, 505.0, "20.1K"),
+                ],
+            )),
+            make_block_with_line(make_line(
+                page,
+                272.0,
+                fs,
+                &[
+                    (95.0, 145.0, "Open Source"),
+                    (200.0, 215.0, "O"),
+                    (250.0, 265.0, "O"),
+                    (300.0, 315.0, "✗"),
+                    (360.0, 375.0, "O"),
+                    (410.0, 425.0, "O"),
+                    (470.0, 485.0, "✗"),
+                ],
+            )),
+        ];
+        let table = make_cluster_table(
+            page,
+            &[95.0, 160.0, 230.0, 290.0, 340.0, 390.0, 450.0, 505.0],
+            &[310.0, 296.0, 282.0],
+            &[300.0, 286.0, 272.0],
+            &[
+                vec!["Total # Samples", "52K", "2.91M", "126K", "12.9K", "60.8K", "126K"],
+                vec!["Maximum # Samples Used", "52K", "100K", "52K", "12.9K", "60.8K", "20.1K"],
+                vec!["Open Source", "O", "O", "✗", "O", "O", "✗"],
+            ],
+            vec![4, 5, 6],
+        );
+
+        let augmented = augment_grouped_header_cluster_table(&elements, &table)
+            .expect("expected grouped-header augmentation");
+
+        assert_eq!(augmented.table_border.num_columns, 7);
+        assert_eq!(augmented.table_border.num_rows, 5);
+        assert_eq!(cell_text(&augmented.table_border.rows[0].cells[0]), "Properties");
+        assert_eq!(cell_text(&augmented.table_border.rows[0].cells[1]), "Instruction");
+        assert_eq!(
+            cell_text(&augmented.table_border.rows[0].cells[4]),
+            "Training Datasets"
+        );
+        assert!(
+            augmented.table_border.rows[0]
+                .cells
+                .iter()
+                .any(|cell| cell_text(cell) == "Alignment")
+        );
+        assert_eq!(
+            cell_text(&augmented.table_border.rows[1].cells[1]),
+            "Alpaca-GPT4"
+        );
+        assert_eq!(
+            cell_text(&augmented.table_border.rows[1].cells[6]),
+            "Synth. Math-Alignment"
+        );
+    }
+
+    #[test]
     fn test_caption_compact_two_column_table_with_lowercase_headers_detected() {
         let page = 1u32;
         let fs = 10.0;
@@ -3912,4 +4302,5 @@ mod tests {
         eprintln!("markdown has pipe table {}", md.contains("| --- |"));
         eprintln!("{md}");
     }
+
 }

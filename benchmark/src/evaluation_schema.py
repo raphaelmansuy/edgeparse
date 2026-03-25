@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 
-CURRENT_EVALUATION_SCHEMA_VERSION = 4
+CURRENT_EVALUATION_SCHEMA_VERSION = 5
 
 REQUIRED_SCORE_KEYS = (
     "overall_mean",
     "nid_mean",
     "teds_mean",
+    "table_cell_occupancy_f1_mean",
     "mhs_mean",
     "paragraph_boundary_f1_mean",
     "prose_block_boundary_f1_mean",
@@ -33,6 +34,7 @@ REQUIRED_DOCUMENT_SCORE_KEYS = (
     "nid_s",
     "teds",
     "teds_s",
+    "table_cell_occupancy_f1",
     "mhs",
     "mhs_s",
     "paragraph_boundary_f1",

@@ -45,6 +45,7 @@ class DocumentScores:
     nid_s: Optional[float]
     teds: Optional[float]
     teds_s: Optional[float]
+    table_cell_occupancy_f1: Optional[float]
     mhs: Optional[float]
     mhs_s: Optional[float]
     paragraph_boundary_f1: Optional[float]
@@ -79,6 +80,7 @@ class DocumentScores:
                 "nid_s": self.nid_s,
                 "teds": self.teds,
                 "teds_s": self.teds_s,
+                "table_cell_occupancy_f1": self.table_cell_occupancy_f1,
                 "mhs": self.mhs,
                 "mhs_s": self.mhs_s,
                 "paragraph_boundary_f1": self.paragraph_boundary_f1,
@@ -145,7 +147,7 @@ def _evaluate_single_document(
     prediction_available = pred_path.is_file()
 
     nid, nid_s = evaluate_reading_order(gt_markdown, pred_markdown)
-    teds, teds_s = evaluate_table(gt_markdown, pred_markdown)
+    teds, teds_s, table_cell_occupancy_f1 = evaluate_table(gt_markdown, pred_markdown)
     mhs, mhs_s = evaluate_heading_level(gt_markdown, pred_markdown)
     paragraph_metrics = evaluate_paragraph_structure(gt_markdown, pred_markdown)
     text_metrics = evaluate_text_quality(gt_markdown, pred_markdown)
@@ -166,6 +168,7 @@ def _evaluate_single_document(
         nid_s=nid_s,
         teds=teds,
         teds_s=teds_s,
+        table_cell_occupancy_f1=table_cell_occupancy_f1,
         mhs=mhs,
         mhs_s=mhs_s,
         paragraph_boundary_f1=paragraph_metrics["boundary_f1"],
@@ -199,6 +202,11 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
     nid_s_values = [doc.nid_s for doc in documents if doc.nid_s is not None]
     teds_values = [doc.teds for doc in documents if doc.teds is not None]
     teds_s_values = [doc.teds_s for doc in documents if doc.teds_s is not None]
+    table_cell_occupancy_f1_values = [
+        doc.table_cell_occupancy_f1
+        for doc in documents
+        if doc.table_cell_occupancy_f1 is not None
+    ]
     mhs_values = [doc.mhs for doc in documents if doc.mhs is not None]
     mhs_s_values = [doc.mhs_s for doc in documents if doc.mhs_s is not None]
     paragraph_boundary_f1_values = [
@@ -292,6 +300,7 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
             "nid_s_mean": nid_s_mean,
             "teds_mean": teds_mean,
             "teds_s_mean": teds_s_mean,
+            "table_cell_occupancy_f1_mean": _safe_mean(table_cell_occupancy_f1_values),
             "mhs_mean": mhs_mean,
             "mhs_s_mean": mhs_s_mean,
             "paragraph_boundary_f1_mean": paragraph_boundary_f1_mean,
@@ -335,6 +344,7 @@ def _logging_scores(
     nid_s = scores.nid_s
     teds = scores.teds
     teds_s = scores.teds_s
+    table_cell_occupancy_f1 = scores.table_cell_occupancy_f1
     mhs = scores.mhs
     mhs_s = scores.mhs_s
     paragraph_boundary_f1 = scores.paragraph_boundary_f1
@@ -346,7 +356,7 @@ def _logging_scores(
         return f"{v:.3f}" if v is not None else "none "
 
     logging.info(
-        "engine=%s document=%s overall=%s nid=%s nid_s=%s teds=%s teds_s=%s "
+        "engine=%s document=%s overall=%s nid=%s nid_s=%s teds=%s teds_s=%s tocf1=%s "
         "mhs=%s mhs_s=%s pbf1=%s prose_bf1=%s "
         "bleu4=%s rouge1=%s rougeL=%s cer=%s wer=%s f1_tok=%s frag=%s wbis=%s tbf1=%s tqs=%s",
         engine_name,
@@ -356,6 +366,7 @@ def _logging_scores(
         _fmt(nid_s),
         _fmt(teds),
         _fmt(teds_s),
+        _fmt(table_cell_occupancy_f1),
         _fmt(mhs),
         _fmt(mhs_s),
         _fmt(paragraph_boundary_f1),
@@ -442,6 +453,7 @@ def _evaluate_engine_version(
         "nid_s",
         "teds",
         "teds_s",
+        "table_cell_occupancy_f1",
         "mhs",
         "mhs_s",
         "bleu4",
@@ -470,6 +482,7 @@ def _evaluate_engine_version(
                 "nid_s":              _v(doc.nid_s),
                 "teds":               _v(doc.teds),
                 "teds_s":             _v(doc.teds_s),
+                "table_cell_occupancy_f1": _v(doc.table_cell_occupancy_f1),
                 "mhs":                _v(doc.mhs),
                 "mhs_s":              _v(doc.mhs_s),
                 "bleu4":              _v(doc.bleu4),

@@ -2970,6 +2970,76 @@ fn list_item_text_from_contents(contents: &[ContentElement]) -> String {
     text
 }
 
+fn has_internal_header_gap(row: &[String]) -> bool {
+    let mut seen_filled = false;
+    let mut seen_gap_after_fill = false;
+    for cell in row {
+        if cell.trim().is_empty() {
+            if seen_filled {
+                seen_gap_after_fill = true;
+            }
+            continue;
+        }
+        if seen_gap_after_fill {
+            return true;
+        }
+        seen_filled = true;
+    }
+    false
+}
+
+fn expand_grouped_header_row(parent: &[String], child: &[String]) -> Vec<String> {
+    let anchor_cols: Vec<usize> = parent
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, cell)| (!cell.trim().is_empty()).then_some(idx))
+        .collect();
+    if anchor_cols.is_empty() {
+        return parent.to_vec();
+    }
+
+    let mut expanded = parent.to_vec();
+    for (col_idx, child_cell) in child.iter().enumerate() {
+        if !expanded[col_idx].trim().is_empty() || child_cell.trim().is_empty() {
+            continue;
+        }
+
+        let mut best_anchor = anchor_cols[0];
+        let mut best_distance = usize::abs_diff(anchor_cols[0], col_idx);
+        for &anchor_idx in &anchor_cols[1..] {
+            let distance = usize::abs_diff(anchor_idx, col_idx);
+            if distance < best_distance || (distance == best_distance && anchor_idx > best_anchor) {
+                best_anchor = anchor_idx;
+                best_distance = distance;
+            }
+        }
+        expanded[col_idx] = parent[best_anchor].trim().to_string();
+    }
+
+    expanded
+}
+
+fn preserve_grouped_header_rows(rows: &mut [Vec<String>]) -> bool {
+    if rows.len() < 2 || rows[0].is_empty() || rows[1].is_empty() {
+        return false;
+    }
+    if rows[0].first().is_none_or(|cell| cell.trim().is_empty()) {
+        return false;
+    }
+    if rows[1].first().is_some_and(|cell| !cell.trim().is_empty()) {
+        return false;
+    }
+
+    let first_filled = rows[0].iter().filter(|cell| !cell.trim().is_empty()).count();
+    let second_filled = rows[1].iter().filter(|cell| !cell.trim().is_empty()).count();
+    if first_filled < 2 || second_filled <= first_filled || !has_internal_header_gap(&rows[0]) {
+        return false;
+    }
+
+    rows[0] = expand_grouped_header_row(&rows[0], &rows[1]);
+    true
+}
+
 /// Merge header continuation rows in a rendered table.
 ///
 /// When a PDF table has multi-line column headers, each wrapped line often
@@ -2982,6 +3052,9 @@ fn list_item_text_from_contents(contents: &[ContentElement]) -> String {
 /// avoid accidentally collapsing data rows that happen to have an empty key.
 fn merge_continuation_rows(rows: &mut Vec<Vec<String>>) {
     if rows.len() < 2 {
+        return;
+    }
+    if preserve_grouped_header_rows(rows) {
         return;
     }
     // The first row must have a non-empty first cell (the header anchor).
@@ -4928,6 +5001,46 @@ mod tests {
         let md = to_markdown(&doc).unwrap();
         assert!(md.contains("| Added cation | Relative Size & Settling Rates of Floccules |"));
         assert!(md.contains("| K+ |  |"));
+    }
+
+    #[test]
+    fn test_grouped_header_rows_are_preserved_without_flattening() {
+        let mut doc = PdfDocument::new("grouped-header.pdf".to_string());
+        doc.number_of_pages = 1;
+        doc.kids.push(make_n_column_table(
+            &[
+                vec!["Properties", "", "Instruction", "", "", "Alignment", ""],
+                vec![
+                    "",
+                    "Alpaca-GPT4",
+                    "OpenOrca",
+                    "Synth. Math-Instruct",
+                    "Orca DPO Pairs",
+                    "Ultrafeedback Cleaned",
+                    "Synth. Math-Alignment",
+                ],
+                vec!["Total # Samples", "52K", "2.91M", "126K", "12.9K", "60.8K", "126K"],
+            ],
+            &[
+                (72.0, 120.0),
+                (120.0, 170.0),
+                (170.0, 220.0),
+                (220.0, 280.0),
+                (280.0, 340.0),
+                (340.0, 410.0),
+                (410.0, 470.0),
+            ],
+        ));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains(
+            "| Properties | Instruction | Instruction | Instruction | Alignment | Alignment | Alignment |"
+        ));
+        assert!(md.contains(
+            "|  | Alpaca-GPT4 | OpenOrca | Synth. Math-Instruct | Orca DPO Pairs | Ultrafeedback Cleaned | Synth. Math-Alignment |"
+        ));
+        assert!(!md.contains("Instruction OpenOrca"));
+        assert!(!md.contains("Alignment Ultrafeedback"));
     }
 
     #[test]

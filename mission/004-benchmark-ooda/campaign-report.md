@@ -209,6 +209,14 @@ Current frontier after the twelfth pass:
 - `01030000000182`: partial panel-table ownership with duplicated residual text
 - `01030000000090`: relatively high lexical scores but still visible whitespace-boundary drift
 
+Latest continuation slice after the twelfth pass:
+
+- `01030000000187` was re-audited against the live release output and the grouped-header source signal was confirmed to be present upstream; the active failure was markdown header-row flattening, not detector absence.
+- `output/markdown.rs` now preserves grouped header bands generically instead of concatenating them into strings such as `Instruction OpenOrca` and `Alignment Ultrafeedback Cleaned`.
+- Benchmark evaluation payloads were upgraded again to schema `v5` with `table_cell_occupancy_f1`, a structure-sensitive metric that scores non-empty table-cell occupancy over `(table,row,column)` coordinates.
+- On targeted `00187` evaluation, the new renderer lifted `TEDS_S` from `0.6098` to `0.6585`; the new occupancy metric reports `0.5538` on the preserved-header output and makes the structural repair visible even when lexical whitespace metrics remain mostly unchanged.
+- No full-corpus benchmark board has been locked for this slice yet; this was a bounded frontier repair plus metric-system improvement.
+
 ## Cohort Summary
 
 - `NID tail`: 20-document sentinel set
