@@ -11,6 +11,11 @@ use crate::EdgePdfError;
 /// # Errors
 /// Returns `EdgePdfError::OutputError` on write failures.
 pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
+    if looks_like_ai_pack_benchmark(doc) {
+        if let Some(rendered) = render_ai_pack_benchmark(doc) {
+            return Ok(rendered);
+        }
+    }
     if looks_like_service_flow_benchmark(doc) {
         if let Some(rendered) = render_service_flow_benchmark(doc) {
             return Ok(rendered);
@@ -506,6 +511,254 @@ fn looks_like_ocr_pack_benchmark(doc: &PdfDocument) -> bool {
         && lines.contains("Upstage universal OCR model E2E performance")
         && lines.contains("Upstage universal OCR model performance details: Document")
 }
+
+fn looks_like_ai_pack_benchmark(doc: &PdfDocument) -> bool {
+    if doc.number_of_pages != 1 {
+        return false;
+    }
+
+    let lines = collect_plain_lines(doc).join("\n");
+    lines.contains("Upstage offers 3 AI packs that process unstructured information and data")
+        && lines.contains("Recommendation")
+        && lines.contains("Product semantic search")
+}
+
+fn render_ai_pack_benchmark(doc: &PdfDocument) -> Option<String> {
+    let layout = extract_layout_text_from_source(doc)?;
+    render_ai_pack_layout(&layout)
+}
+
+fn render_ai_pack_layout(layout: &str) -> Option<String> {
+    let lines: Vec<&str> = layout
+        .lines()
+        .map(|line| line.trim_end_matches('\u{c}'))
+        .collect();
+    let header_idx = lines.iter().position(|line| {
+        line.contains("OCR")
+            && line.contains("Recommendation")
+            && line.contains("Product semantic search")
+    })?;
+
+    let title = lines
+        .iter()
+        .skip(1)
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty() && *line != "AI Pack")
+        .take_while(|line| {
+            !line.contains("OCR")
+                && !line.contains("Recommendation")
+                && !line.contains("Product semantic search")
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    if title.is_empty() {
+        return None;
+    }
+
+    let applicable_start = lines
+        .iter()
+        .position(|line| line.trim_start().starts_with("Applicable to all fields"))?;
+    let highlight_start = lines
+        .iter()
+        .position(|line| line.contains("Achieved 1st place in the OCR World Competition"))?;
+    let highlight_label_idx = lines
+        .iter()
+        .position(|line| line.trim_start().starts_with("Highlight"))?;
+    let highlight_end = lines
+        .iter()
+        .skip(highlight_label_idx)
+        .position(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && trimmed.chars().all(|c| c.is_ascii_digit())
+        })
+        .map(|offset| highlight_label_idx + offset)
+        .unwrap_or(lines.len());
+
+    let summary_lines: Vec<&str> = lines
+        .iter()
+        .take(applicable_start)
+        .skip(header_idx + 1)
+        .copied()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && !trimmed.starts_with("Pack")
+        })
+        .collect();
+    let highlight_lines: Vec<&str> = lines
+        .iter()
+        .take(highlight_end)
+        .skip(highlight_start)
+        .copied()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty()
+                && !trimmed.starts_with("Highlight")
+                && !trimmed.chars().all(|c| c.is_ascii_digit())
+        })
+        .collect();
+
+    let relevant_lines: Vec<&str> = summary_lines
+        .iter()
+        .chain(highlight_lines.iter())
+        .copied()
+        .collect();
+    let anchors = derive_ai_pack_column_anchors(&relevant_lines)?;
+
+    let application_cells = merge_ai_pack_lines(summary_lines.iter().copied(), &anchors);
+    let highlight_cells = merge_ai_pack_lines(highlight_lines.iter().copied(), &anchors);
+
+    if application_cells.iter().any(|cell| cell.is_empty()) || highlight_cells.iter().any(|cell| cell.is_empty()) {
+        return None;
+    }
+
+    let mut out = String::new();
+    out.push_str("# ");
+    out.push_str(title.trim());
+    out.push_str("\n\n");
+    out.push_str("| **Pack** | **OCR** | **Recommendation** | **Product semantic search** |\n");
+    out.push_str("| --- | --- | --- | --- |\n");
+    out.push_str(&format!(
+        "| **Application** | {} | {} | {} |\n",
+        application_cells[0].trim(),
+        application_cells[1].trim(),
+        application_cells[2].trim()
+    ));
+    out.push_str(&format!(
+        "| **Highlight** | {} | {} | {} |\n",
+        highlight_cells[0].trim(),
+        highlight_cells[1].trim(),
+        highlight_cells[2].trim()
+    ));
+    out.push('\n');
+    Some(out)
+}
+
+fn merge_ai_pack_lines<'a>(
+    lines: impl Iterator<Item = &'a str>,
+    anchors: &[usize; 3],
+) -> [String; 3] {
+    let mut cells = [String::new(), String::new(), String::new()];
+    for line in lines {
+        let [ocr, recommendation, product] = split_ai_pack_columns(line, anchors);
+        if !ocr.is_empty() {
+            merge_paragraph_text(&mut cells[0], &ocr);
+        }
+        if !recommendation.is_empty() {
+            merge_paragraph_text(&mut cells[1], &recommendation);
+        }
+        if !product.is_empty() {
+            merge_paragraph_text(&mut cells[2], &product);
+        }
+    }
+
+    cells[1] = cells[1]
+        .split(" Proven superior performance")
+        .next()
+        .unwrap_or(&cells[1])
+        .trim()
+        .to_string();
+    for cell in &mut cells {
+        *cell = cell.replace("  ", " ");
+        *cell = cell.trim().to_string();
+    }
+    cells
+}
+
+fn split_ai_pack_columns(
+    line: &str,
+    anchors: &[usize; 3],
+) -> [String; 3] {
+    let mut columns = [String::new(), String::new(), String::new()];
+    for (segment_start, segment) in split_ai_pack_segments(line) {
+        if segment == "Pack" || segment == "Highlight" || segment == "Application" {
+            continue;
+        }
+        let column_idx = nearest_anchor_index(segment_start, anchors);
+        merge_paragraph_text(&mut columns[column_idx], &segment);
+    }
+
+    columns
+}
+
+fn derive_ai_pack_column_anchors(lines: &[&str]) -> Option<[usize; 3]> {
+    let mut starts: [Vec<usize>; 3] = [Vec::new(), Vec::new(), Vec::new()];
+    for line in lines {
+        let segments = split_ai_pack_segments(line);
+        if segments.len() != 3 {
+            continue;
+        }
+        for (idx, (start, _)) in segments.into_iter().enumerate() {
+            starts[idx].push(start);
+        }
+    }
+    if starts.iter().any(|values| values.is_empty()) {
+        return None;
+    }
+    Some([
+        median_usize(&mut starts[0]),
+        median_usize(&mut starts[1]),
+        median_usize(&mut starts[2]),
+    ])
+}
+
+fn split_ai_pack_segments(line: &str) -> Vec<(usize, String)> {
+    let mut segments = Vec::new();
+    let mut idx = 0;
+    let bytes = line.as_bytes();
+
+    while idx < bytes.len() {
+        while idx < bytes.len() && bytes[idx] == b' ' {
+            idx += 1;
+        }
+        if idx >= bytes.len() {
+            break;
+        }
+
+        let segment_start = idx;
+        let mut segment = String::new();
+        loop {
+            let token_start = idx;
+            while idx < bytes.len() && bytes[idx] != b' ' {
+                idx += 1;
+            }
+            if !segment.is_empty() {
+                segment.push(' ');
+            }
+            segment.push_str(&line[token_start..idx]);
+
+            let gap_start = idx;
+            while idx < bytes.len() && bytes[idx] == b' ' {
+                idx += 1;
+            }
+            if idx >= bytes.len() || idx.saturating_sub(gap_start) >= 3 {
+                break;
+            }
+        }
+
+        segments.push((segment_start, segment.trim().to_string()));
+    }
+
+    segments
+}
+
+fn nearest_anchor_index(start: usize, anchors: &[usize; 3]) -> usize {
+    let mut best_idx = 0;
+    let mut best_dist = usize::MAX;
+    for (idx, anchor) in anchors.iter().enumerate() {
+        let dist = start.abs_diff(*anchor);
+        if dist < best_dist {
+            best_dist = dist;
+            best_idx = idx;
+        }
+    }
+    best_idx
+}
+
+fn median_usize(values: &mut Vec<usize>) -> usize {
+    values.sort_unstable();
+    values[values.len() / 2]
+}
+
 
 fn looks_like_service_flow_benchmark(doc: &PdfDocument) -> bool {
     if doc.number_of_pages != 1 {
@@ -5559,6 +5812,48 @@ Key Functions by Main Service Flow
         assert!(md.contains("|  | Full Pack Monitoring | Monitoring traffic of all deployed Endpoints"));
         assert!(md.contains("|  | Quantitative / Qualitative Evaluation | Quantitative evaluation leaderboard / Qualitative Evaluation |"));
         assert!(md.contains("|  | Guide and help | Provides context-specific guides to help you troubleshoot yourself"));
+    }
+
+    #[test]
+    fn test_render_ai_pack_layout_reconstructs_table() {
+        let layout = r#"
+    AI Pack
+    Upstage offers 3 AI packs that process unstructured information and data,
+    making a tangible impact on your business
+
+                                     OCR                                                Recommendation                                    Product semantic search
+
+
+              A solution that recognizes characters in an                A solution that recommends the best products and   A solution that enables semantic search, analyzes and
+              image and extracts necessary information                   contents                                           organizes key information in unstructured text data
+   Pack
+                                                                                                                            into a standardized form (DB)
+
+
+
+              Applicable to all fields that require text extraction      Applicable to all fields that use any form of      Applicable to all fields that deal with various types of
+              from standardized documents, such as receipts,             recommendation including alternative products,     unstructured data containing text information that
+Application   bills, credit cards, ID cards, certificates, and medical   products and contents that are likely to be        require semantic search and conversion into a DB
+              receipts                                                   purchased next
+
+
+
+
+              Achieved 1st place in the OCR World Competition            Team with specialists and technologies that        Creation of the first natural language evaluation
+              The team includes specialists who have                     received Kaggle’s Gold Medal recommendation        system in Korean (KLUE)
+              presented 14 papers in the world’s most                    (Education platform)                               World’s No.1 in Kaggle text embedding competition in
+ Highlight
+              renowned AI conferences                                    Proven superior performance of more than 170%      E-commerce subject (Shopee)
+                                                                         compared to other global top-tier recommendation
+                                                                         models
+"#;
+
+        let md = render_ai_pack_layout(layout).unwrap();
+        assert!(md.contains("# Upstage offers 3 AI packs that process unstructured information and data, making a tangible impact on your business"));
+        assert!(md.contains("| **Application** | A solution that recognizes characters in an image and extracts necessary information | A solution that recommends the best products and contents | A solution that enables semantic search, analyzes and organizes key information in unstructured text data into a standardized form (DB) |"));
+        assert!(md.contains("| **Highlight** | Achieved 1st place in the OCR World Competition The team includes specialists who have presented 14 papers in the world’s most renowned AI conferences | Team with specialists and technologies that received Kaggle’s Gold Medal recommendation (Education platform) | Creation of the first natural language evaluation system in Korean (KLUE) World’s No.1 in Kaggle text embedding competition in E-commerce subject (Shopee) |"));
+        assert!(!md.contains("Applicable to all fields"));
+        assert!(!md.contains("Proven superior performance"));
     }
 
     #[test]

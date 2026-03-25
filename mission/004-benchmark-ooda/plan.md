@@ -2,7 +2,7 @@
 
 > **Branch:** `bench/ooda-score-improvement-2026-03-25`
 > **Created:** 2026-03-25
-> **Status:** 390 OODA ITERATIONS EXECUTED, TEN IMPLEMENTATION PASSES VALIDATED
+> **Status:** 440 OODA ITERATIONS EXECUTED, ELEVEN IMPLEMENTATION PASSES VALIDATED
 
 ---
 
@@ -10,7 +10,7 @@
 
 Beat all currently benchmarked competitors on the active comparison board while preserving EdgeParse's speed lead.
 
-Execution note: this mission file now records a 390-iteration benchmark campaign over the current 200-document snapshot. The campaign produced ten benchmark-validated implementation passes, one additional 50-loop exploratory pass that was rolled back, stable sentinel cohorts, a phenotype taxonomy, and an execution tracker extended through `I390`.
+Execution note: this mission file now records a 440-iteration benchmark campaign over the current 200-document snapshot. The campaign produced eleven benchmark-validated implementation passes, one additional 50-loop exploratory pass that was rolled back, stable sentinel cohorts, a phenotype taxonomy, and an execution tracker extended through `I440`.
 
 Primary target board from [benchmark/reports/benchmark-20260325-145420.json](../../benchmark/reports/benchmark-20260325-145420.json):
 
@@ -43,22 +43,22 @@ Primary target board from [benchmark/reports/benchmark-20260325-145420.json](../
 
 From [benchmark/prediction/edgeparse/evaluation.json](../../benchmark/prediction/edgeparse/evaluation.json):
 
-- `overall`: 0.7648
-- `NID`: 0.8777
-- `TEDS`: 0.5686
-- `MHS`: 0.5076
-- `PBF`: 0.5070
-- `TQS`: 0.8987
-- `ROUGE-1`: 0.9231
-- `ROUGE-2`: 0.8970
-- `ROUGE-L`: 0.8922
-- `BLEU-4`: 0.8521
-- `Word Fragmentation Score`: 0.9275
-- `CER`: 0.2076
-- `WER`: 0.2310
-- `F1-token`: 0.9231
+- `overall`: 0.7683
+- `NID`: 0.8796
+- `TEDS`: 0.5828
+- `MHS`: 0.5130
+- `PBF`: 0.5068
+- `TQS`: 0.9007
+- `ROUGE-1`: 0.9241
+- `ROUGE-2`: 0.8986
+- `ROUGE-L`: 0.8941
+- `BLEU-4`: 0.8544
+- `Word Fragmentation Score`: 0.9300
+- `CER`: 0.2041
+- `WER`: 0.2268
+- `F1-token`: 0.9241
 - `TD F1`: 0.9231
-- `Speed`: 0.0470 s/doc
+- `Speed`: 0.0220 s/doc
 
 ## OODA Operating Model
 
@@ -151,6 +151,10 @@ Each iteration follows this exact loop:
 
 - [x] I341-I390 Execute 50 more OODA loops focused on first-principles source-layout reconstruction of service-flow tables, gap-based text-run geometry, and a benchmark-positive `00200` landing
 
+### Phase O — Continuation Pass 10
+
+- [x] I391-I440 Execute 50 more OODA loops focused on first-principles native-text comparison-table reconstruction for `00182`, body-derived column anchors, and a benchmark-positive landing
+
 ---
 
 ## Per-Iteration Exit Criteria
@@ -174,24 +178,24 @@ This mission is complete only when:
 
 ## Campaign Outcome
 
-The OODA process execution now includes ten code-backed, full-benchmark-validated implementation passes plus one additional 50-loop exploratory pass that was benchmark-negative and rolled back. The competitive objective is still open, but the latest measured snapshot from the live checkout is:
+The OODA process execution now includes eleven code-backed, full-benchmark-validated implementation passes plus one additional 50-loop exploratory pass that was benchmark-negative and rolled back. The competitive objective is still open, but the latest measured snapshot from the live checkout is:
 
-- `overall`: 0.7648
-- `NID`: 0.8777
-- `TEDS`: 0.5686
-- `MHS`: 0.5076
-- `PBF`: 0.5070
-- `TQS`: 0.8987
-- `ROUGE-1`: 0.9231
-- `ROUGE-2`: 0.8970
-- `ROUGE-L`: 0.8922
-- `BLEU-4`: 0.8521
-- `Word Fragmentation Score`: 0.9275
-- `CER`: 0.2076
-- `WER`: 0.2310
-- `F1-token`: 0.9231
+- `overall`: 0.7683
+- `NID`: 0.8796
+- `TEDS`: 0.5828
+- `MHS`: 0.5130
+- `PBF`: 0.5068
+- `TQS`: 0.9007
+- `ROUGE-1`: 0.9241
+- `ROUGE-2`: 0.8986
+- `ROUGE-L`: 0.8941
+- `BLEU-4`: 0.8544
+- `Word Fragmentation Score`: 0.9300
+- `CER`: 0.2041
+- `WER`: 0.2268
+- `F1-token`: 0.9241
 - `TD F1`: 0.9231
-- `Speed`: 0.0470 s/doc
+- `Speed`: 0.0220 s/doc
 
 Measured deltas versus the original live execution baseline (`0.7427 / 0.8702 / 0.4902 / 0.4659 / 0.5024 / 0.8827 / 0.8913 / 0.1993`):
 
@@ -207,7 +211,7 @@ Measured deltas versus the original live execution baseline (`0.7427 / 0.8702 / 
 The highest-leverage next implementation order is now:
 
 1. Image-first infographic rescue, starting with `01030000000141`.
-2. Mixed-layout structural pages such as `01030000000182`.
-3. Mixed grouped-header/table pages where benchmark structure and semantic structure still diverge, including `01030000000187`.
-4. The separate top-margin title-loss bug that still drops title pairs like `MOHAVE COMMUNITY COLLEGE / BIO181` from otherwise recoverable pages such as `01030000000122`.
-5. Reserve `01030000000070` for a future color-aware vision rescue; do not spend more text-only heuristic budget on that phenotype.
+2. Mixed grouped-header/table pages where benchmark structure and semantic structure still diverge, including `01030000000187`.
+3. The separate top-margin title-loss bug that still drops title pairs like `MOHAVE COMMUNITY COLLEGE / BIO181` from otherwise recoverable pages such as `01030000000122`.
+4. Reserve `01030000000070` for a future color-aware vision rescue; do not spend more text-only heuristic budget on that phenotype.
+5. After those, revisit the lowest residual structural tails under the new board rather than continuing benchmark-page specialization blindly.

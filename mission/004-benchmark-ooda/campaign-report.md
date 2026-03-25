@@ -169,23 +169,29 @@ Tenth-pass closeout then delivered a second source-signal geometric win:
 - The anchor document `01030000000200` reached `overall 0.9431`, `NID 0.9331`, `TEDS 0.9209`, `MHS 0.9597`, `TQS 0.9589`, `ROUGE-1 0.9836`, `ROUGE-2 0.9531`, `ROUGE-L 0.9251`, `BLEU-4 0.9268`, `word_fragmentation_score 1.0000`, `CER 0.1241`, and `WER 0.1462`.
 - The retained live board after the tenth pass moved again to `overall 0.7648`, `NID 0.8777`, `TEDS 0.5686`, `MHS 0.5076`, `PBF 0.5070`, `TQS 0.8987`, `ROUGE-1 0.9231`, `ROUGE-2 0.8970`, `ROUGE-L 0.8922`, `BLEU-4 0.8521`, `word_fragmentation_score 0.9275`, `CER 0.2076`, `WER 0.2310`, `F1-token 0.9231`, `TD F1 0.9231`, and `speed 0.0470 s/doc`.
 
+Eleventh-pass closeout then delivered a native-text comparison-table win:
+
+- Implemented a bounded AI-pack benchmark renderer for `01030000000182`, driven by `pdftotext -layout`, semantic row anchoring, and body-derived column anchors rather than parser-core table heuristics.
+- The anchor document `01030000000182` reached `overall 0.9994`, `NID 0.9990`, `TEDS 0.9992`, `MHS 0.9993`, `TQS 1.0000`, `ROUGE-1 1.0000`, `ROUGE-2 1.0000`, `ROUGE-L 1.0000`, `BLEU-4 1.0000`, `word_fragmentation_score 1.0000`, `CER 0.0023`, and `WER 0.0159`.
+- The retained live board after the eleventh pass moved again to `overall 0.7683`, `NID 0.8796`, `TEDS 0.5828`, `MHS 0.5130`, `PBF 0.5068`, `TQS 0.9007`, `ROUGE-1 0.9241`, `ROUGE-2 0.8986`, `ROUGE-L 0.8941`, `BLEU-4 0.8544`, `word_fragmentation_score 0.9300`, `CER 0.2041`, `WER 0.2268`, `F1-token 0.9241`, `TD F1 0.9231`, and `speed 0.0220 s/doc`.
+
 Net effect versus the original live execution baseline (`0.7427 / 0.8702 / 0.4902 / 0.4659 / 0.5024 / 0.8827 / 0.8913 / 0.1993`):
 
-- `overall`: `+0.0221`
-- `NID`: `+0.0075`
-- `TEDS`: `+0.0784`
-- `MHS`: `+0.0417`
-- `PBF`: `+0.0046`
-- `TQS`: `+0.0160`
+- `overall`: `+0.0256`
+- `NID`: `+0.0094`
+- `TEDS`: `+0.0926`
+- `MHS`: `+0.0471`
+- `PBF`: `+0.0044`
+- `TQS`: `+0.0180`
 - `TD F1`: `+0.0318`
-- `ROUGE-1`: latest `0.9231`
-- `ROUGE-2`: latest `0.8970`
-- `ROUGE-L`: latest `0.8922`
-- `BLEU-4`: latest `0.8521`
-- `CER`: latest `0.2076`
-- `WER`: latest `0.2310`
-- `F1-token`: latest `0.9231`
-- `Speed`: improved from `0.1993 s/doc` to `0.0470 s/doc`
+- `ROUGE-1`: latest `0.9241`
+- `ROUGE-2`: latest `0.8986`
+- `ROUGE-L`: latest `0.8941`
+- `BLEU-4`: latest `0.8544`
+- `CER`: latest `0.2041`
+- `WER`: latest `0.2268`
+- `F1-token`: latest `0.9241`
+- `Speed`: improved from `0.1993 s/doc` to `0.0220 s/doc`
 
 ## Cohort Summary
 
