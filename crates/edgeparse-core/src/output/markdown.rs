@@ -1,8 +1,13 @@
 //! Markdown output generator.
 
+use std::collections::HashMap;
+
+use crate::models::bbox::BoundingBox;
+use crate::models::chunks::TextChunk;
 use crate::models::content::ContentElement;
 use crate::models::document::PdfDocument;
 use crate::models::enums::SemanticType;
+use crate::models::semantic::SemanticTextNode;
 use crate::models::table::TableTokenRow;
 use crate::EdgePdfError;
 
@@ -38,8 +43,22 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
         return Ok(output);
     }
 
+    let geometric_table_regions = detect_geometric_table_regions(doc);
+    let mut geometric_table_cover = HashMap::new();
+    for region in geometric_table_regions {
+        for idx in region.start_idx..=region.end_idx {
+            geometric_table_cover.insert(idx, region.clone());
+        }
+    }
+
     let mut i = 0usize;
     while i < doc.kids.len() {
+        if let Some(region) = geometric_table_cover.get(&i) {
+            output.push_str(&region.rendered);
+            i = region.end_idx + 1;
+            continue;
+        }
+
         match &doc.kids[i] {
             ContentElement::Heading(h) => {
                 let text = h.base.base.value();
@@ -3023,6 +3042,579 @@ fn render_table(out: &mut String, table: &crate::models::semantic::SemanticTable
     render_table_border(out, &table.table_border);
 }
 
+#[derive(Clone)]
+struct GeometricTableRegion {
+    start_idx: usize,
+    end_idx: usize,
+    rendered: String,
+}
+
+#[derive(Clone)]
+struct ChunkLine {
+    bbox: BoundingBox,
+    chunks: Vec<TextChunk>,
+}
+
+#[derive(Clone)]
+struct SlotFragment {
+    slot_idx: usize,
+    bbox: BoundingBox,
+    text: String,
+}
+
+fn detect_geometric_table_regions(doc: &PdfDocument) -> Vec<GeometricTableRegion> {
+    let mut regions = Vec::new();
+    let mut occupied_until = 0usize;
+
+    for (idx, element) in doc.kids.iter().enumerate() {
+        if idx < occupied_until {
+            continue;
+        }
+
+        let Some(table) = table_border_from_element(element) else {
+            continue;
+        };
+        let Some(region) = build_geometric_table_region(doc, idx, table) else {
+            continue;
+        };
+        occupied_until = region.end_idx.saturating_add(1);
+        regions.push(region);
+    }
+
+    regions
+}
+
+fn table_border_from_element(
+    element: &ContentElement,
+) -> Option<&crate::models::table::TableBorder> {
+    match element {
+        ContentElement::TableBorder(table) => Some(table),
+        ContentElement::Table(table) => Some(&table.table_border),
+        _ => None,
+    }
+}
+
+fn build_geometric_table_region(
+    doc: &PdfDocument,
+    table_idx: usize,
+    table: &crate::models::table::TableBorder,
+) -> Option<GeometricTableRegion> {
+    let mut table_rows = collect_table_border_rows(table);
+    if table_rows.is_empty() || table.num_columns < 3 {
+        return None;
+    }
+    merge_continuation_rows(&mut table_rows);
+
+    let column_ranges = table_column_ranges(table)?;
+    let candidate_indices = collect_table_header_candidate_indices(doc, table_idx, table);
+    if candidate_indices.is_empty() {
+        return None;
+    }
+
+    let needs_stub = infer_left_stub_requirement(doc, &candidate_indices, &table_rows, &column_ranges);
+    if !needs_stub {
+        return None;
+    }
+    let slot_ranges = slot_ranges(&column_ranges, doc, &candidate_indices, needs_stub)?;
+    let mut header_rows = reconstruct_aligned_rows(doc, &candidate_indices, &slot_ranges, true, 2);
+    if header_rows.is_empty() {
+        return None;
+    }
+    normalize_leading_stub_header(&mut header_rows);
+
+    let slot_count = slot_ranges.len();
+    let dense_header_rows = header_rows
+        .iter()
+        .filter(|row| row.iter().filter(|cell| !cell.trim().is_empty()).count() >= slot_count.saturating_sub(1).max(2))
+        .count();
+    if dense_header_rows == 0 {
+        return None;
+    }
+
+    let mut combined_rows = Vec::new();
+    combined_rows.extend(header_rows);
+
+    let following_indices = collect_table_footer_candidate_indices(doc, table_idx, table);
+    let body_rows = if needs_stub && should_merge_panel_body_rows(&table_rows) {
+        let trailing_rows = reconstruct_aligned_rows(doc, &following_indices, &slot_ranges, false, 1);
+        vec![merge_panel_body_row(&table_rows, &trailing_rows, slot_count)]
+    } else if needs_stub {
+        table_rows
+            .iter()
+            .map(|row| {
+                let mut shifted = vec![String::new()];
+                shifted.extend(row.iter().cloned());
+                shifted
+            })
+            .collect()
+    } else {
+        table_rows
+    };
+
+    if body_rows.is_empty() {
+        return None;
+    }
+    combined_rows.extend(body_rows);
+
+    let rendered = render_pipe_rows(&combined_rows);
+    Some(GeometricTableRegion {
+        start_idx: candidate_indices[0],
+        end_idx: following_indices
+            .last()
+            .copied()
+            .unwrap_or(table_idx),
+        rendered,
+    })
+}
+
+fn table_column_ranges(table: &crate::models::table::TableBorder) -> Option<Vec<(f64, f64)>> {
+    if table.num_columns == 0 {
+        return None;
+    }
+
+    let mut ranges = vec![(f64::INFINITY, f64::NEG_INFINITY); table.num_columns];
+    for row in &table.rows {
+        for cell in &row.cells {
+            if cell.col_number >= table.num_columns {
+                continue;
+            }
+            let range = &mut ranges[cell.col_number];
+            range.0 = range.0.min(cell.bbox.left_x);
+            range.1 = range.1.max(cell.bbox.right_x);
+        }
+    }
+
+    if ranges
+        .iter()
+        .any(|(left, right)| !left.is_finite() || !right.is_finite() || right <= left)
+    {
+        return None;
+    }
+
+    Some(ranges)
+}
+
+fn collect_table_header_candidate_indices(
+    doc: &PdfDocument,
+    table_idx: usize,
+    table: &crate::models::table::TableBorder,
+) -> Vec<usize> {
+    let mut indices = Vec::new();
+    let table_page = table.bbox.page_number;
+    let table_top = table.bbox.top_y;
+    let mut cursor = table_idx;
+
+    while let Some(prev_idx) = cursor.checked_sub(1) {
+        let element = &doc.kids[prev_idx];
+        if element.page_number() != table_page {
+            break;
+        }
+        if !is_geometric_text_candidate(element) {
+            break;
+        }
+
+        let bbox = element.bbox();
+        let vertical_gap = bbox.bottom_y - table_top;
+        if vertical_gap < -6.0 || vertical_gap > 260.0 {
+            break;
+        }
+
+        indices.push(prev_idx);
+        cursor = prev_idx;
+        if indices.len() >= 10 {
+            break;
+        }
+    }
+
+    indices.reverse();
+    indices
+}
+
+fn collect_table_footer_candidate_indices(
+    doc: &PdfDocument,
+    table_idx: usize,
+    table: &crate::models::table::TableBorder,
+) -> Vec<usize> {
+    let mut indices = Vec::new();
+    let table_page = table.bbox.page_number;
+    let table_bottom = table.bbox.bottom_y;
+
+    for idx in table_idx + 1..doc.kids.len() {
+        let element = &doc.kids[idx];
+        if element.page_number() != table_page {
+            break;
+        }
+        if !is_geometric_text_candidate(element) {
+            break;
+        }
+        if looks_like_margin_page_number(doc, element, &extract_element_text(element)) {
+            break;
+        }
+
+        let bbox = element.bbox();
+        let gap = table_bottom - bbox.top_y;
+        if gap < -6.0 || gap > 28.0 {
+            break;
+        }
+        indices.push(idx);
+        if indices.len() >= 4 {
+            break;
+        }
+    }
+
+    indices
+}
+
+fn is_geometric_text_candidate(element: &ContentElement) -> bool {
+    matches!(
+        element,
+        ContentElement::Paragraph(_)
+            | ContentElement::Heading(_)
+            | ContentElement::NumberHeading(_)
+            | ContentElement::TextBlock(_)
+            | ContentElement::TextLine(_)
+    )
+}
+
+fn infer_left_stub_requirement(
+    doc: &PdfDocument,
+    candidate_indices: &[usize],
+    table_rows: &[Vec<String>],
+    column_ranges: &[(f64, f64)],
+) -> bool {
+    if column_ranges.is_empty() {
+        return false;
+    }
+
+    let first_width = (column_ranges[0].1 - column_ranges[0].0).max(1.0);
+    let has_left_label = candidate_indices.iter().any(|idx| {
+        let bbox = doc.kids[*idx].bbox();
+        bbox.right_x <= column_ranges[0].0 + first_width * 0.12 && bbox.width() <= first_width * 0.45
+    });
+    if !has_left_label {
+        return false;
+    }
+
+    let mut first_col_word_counts: Vec<usize> = table_rows
+        .iter()
+        .filter_map(|row| row.first())
+        .map(|cell| cell.split_whitespace().count())
+        .collect();
+    if first_col_word_counts.is_empty() {
+        return false;
+    }
+    first_col_word_counts.sort_unstable();
+    let median = first_col_word_counts[first_col_word_counts.len() / 2];
+    median >= 5
+}
+
+fn slot_ranges(
+    column_ranges: &[(f64, f64)],
+    doc: &PdfDocument,
+    candidate_indices: &[usize],
+    needs_stub: bool,
+) -> Option<Vec<(f64, f64)>> {
+    let mut slots = Vec::new();
+    if needs_stub {
+        let first_left = column_ranges.first()?.0;
+        let left_stub_start = candidate_indices
+            .iter()
+            .map(|idx| doc.kids[*idx].bbox().left_x)
+            .fold(first_left, f64::min);
+        let stub_right = first_left - 1.0;
+        if stub_right <= left_stub_start {
+            return None;
+        }
+        slots.push((left_stub_start, stub_right));
+    }
+    slots.extend(column_ranges.iter().copied());
+    Some(slots)
+}
+
+fn reconstruct_aligned_rows(
+    doc: &PdfDocument,
+    candidate_indices: &[usize],
+    slot_ranges: &[(f64, f64)],
+    drop_wide_singletons: bool,
+    min_filled_slots: usize,
+) -> Vec<Vec<String>> {
+    if candidate_indices.is_empty() || slot_ranges.is_empty() {
+        return Vec::new();
+    }
+
+    let mut row_bands: Vec<(BoundingBox, Vec<String>)> = Vec::new();
+
+    for idx in candidate_indices {
+        for line in extract_chunk_lines(&doc.kids[*idx]) {
+            let fragments = split_line_into_slot_fragments(&line, slot_ranges);
+            if fragments.is_empty() {
+                continue;
+            }
+
+            if drop_wide_singletons && fragments.len() == 1 {
+                let only = &fragments[0];
+                let span_width = only.bbox.width();
+                let table_width =
+                    slot_ranges.last().map(|(_, right)| *right).unwrap_or(0.0) - slot_ranges[0].0;
+                if span_width >= table_width * 0.55 {
+                    continue;
+                }
+            }
+
+            let line_center = line.bbox.center_y();
+            let tolerance = line
+                .chunks
+                .iter()
+                .map(|chunk| chunk.font_size)
+                .fold(8.0, f64::max)
+                * 0.8;
+
+            let mut target_row = None;
+            for (row_idx, (bbox, _)) in row_bands.iter().enumerate() {
+                if (bbox.center_y() - line_center).abs() <= tolerance {
+                    target_row = Some(row_idx);
+                    break;
+                }
+            }
+
+            if let Some(row_idx) = target_row {
+                let (bbox, cells) = &mut row_bands[row_idx];
+                *bbox = bbox.union(&line.bbox);
+                for fragment in fragments {
+                    append_cell_text(&mut cells[fragment.slot_idx], &fragment.text);
+                }
+            } else {
+                let mut cells = vec![String::new(); slot_ranges.len()];
+                for fragment in fragments {
+                    append_cell_text(&mut cells[fragment.slot_idx], &fragment.text);
+                }
+                row_bands.push((line.bbox.clone(), cells));
+            }
+        }
+    }
+
+    row_bands.sort_by(|left, right| {
+        right
+            .0
+            .top_y
+            .partial_cmp(&left.0.top_y)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    row_bands
+        .into_iter()
+        .map(|(_, cells)| cells)
+        .filter(|cells| {
+            let filled = cells.iter().filter(|cell| !cell.trim().is_empty()).count();
+            filled >= min_filled_slots
+        })
+        .collect()
+}
+
+fn extract_chunk_lines(element: &ContentElement) -> Vec<ChunkLine> {
+    match element {
+        ContentElement::Paragraph(p) => chunk_lines_from_semantic_node(&p.base),
+        ContentElement::Heading(h) => chunk_lines_from_semantic_node(&h.base.base),
+        ContentElement::NumberHeading(nh) => chunk_lines_from_semantic_node(&nh.base.base.base),
+        ContentElement::TextBlock(tb) => tb
+            .text_lines
+            .iter()
+            .map(|line| ChunkLine {
+                bbox: line.bbox.clone(),
+                chunks: line.text_chunks.clone(),
+            })
+            .collect(),
+        ContentElement::TextLine(tl) => vec![ChunkLine {
+            bbox: tl.bbox.clone(),
+            chunks: tl.text_chunks.clone(),
+        }],
+        _ => Vec::new(),
+    }
+}
+
+fn chunk_lines_from_semantic_node(node: &SemanticTextNode) -> Vec<ChunkLine> {
+    let mut lines = Vec::new();
+    for column in &node.columns {
+        for block in &column.text_blocks {
+            for line in &block.text_lines {
+                lines.push(ChunkLine {
+                    bbox: line.bbox.clone(),
+                    chunks: line.text_chunks.clone(),
+                });
+            }
+        }
+    }
+    lines
+}
+
+fn split_line_into_slot_fragments(line: &ChunkLine, slot_ranges: &[(f64, f64)]) -> Vec<SlotFragment> {
+    let mut groups: Vec<(usize, Vec<TextChunk>, BoundingBox)> = Vec::new();
+
+    for chunk in line
+        .chunks
+        .iter()
+        .filter(|chunk| !chunk.value.trim().is_empty())
+        .cloned()
+    {
+        let slot_idx = assign_chunk_to_slot(&chunk.bbox, slot_ranges);
+        if let Some((prev_slot, prev_chunks, prev_bbox)) = groups.last_mut() {
+            let gap = chunk.bbox.left_x - prev_bbox.right_x;
+            if *prev_slot == slot_idx && gap <= chunk.font_size.max(6.0) * 2.4 {
+                *prev_bbox = prev_bbox.union(&chunk.bbox);
+                prev_chunks.push(chunk);
+                continue;
+            }
+        }
+        groups.push((slot_idx, vec![chunk.clone()], chunk.bbox.clone()));
+    }
+
+    groups
+        .into_iter()
+        .filter_map(|(slot_idx, chunks, bbox)| {
+            let text =
+                normalize_common_ocr_text(&crate::models::text::TextLine::concatenate_chunks(&chunks));
+            if text.trim().is_empty() {
+                None
+            } else {
+                Some(SlotFragment { slot_idx, bbox, text })
+            }
+        })
+        .collect()
+}
+
+fn assign_chunk_to_slot(bbox: &BoundingBox, slot_ranges: &[(f64, f64)]) -> usize {
+    let mut best_idx = 0usize;
+    let mut best_overlap = f64::NEG_INFINITY;
+    let center_x = bbox.center_x();
+
+    for (idx, (left, right)) in slot_ranges.iter().enumerate() {
+        let overlap = (bbox.right_x.min(*right) - bbox.left_x.max(*left)).max(0.0);
+        let score = if overlap > 0.0 {
+            overlap / bbox.width().max(1.0)
+        } else {
+            -((center_x - ((*left + *right) / 2.0)).abs())
+        };
+        if score > best_overlap {
+            best_overlap = score;
+            best_idx = idx;
+        }
+    }
+
+    best_idx
+}
+
+fn append_cell_text(cell: &mut String, fragment: &str) {
+    let trimmed = fragment.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if !cell.is_empty() {
+        cell.push(' ');
+    }
+    cell.push_str(trimmed);
+}
+
+fn normalize_leading_stub_header(rows: &mut [Vec<String>]) {
+    if rows.len() < 2 || rows[0].is_empty() || rows[1].is_empty() {
+        return;
+    }
+
+    if !rows[0][0].trim().is_empty() || rows[1][0].trim().is_empty() {
+        return;
+    }
+
+    let first_row_filled = rows[0]
+        .iter()
+        .skip(1)
+        .filter(|cell| !cell.trim().is_empty())
+        .count();
+    let second_row_filled = rows[1]
+        .iter()
+        .skip(1)
+        .filter(|cell| !cell.trim().is_empty())
+        .count();
+    if first_row_filled < 2 || second_row_filled < 2 {
+        return;
+    }
+
+    rows[0][0] = rows[1][0].trim().to_string();
+    rows[1][0].clear();
+}
+
+fn should_merge_panel_body_rows(rows: &[Vec<String>]) -> bool {
+    rows.len() >= 3
+        && rows
+            .iter()
+            .all(|row| !row.is_empty() && row.iter().all(|cell| !cell.trim().is_empty()))
+}
+
+fn merge_panel_body_row(
+    table_rows: &[Vec<String>],
+    trailing_rows: &[Vec<String>],
+    slot_count: usize,
+) -> Vec<String> {
+    let mut merged = vec![String::new(); slot_count];
+    for row in table_rows {
+        for (col_idx, cell) in row.iter().enumerate() {
+            if col_idx + 1 >= slot_count {
+                break;
+            }
+            append_cell_text(&mut merged[col_idx + 1], cell);
+        }
+    }
+    for row in trailing_rows {
+        for (col_idx, cell) in row.iter().enumerate() {
+            if col_idx >= slot_count {
+                break;
+            }
+            append_cell_text(&mut merged[col_idx], cell);
+        }
+    }
+    merged
+}
+
+fn render_pipe_rows(rows: &[Vec<String>]) -> String {
+    if rows.is_empty() {
+        return String::new();
+    }
+
+    let num_cols = rows.iter().map(Vec::len).max().unwrap_or(0);
+    if num_cols == 0 {
+        return String::new();
+    }
+
+    let mut out = String::new();
+    for (row_idx, row) in rows.iter().enumerate() {
+        out.push('|');
+        for col_idx in 0..num_cols {
+            let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+            out.push_str(&format!(" {} |", cell.trim()));
+        }
+        out.push('\n');
+
+        if row_idx == 0 {
+            out.push('|');
+            for _ in 0..num_cols {
+                out.push_str(" --- |");
+            }
+            out.push('\n');
+        }
+    }
+    out.push('\n');
+    out
+}
+
+fn extract_element_text(element: &ContentElement) -> String {
+    match element {
+        ContentElement::Paragraph(p) => clean_paragraph_text(&p.base.value()),
+        ContentElement::Heading(h) => clean_paragraph_text(&h.base.base.value()),
+        ContentElement::NumberHeading(nh) => clean_paragraph_text(&nh.base.base.base.value()),
+        ContentElement::TextBlock(tb) => clean_paragraph_text(&tb.value()),
+        ContentElement::TextLine(tl) => clean_paragraph_text(&tl.value()),
+        _ => String::new(),
+    }
+}
+
 /// Collect rendered rows from a single TableBorder (no cross-page chaining).
 fn collect_table_border_rows(table: &crate::models::table::TableBorder) -> Vec<Vec<String>> {
     let num_cols = table.num_columns.max(1);
@@ -3054,8 +3646,6 @@ fn render_table_border(out: &mut String, table: &crate::models::table::TableBord
         return;
     }
 
-    let num_cols = table.num_columns.max(1);
-
     // Collect rows from this table.
     let mut rendered_rows = collect_table_border_rows(table);
 
@@ -3072,23 +3662,7 @@ fn render_table_border(out: &mut String, table: &crate::models::table::TableBord
         return;
     }
 
-    for (row_idx, cell_texts) in rendered_rows.iter().enumerate() {
-        out.push('|');
-        for cell_text in cell_texts {
-            out.push_str(&format!(" {} |", cell_text.trim()));
-        }
-        out.push('\n');
-
-        // Add separator after first row (header)
-        if row_idx == 0 {
-            out.push('|');
-            for _ in 0..num_cols {
-                out.push_str(" --- |");
-            }
-            out.push('\n');
-        }
-    }
-    out.push('\n');
+    out.push_str(&render_pipe_rows(&rendered_rows));
 }
 
 /// Returns true if `text` looks like a page number (Arabic digits or Roman numerals).
@@ -4129,6 +4703,198 @@ mod tests {
         })
     }
 
+    fn make_chunked_paragraph_line(
+        segments: &[(&str, f64, f64)],
+        bottom: f64,
+        top: f64,
+    ) -> ContentElement {
+        let bbox = BoundingBox::new(
+            Some(1),
+            segments.first().map(|(_, left, _)| *left).unwrap_or(72.0),
+            bottom,
+            segments.last().map(|(_, _, right)| *right).unwrap_or(320.0),
+            top,
+        );
+
+        let chunks = segments
+            .iter()
+            .map(|(text, left, right)| TextChunk {
+                value: (*text).to_string(),
+                bbox: BoundingBox::new(Some(1), *left, bottom, *right, top),
+                font_name: "Lato-Regular".to_string(),
+                font_size: top - bottom,
+                font_weight: 400.0,
+                italic_angle: 0.0,
+                font_color: "#000000".to_string(),
+                contrast_ratio: 21.0,
+                symbol_ends: vec![],
+                text_format: TextFormat::Normal,
+                text_type: TextType::Regular,
+                pdf_layer: PdfLayer::Main,
+                ocg_visible: true,
+                index: None,
+                page_number: Some(1),
+                level: None,
+                mcid: None,
+            })
+            .collect::<Vec<_>>();
+
+        let line = TextLine {
+            bbox: bbox.clone(),
+            index: None,
+            level: None,
+            font_size: top - bottom,
+            base_line: bottom + 2.0,
+            slant_degree: 0.0,
+            is_hidden_text: false,
+            text_chunks: chunks,
+            is_line_start: true,
+            is_line_end: true,
+            is_list_line: false,
+            connected_line_art_label: None,
+        };
+        let block = TextBlock {
+            bbox: bbox.clone(),
+            index: None,
+            level: None,
+            font_size: line.font_size,
+            base_line: line.base_line,
+            slant_degree: 0.0,
+            is_hidden_text: false,
+            text_lines: vec![line],
+            has_start_line: true,
+            has_end_line: true,
+            text_alignment: None,
+        };
+        let column = TextColumn {
+            bbox: bbox.clone(),
+            index: None,
+            level: None,
+            font_size: block.font_size,
+            base_line: block.base_line,
+            slant_degree: 0.0,
+            is_hidden_text: false,
+            text_blocks: vec![block],
+        };
+
+        ContentElement::Paragraph(SemanticParagraph {
+            base: SemanticTextNode {
+                bbox,
+                index: None,
+                level: None,
+                semantic_type: SemanticType::Paragraph,
+                correct_semantic_score: None,
+                columns: vec![column],
+                font_weight: Some(400.0),
+                font_size: Some(top - bottom),
+                text_color: None,
+                italic_angle: None,
+                font_name: Some("Lato-Regular".to_string()),
+                text_format: None,
+                max_font_size: Some(top - bottom),
+                background_color: None,
+                is_hidden_text: false,
+            },
+            enclosed_top: false,
+            enclosed_bottom: false,
+            indentation: 0,
+        })
+    }
+
+    fn make_n_column_table(rows: &[Vec<&str>], column_bounds: &[(f64, f64)]) -> ContentElement {
+        let mut table_rows = Vec::new();
+        for (row_number, row_values) in rows.iter().enumerate() {
+            let top = 656.0 - row_number as f64 * 18.0;
+            let bottom = top - 16.0;
+            let mut cells = Vec::new();
+            for (col_number, (left_x, right_x)) in column_bounds.iter().enumerate() {
+                let text = row_values.get(col_number).copied().unwrap_or("");
+                let content = if text.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![TableToken {
+                        base: TextChunk {
+                            value: text.to_string(),
+                            bbox: BoundingBox::new(Some(1), *left_x, bottom, *right_x, top),
+                            font_name: "Test".to_string(),
+                            font_size: 11.0,
+                            font_weight: 400.0,
+                            italic_angle: 0.0,
+                            font_color: "[0.0]".to_string(),
+                            contrast_ratio: 21.0,
+                            symbol_ends: Vec::new(),
+                            text_format: TextFormat::Normal,
+                            text_type: TextType::Regular,
+                            pdf_layer: PdfLayer::Main,
+                            ocg_visible: true,
+                            index: None,
+                            page_number: Some(1),
+                            level: None,
+                            mcid: None,
+                        },
+                        token_type: TableTokenType::Text,
+                    }]
+                };
+                cells.push(TableBorderCell {
+                    bbox: BoundingBox::new(Some(1), *left_x, bottom, *right_x, top),
+                    index: None,
+                    level: None,
+                    row_number,
+                    col_number,
+                    row_span: 1,
+                    col_span: 1,
+                    content,
+                    contents: vec![],
+                    semantic_type: None,
+                });
+            }
+
+            table_rows.push(TableBorderRow {
+                bbox: BoundingBox::new(
+                    Some(1),
+                    column_bounds.first().map(|(left, _)| *left).unwrap_or(72.0),
+                    bottom,
+                    column_bounds.last().map(|(_, right)| *right).unwrap_or(420.0),
+                    top,
+                ),
+                index: None,
+                level: None,
+                row_number,
+                cells,
+                semantic_type: None,
+            });
+        }
+
+        let left = column_bounds.first().map(|(value, _)| *value).unwrap_or(72.0);
+        let right = column_bounds.last().map(|(_, value)| *value).unwrap_or(420.0);
+        let x_coordinates = std::iter::once(left)
+            .chain(column_bounds.iter().map(|(_, right)| *right))
+            .collect::<Vec<_>>();
+
+        ContentElement::TableBorder(TableBorder {
+            bbox: BoundingBox::new(
+                Some(1),
+                left,
+                656.0 - rows.len() as f64 * 18.0 - 16.0,
+                right,
+                656.0,
+            ),
+            index: None,
+            level: Some("1".to_string()),
+            x_coordinates,
+            x_widths: vec![0.0; column_bounds.len() + 1],
+            y_coordinates: (0..=rows.len()).map(|i| 656.0 - i as f64 * 18.0).collect(),
+            y_widths: vec![0.0; rows.len() + 1],
+            rows: table_rows,
+            num_rows: rows.len(),
+            num_columns: column_bounds.len(),
+            is_bad_table: false,
+            is_table_transformer: false,
+            previous_table: None,
+            next_table: None,
+        })
+    }
+
     #[test]
     fn test_numeric_two_column_table_is_not_misrendered_as_toc() {
         let mut doc = PdfDocument::new("cec-table.pdf".to_string());
@@ -4162,6 +4928,100 @@ mod tests {
         let md = to_markdown(&doc).unwrap();
         assert!(md.contains("| Added cation | Relative Size & Settling Rates of Floccules |"));
         assert!(md.contains("| K+ |  |"));
+    }
+
+    #[test]
+    fn test_geometric_panel_headers_are_promoted_into_table() {
+        let mut doc = PdfDocument::new("ai-pack-panel.pdf".to_string());
+        doc.kids.push(make_chunked_paragraph_line(&[("OCR", 220.0, 250.0)], 720.0, 732.0));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("Recommendation", 430.0, 540.0)],
+            720.0,
+            732.0,
+        ));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("Product semantic search", 660.0, 860.0)],
+            720.0,
+            732.0,
+        ));
+        doc.kids.push(make_chunked_paragraph_line(&[("Pack", 72.0, 110.0)], 684.0, 696.0));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("A solution that recognizes characters", 140.0, 340.0)],
+            684.0,
+            696.0,
+        ));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("A solution that recommends the best products", 390.0, 620.0)],
+            684.0,
+            696.0,
+        ));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("A solution that enables semantic search", 650.0, 900.0)],
+            684.0,
+            696.0,
+        ));
+        doc.kids.push(make_n_column_table(
+            &[
+                vec![
+                    "Achieved 1st place in the OCR World Competition",
+                    "Team with specialists and technologies",
+                    "Creation of the first natural language evaluation",
+                ],
+                vec![
+                    "The team includes specialists who have",
+                    "received Kaggle's Gold Medal recommendation",
+                    "system in Korean (KLUE)",
+                ],
+                vec![
+                    "presented 14 papers in renowned AI conferences",
+                    "top-tier recommendation",
+                    "Shopee subject",
+                ],
+            ],
+            &[(120.0, 360.0), (360.0, 630.0), (630.0, 910.0)],
+        ));
+        doc.kids.push(make_chunked_paragraph_line(&[("models", 430.0, 490.0)], 552.0, 564.0));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains("| Pack | OCR | Recommendation | Product semantic search |"));
+        assert!(md.contains("| A solution that recognizes characters | A solution that recommends the best products | A solution that enables semantic search |"));
+        assert!(md.contains(
+            "received Kaggle's Gold Medal recommendation top-tier recommendation models"
+        ));
+    }
+
+    #[test]
+    fn test_geometric_chunk_alignment_splits_header_line_into_columns() {
+        let line = make_chunked_paragraph_line(
+            &[
+                ("Properties", 72.0, 145.0),
+                ("Instruction", 180.0, 255.0),
+                ("Alignment", 480.0, 545.0),
+            ],
+            720.0,
+            732.0,
+        );
+        let chunk_lines = extract_chunk_lines(&line);
+        let fragments = split_line_into_slot_fragments(
+            &chunk_lines[0],
+            &[
+                (72.0, 170.0),
+                (170.0, 280.0),
+                (280.0, 380.0),
+                (380.0, 480.0),
+                (480.0, 600.0),
+                (600.0, 720.0),
+                (720.0, 850.0),
+            ],
+        );
+
+        assert_eq!(fragments.len(), 3);
+        assert_eq!(fragments[0].slot_idx, 0);
+        assert_eq!(fragments[0].text, "Properties");
+        assert_eq!(fragments[1].slot_idx, 1);
+        assert_eq!(fragments[1].text, "Instruction");
+        assert_eq!(fragments[2].slot_idx, 4);
+        assert_eq!(fragments[2].text, "Alignment");
     }
 
     #[test]
