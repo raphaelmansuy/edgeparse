@@ -104,7 +104,8 @@ build_run_cmd() {
             ;;
         libriscv)
             # libriscv rvlinux: fastest RISC-V sandbox, Linux syscall emulation
-            echo "rvlinux ${wasm_or_bin} $*"
+            # rvlinux intercepts -f (fuel) and -h (help), so use -- to separate
+            echo "rvlinux ${wasm_or_bin} -- $*"
             ;;
         rvvm)
             # RVVM: tracing JIT RISC-V emulator, userland mode

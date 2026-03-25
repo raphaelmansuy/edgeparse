@@ -21,14 +21,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Build RVVM from source
+# NOTE: RVVM binary naming varies by version/platform. Recent versions produce
+# rvvm_x86_64 (or rvvm_<arch>) instead of rvvm_userland or rvvm.
 RUN git clone --depth 1 https://github.com/LekKit/RVVM /tmp/rvvm && \
     cd /tmp/rvvm && \
     make all -j"$(nproc)" && \
-    cp release.linux.x86_64/rvvm_userland /usr/local/bin/rvvm-userland 2>/dev/null || \
-    cp release.*/rvvm_userland /usr/local/bin/rvvm-userland 2>/dev/null || \
-    (echo "NOTE: rvvm_userland not found, trying rvvm" && \
-     cp release.linux.x86_64/rvvm /usr/local/bin/rvvm-userland 2>/dev/null || \
-     cp release.*/rvvm /usr/local/bin/rvvm-userland) && \
+    echo "=== Build artifacts ===" && ls -la release.*/ && \
+    ( cp release.linux.x86_64/rvvm_userland /usr/local/bin/rvvm-userland 2>/dev/null || \
+      cp release.*/rvvm_userland /usr/local/bin/rvvm-userland 2>/dev/null || \
+      cp release.linux.x86_64/rvvm /usr/local/bin/rvvm-userland 2>/dev/null || \
+      cp release.*/rvvm /usr/local/bin/rvvm-userland 2>/dev/null || \
+      cp release.linux.x86_64/rvvm_x86_64 /usr/local/bin/rvvm-userland 2>/dev/null || \
+      cp release.*/rvvm_* /usr/local/bin/rvvm-userland 2>/dev/null || \
+      { echo "ERROR: No RVVM binary found"; exit 1; } ) && \
     rm -rf /tmp/rvvm
 
 # Verify
