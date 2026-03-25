@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use clap::Parser;
 use edgeparse_core::api::config::OutputFormat;
+#[cfg(feature = "native")]
 use rayon::prelude::*;
 
 /// EdgeParse: High-performance PDF-to-structured-data extraction
@@ -124,10 +125,12 @@ fn main() {
     // Build processing config
     let config = build_config(&cli);
 
-    // Process each input file in parallel
+    // Process each input file (parallel when native feature is enabled)
     let has_errors = AtomicBool::new(false);
-    cli.input.par_iter().for_each(|input_path| {
-        match edgeparse_core::convert(input_path, &config) {
+
+    let process_file = |input_path: &PathBuf| {
+        let result = convert_file(input_path, &config);
+        match result {
             Ok(doc) => {
                 log::info!(
                     "Processed {} ({} pages)",
@@ -144,7 +147,13 @@ fn main() {
                 has_errors.store(true, Ordering::Relaxed);
             }
         }
-    });
+    };
+
+    #[cfg(feature = "native")]
+    cli.input.par_iter().for_each(process_file);
+
+    #[cfg(not(feature = "native"))]
+    cli.input.iter().for_each(process_file);
 
     if has_errors.load(Ordering::Relaxed) {
         process::exit(1);
@@ -200,6 +209,30 @@ fn write_outputs(
     }
 
     Ok(())
+}
+
+/// Convert a PDF file using the appropriate backend.
+///
+/// On native builds, uses `edgeparse_core::convert()` which supports raster
+/// table OCR via external tools. On WASI/non-native builds, reads the file
+/// into memory and uses `convert_bytes()` instead (no external tool support).
+fn convert_file(
+    input_path: &std::path::Path,
+    config: &edgeparse_core::api::config::ProcessingConfig,
+) -> Result<edgeparse_core::models::document::PdfDocument, edgeparse_core::EdgePdfError> {
+    #[cfg(feature = "native")]
+    {
+        edgeparse_core::convert(input_path, config)
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        let data = std::fs::read(input_path)?;
+        let file_name = input_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown.pdf");
+        edgeparse_core::convert_bytes(&data, file_name, config)
+    }
 }
 
 fn build_config(cli: &Cli) -> edgeparse_core::api::config::ProcessingConfig {

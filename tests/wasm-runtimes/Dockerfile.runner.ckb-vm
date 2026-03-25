@@ -1,0 +1,46 @@
+# ─── CKB-VM Runner ──────────────────────────────────────────────────────────
+# Greg's AI coding buddy:
+#   CKB-VM — Production blockchain VM from Nervos Network.
+#   rv64imc ISA, W^X memory protection, gas metering, JIT compilation.
+#   2.5x faster than Wasmer Singlepass. Deployed on CKB mainnet.
+#
+#   Uses ckb-debugger to execute RISC-V ELF binaries with
+#   Linux syscall emulation. Limited POSIX support — designed for
+#   deterministic computation, not general-purpose Linux apps.
+#
+#   EXPERIMENTAL: CKB-VM has limited syscall support. edgeparse's
+#   file I/O may not be fully supported. Tests may partially fail.
+#
+#   docker build -f tests/wasm-runtimes/Dockerfile.runner.ckb-vm \
+#                -t edgeparse-riscv-ckb-vm .
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM rust:1-slim-bookworm AS builder
+
+# Build ckb-standalone-debugger which can run RISC-V ELF binaries
+RUN cargo install ckb-debugger 2>/dev/null || \
+    (apt-get update && apt-get install -y --no-install-recommends git pkg-config libssl-dev && \
+     cargo install --git https://github.com/nervosnetwork/ckb-standalone-debugger ckb-debugger)
+
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local/cargo/bin/ckb-debugger /usr/local/bin/
+
+# Verify
+RUN ckb-debugger --version 2>&1 || echo "CKB debugger installed"
+
+WORKDIR /test
+
+COPY tests/fixtures/sample.pdf          /test/fixtures/
+COPY tests/wasm-runtimes/run-tests.sh   /test/
+RUN chmod +x /test/run-tests.sh
+
+# Copy pre-built RISC-V binary (statically linked)
+COPY tests/wasm-runtimes/.build/edgeparse-riscv64-static /test/edgeparse-riscv64
+
+ENTRYPOINT ["/test/run-tests.sh"]
+CMD ["ckb-vm"]

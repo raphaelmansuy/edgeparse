@@ -1,0 +1,31 @@
+# ─── Shared Runner Base ─────────────────────────────────────────────────────
+# Greg's AI coding buddy:
+#   Common base layer for all WASM runtime test containers.
+#   Build this FIRST — subsequent runtime images inherit its cached layers.
+#
+#   docker build -f tests/wasm-runtimes/Dockerfile.runner.base \
+#                -t edgeparse-wasi-base .
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM ubuntu:24.04
+
+# Shared dependencies — curl for runtime installers, ca-certs for HTTPS,
+# xz-utils for compressed release tarballs, file for MIME sniffing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    xz-utils \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /test
+
+# Copy test fixtures and scripts
+COPY tests/fixtures/sample.pdf          /test/fixtures/
+COPY tests/wasm-runtimes/run-tests.sh   /test/
+RUN chmod +x /test/run-tests.sh
+
+# The .wasm binary is expected at /test/edgeparse.wasm
+# It gets copied in by each runtime Dockerfile or mounted at runtime.
+
+ENTRYPOINT ["/test/run-tests.sh"]
