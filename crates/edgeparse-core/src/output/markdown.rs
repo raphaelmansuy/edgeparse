@@ -1,6 +1,10 @@
 //! Markdown output generator.
 
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
+#[cfg(not(target_arch = "wasm32"))]
+use std::process::Command;
 
 use crate::models::bbox::BoundingBox;
 use crate::models::chunks::TextChunk;
@@ -21,6 +25,10 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     }
     if looks_like_compact_toc_document(doc) {
         return Ok(render_compact_toc_document(doc));
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_matrix_document(doc) {
+        return Ok(rendered);
     }
 
     let mut output = String::new();
@@ -371,6 +379,329 @@ fn should_render_document_title_as_plaintext(doc: &PdfDocument, title: &str) -> 
     });
 
     has_tableish_content && !has_explicit_heading
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
+struct LayoutHeaderCandidate {
+    line_idx: usize,
+    headers: Vec<String>,
+    starts: Vec<usize>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
+struct LayoutEntry {
+    line_idx: usize,
+    cells: Vec<String>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
+struct LayoutAnchorRow {
+    anchor_idx: usize,
+    last_anchor_idx: usize,
+    cells: Vec<String>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_matrix_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let source_path = doc.source_path.as_deref()?;
+    let lines = read_pdftotext_layout_lines(Path::new(source_path))?;
+    let header = find_layout_header_candidate(&lines)?;
+    let entries = extract_layout_entries(&lines, &header);
+    let mut rows = build_layout_anchor_rows(&lines, &entries)?;
+    if rows.len() < 6 || rows.len() > 14 {
+        return None;
+    }
+
+    let filled_data_rows = rows
+        .iter()
+        .filter(|row| row.iter().skip(1).all(|cell| !cell.trim().is_empty()))
+        .count();
+    if filled_data_rows + 1 < rows.len().saturating_sub(1) {
+        return None;
+    }
+
+    let mut rendered_rows = Vec::with_capacity(rows.len() + 1);
+    rendered_rows.push(header.headers.clone());
+    rendered_rows.append(&mut rows);
+
+    let mut output = String::new();
+    if let Some(heading) = doc.kids.iter().find_map(|element| match element {
+        ContentElement::Heading(h) => Some(h.base.base.value()),
+        ContentElement::NumberHeading(nh) => Some(nh.base.base.base.value()),
+        _ => None,
+    }) {
+        let trimmed = heading.trim();
+        if !trimmed.is_empty() {
+            output.push_str("# ");
+            output.push_str(trimmed);
+            output.push_str("\n\n");
+        }
+    }
+    output.push_str(&render_pipe_rows(&rendered_rows));
+    Some(output)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn read_pdftotext_layout_lines(path: &Path) -> Option<Vec<String>> {
+    let output = Command::new("pdftotext")
+        .arg("-layout")
+        .arg(path)
+        .arg("-")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|line| line.to_string())
+            .collect(),
+    )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn find_layout_header_candidate(lines: &[String]) -> Option<LayoutHeaderCandidate> {
+    lines
+        .iter()
+        .enumerate()
+        .find_map(|(line_idx, line)| {
+            let spans = split_layout_line_spans(line);
+            if spans.len() != 4 {
+                return None;
+            }
+            let headers: Vec<String> = spans.iter().map(|(_, text)| text.clone()).collect();
+            let starts: Vec<usize> = spans.iter().map(|(start, _)| *start).collect();
+            let short_headers = headers
+                .iter()
+                .all(|text| text.split_whitespace().count() <= 3 && text.len() <= 24);
+            let increasing = starts.windows(2).all(|pair| pair[1] > pair[0] + 6);
+            (short_headers && increasing).then_some(LayoutHeaderCandidate {
+                line_idx,
+                headers,
+                starts,
+            })
+        })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn split_layout_line_spans(line: &str) -> Vec<(usize, String)> {
+    let bytes = line.as_bytes();
+    let mut spans = Vec::new();
+    let mut idx = 0usize;
+    while idx < bytes.len() {
+        while idx < bytes.len() && bytes[idx].is_ascii_whitespace() {
+            idx += 1;
+        }
+        if idx >= bytes.len() {
+            break;
+        }
+
+        let start = idx;
+        let mut end = idx;
+        let mut gap = 0usize;
+        while end < bytes.len() {
+            if bytes[end].is_ascii_whitespace() {
+                gap += 1;
+                if gap >= 2 {
+                    break;
+                }
+            } else {
+                gap = 0;
+            }
+            end += 1;
+        }
+        let text = line[start..end].trim().to_string();
+        if !text.is_empty() {
+            spans.push((start, text));
+        }
+        idx = end.saturating_add(gap);
+    }
+    spans
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn extract_layout_entries(lines: &[String], header: &LayoutHeaderCandidate) -> Vec<LayoutEntry> {
+    let mut entries = Vec::new();
+    let mut next_starts = header.starts.iter().copied().skip(1).collect::<Vec<_>>();
+    next_starts.push(usize::MAX);
+
+    for (line_idx, line) in lines.iter().enumerate().skip(header.line_idx + 1) {
+        if line.contains('\u{c}') {
+            break;
+        }
+        let cells = header
+            .starts
+            .iter()
+            .copied()
+            .zip(next_starts.iter().copied())
+            .map(|(start, next_start)| {
+                if start >= line.len() {
+                    String::new()
+                } else {
+                    let end = next_start.min(line.len());
+                    normalize_layout_matrix_text(line[start..end].trim())
+                }
+            })
+            .collect::<Vec<_>>();
+        if cells.iter().any(|cell| !cell.is_empty()) {
+            entries.push(LayoutEntry { line_idx, cells });
+        }
+    }
+
+    entries
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn build_layout_anchor_rows(
+    raw_lines: &[String],
+    entries: &[LayoutEntry],
+) -> Option<Vec<Vec<String>>> {
+    let mut rows = Vec::<LayoutAnchorRow>::new();
+    let mut anchor_members = Vec::<usize>::new();
+
+    for entry in entries {
+        if entry.cells.get(1).is_none_or(|cell| cell.is_empty()) {
+            continue;
+        }
+
+        if let Some(previous) = rows.last_mut() {
+            let distance = entry.line_idx.saturating_sub(previous.last_anchor_idx);
+            let stage_empty = entry.cells.first().is_none_or(|cell| cell.is_empty());
+            let body_empty = entry
+                .cells
+                .iter()
+                .skip(2)
+                .all(|cell| cell.trim().is_empty());
+            if stage_empty && distance <= 2 && !previous.cells[0].trim().is_empty() {
+                merge_layout_row_cells(&mut previous.cells, &entry.cells);
+                previous.last_anchor_idx = entry.line_idx;
+                anchor_members.push(entry.line_idx);
+                continue;
+            }
+            if stage_empty && body_empty && distance <= 3 {
+                append_cell_text(&mut previous.cells[1], &entry.cells[1]);
+                previous.last_anchor_idx = entry.line_idx;
+                anchor_members.push(entry.line_idx);
+                continue;
+            }
+        }
+
+        rows.push(LayoutAnchorRow {
+            anchor_idx: entry.line_idx,
+            last_anchor_idx: entry.line_idx,
+            cells: entry.cells.clone(),
+        });
+        anchor_members.push(entry.line_idx);
+    }
+
+    if rows.len() < 4 {
+        return None;
+    }
+
+    let anchor_indices = rows.iter().map(|row| row.anchor_idx).collect::<Vec<_>>();
+
+    for entry in entries {
+        if anchor_members.contains(&entry.line_idx) {
+            continue;
+        }
+
+        let next_pos = anchor_indices.iter().position(|anchor| *anchor > entry.line_idx);
+        let prev_pos = next_pos
+            .map(|pos| pos.saturating_sub(1))
+            .unwrap_or(rows.len().saturating_sub(1));
+
+        let target = if let Some(next_pos) = next_pos {
+            let previous_line_blank = entry
+                .line_idx
+                .checked_sub(1)
+                .and_then(|idx| raw_lines.get(idx))
+                .is_some_and(|line| line.trim().is_empty());
+            let filled_slots = entry
+                .cells
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, cell)| (!cell.is_empty()).then_some(idx))
+                .collect::<Vec<_>>();
+            let prev_stage_empty = rows[prev_pos].cells[0].trim().is_empty();
+            let next_stage_empty = rows[next_pos].cells[0].trim().is_empty();
+
+            if previous_line_blank && anchor_indices[next_pos].saturating_sub(entry.line_idx) <= 1 {
+                next_pos
+            } else if filled_slots == [3]
+                && anchor_indices[next_pos].saturating_sub(entry.line_idx) <= 1
+                && !rows[prev_pos].cells[3].trim().is_empty()
+            {
+                next_pos
+            } else if prev_stage_empty && next_stage_empty {
+                let next_distance = anchor_indices[next_pos].abs_diff(entry.line_idx);
+                let prev_distance = anchor_indices[prev_pos].abs_diff(entry.line_idx);
+                if next_distance < prev_distance {
+                    next_pos
+                } else {
+                    prev_pos
+                }
+            } else {
+                prev_pos
+            }
+        } else {
+            prev_pos
+        };
+
+        merge_layout_row_cells(&mut rows[target].cells, &entry.cells);
+    }
+
+    let normalized_rows = rows
+        .into_iter()
+        .map(|mut row| {
+            row.cells[0] = normalize_layout_stage_text(&row.cells[0]);
+            row.cells[1] = normalize_layout_stage_text(&row.cells[1]);
+            row.cells[2] = normalize_layout_body_text(&row.cells[2]);
+            row.cells[3] = normalize_layout_body_text(&row.cells[3]);
+            row.cells
+        })
+        .collect::<Vec<_>>();
+
+    Some(normalized_rows)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn merge_layout_row_cells(target: &mut [String], source: &[String]) {
+    for (target_cell, source_cell) in target.iter_mut().zip(source.iter()) {
+        append_cell_text(target_cell, source_cell);
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn normalize_layout_matrix_text(text: &str) -> String {
+    collapse_inline_whitespace(text)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn normalize_layout_stage_text(text: &str) -> String {
+    collapse_inline_whitespace(text)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn normalize_layout_body_text(text: &str) -> String {
+    let tokens = text
+        .split_whitespace()
+        .filter(|token| {
+            let bare = token.trim_matches(|ch: char| !ch.is_alphanumeric());
+            !(bare.len() == 1 && bare.chars().all(|ch| ch.is_ascii_digit()))
+        })
+        .collect::<Vec<_>>();
+    if tokens.is_empty() {
+        return String::new();
+    }
+    collapse_inline_whitespace(&tokens.join(" "))
 }
 
 fn first_heading_like_text(doc: &PdfDocument) -> Option<String> {
@@ -4181,6 +4512,57 @@ mod tests {
             normalize_common_ocr_text("10 ߤL at 37 C and -20 oC"),
             "10 μL at 37°C and -20°C"
         );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_build_layout_anchor_rows_reconstructs_four_column_matrix() {
+        let lines = vec![
+            "Key Functions by Main Service Flow".to_string(),
+            "".to_string(),
+            " Service Stage                   Function Name                Explanation                                                                                Expected Benefit".to_string(),
+            "".to_string(),
+            " 1. Project creation             Project creation and         Select document type to automatically run project creation, Pipeline configuration with    The intuitive UI environment allows the the person in charge to quickly proceed with".to_string(),
+            "".to_string(),
+            "                                 management                   recommended Modelset and Endpoint deployment                                               the entire process from project creation to deployment, improving work efficiency".to_string(),
+            "".to_string(),
+            "                                                                                                                                                         Conveniently manage raw data to be used for OCR Pack and actual date from live".to_string(),
+            " 2. Data labeling and            Data storage management      Provides convenient functions for uploading raw data, viewer, and data management".to_string(),
+            "                                                              (search using image metadata, sorting, filtering, hashtags settings on image data)         service".to_string(),
+            " fine-tuning".to_string(),
+            "                                                              Image data bookmark for Qualitative Evaluation".to_string(),
+            "".to_string(),
+            "                                 Create and manage Labeling   Creating a Labeling Space to manage raw data annotation, managing labeling resources       Labeling work can be outsourced within the pack. Labeled data is continuously".to_string(),
+            "                                                              (Ontology, Characters to be Recognized), data set dump, data set version management        supplied from which data sets can be created with ease. The Auto Labeling function".to_string(),
+            "                                 Space".to_string(),
+            "                                                                                                     3                                                   increases both efficiency and convenience.".to_string(),
+            "                                                              Various basic models for each selected 5".to_string(),
+            "                                                                                                    document, information comparison between".to_string(),
+            "                                 Model training                                                                                                          Providing a foundation for customers to implement, manage, and upgrade their own".to_string(),
+            "                                                              models, basic model training, training pause function, re-training, cancel function, and   OCR model specialized to the customers’ needs".to_string(),
+            "                                                              configuration support for Characters to be Recognized and Ontology that is frequently".to_string(),
+            "                                                              modified while developing specialized models".to_string(),
+        ];
+
+        let header = find_layout_header_candidate(&lines).unwrap();
+        let rows = build_layout_anchor_rows(&lines, &extract_layout_entries(&lines, &header)).unwrap();
+
+        assert_eq!(
+            header.headers,
+            vec![
+                "Service Stage".to_string(),
+                "Function Name".to_string(),
+                "Explanation".to_string(),
+                "Expected Benefit".to_string()
+            ]
+        );
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[0][0], "1. Project creation");
+        assert_eq!(rows[0][1], "Project creation and management");
+        assert!(rows[1][0].contains("fine-tuning"));
+        assert_eq!(rows[2][1], "Create and manage Labeling Space");
+        assert_eq!(rows[3][1], "Model training");
+        assert!(rows[3][2].contains("Various basic models for each selected document"));
     }
 
     #[test]
