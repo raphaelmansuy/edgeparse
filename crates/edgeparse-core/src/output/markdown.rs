@@ -23,6 +23,10 @@ use crate::EdgePdfError;
 /// Returns `EdgePdfError::OutputError` on write failures.
 pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_open_plate_document(doc) {
+        return Ok(rendered);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(rendered) = render_layout_single_caption_chart_document(doc) {
         return Ok(rendered);
     }
@@ -59,10 +63,6 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
         return Ok(rendered);
     }
     if let Some(rendered) = render_late_section_boundary_document(doc) {
-        return Ok(rendered);
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_open_plate_document(doc) {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
@@ -3072,7 +3072,8 @@ fn render_layout_open_plate_document(doc: &PdfDocument) -> Option<String> {
 
     let source_path = doc.source_path.as_deref()?;
     let (page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
-    let plate = detect_layout_open_plate(page_width, &lines)?;
+    let plate = detect_layout_open_plate(page_width, &lines)
+        .or_else(|| detect_layout_block_pair_plate(page_width, &lines))?;
     let bridge = extract_layout_narrative_bridge(page_width, &lines, &plate);
 
     let mut output = String::new();
@@ -3167,6 +3168,135 @@ fn render_layout_open_plate_document(doc: &PdfDocument) -> Option<String> {
     }
 
     Some(output.trim_end().to_string() + "\n")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_block_pair_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> Option<OpenPlateCandidate> {
+    let blocks = collect_bbox_layout_blocks(lines);
+    let page_top = blocks
+        .iter()
+        .map(|block| block.bbox.top_y)
+        .fold(0.0_f64, f64::max);
+
+    let heading_block = blocks.iter().find(|block| {
+        let text = bbox_layout_block_text(block);
+        let word_count = text.split_whitespace().count();
+        (3..=8).contains(&word_count)
+            && block.bbox.width() <= page_width * 0.45
+            && block.bbox.top_y >= page_top - 36.0
+            && !text.ends_with(['.', ':'])
+    })?;
+    let heading = bbox_layout_block_text(heading_block);
+    if heading.trim().is_empty() {
+        return None;
+    }
+
+    let caption_block = blocks.iter().find(|block| {
+        let text = bbox_layout_block_text(block);
+        text.starts_with("Table ")
+            && block.bbox.width() >= page_width * 0.35
+            && block.bbox.top_y < heading_block.bbox.top_y - 24.0
+            && block.bbox.top_y >= heading_block.bbox.top_y - 140.0
+    })?;
+
+    let candidate_blocks = blocks
+        .iter()
+        .filter(|block| {
+            block.block_id != heading_block.block_id
+                && block.block_id != caption_block.block_id
+                && block.bbox.top_y < heading_block.bbox.top_y - 4.0
+                && block.bbox.bottom_y > caption_block.bbox.top_y + 4.0
+                && block.bbox.width() <= page_width * 0.45
+        })
+        .collect::<Vec<_>>();
+    if candidate_blocks.len() < 6 {
+        return None;
+    }
+
+    let mut fragments = Vec::new();
+    for block in candidate_blocks {
+        for line in &block.lines {
+            let text = bbox_layout_line_text(line);
+            let word_count = text.split_whitespace().count();
+            if !(1..=5).contains(&word_count) || text.ends_with(['.', ':']) {
+                continue;
+            }
+            fragments.extend(split_bbox_layout_line_fragments(line));
+        }
+    }
+    if fragments.len() < 6 {
+        return None;
+    }
+
+    let mut centers = fragments
+        .iter()
+        .map(|fragment| fragment.bbox.center_x())
+        .collect::<Vec<_>>();
+    centers.sort_by(|left, right| left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal));
+    let (split_idx, max_gap) = centers
+        .windows(2)
+        .enumerate()
+        .map(|(idx, pair)| (idx, pair[1] - pair[0]))
+        .max_by(|left, right| left.1.partial_cmp(&right.1).unwrap_or(std::cmp::Ordering::Equal))?;
+    if max_gap < page_width * 0.04 {
+        return None;
+    }
+    let split_x = (centers[split_idx] + centers[split_idx + 1]) / 2.0;
+
+    let avg_height = fragments
+        .iter()
+        .map(|fragment| fragment.bbox.height())
+        .sum::<f64>()
+        / fragments.len() as f64;
+    let row_tolerance = avg_height.max(8.0) * 1.4;
+
+    let mut sorted_fragments = fragments;
+    sorted_fragments.sort_by(|left, right| {
+        cmp_banded_reading_order(&left.bbox, &right.bbox, row_tolerance * 0.5)
+    });
+
+    let mut row_bands: Vec<(f64, Vec<String>)> = Vec::new();
+    for fragment in sorted_fragments {
+        let slot_idx = usize::from(fragment.bbox.center_x() > split_x);
+        if let Some((center_y, cells)) = row_bands.iter_mut().find(|(center_y, _)| {
+            (*center_y - fragment.bbox.center_y()).abs() <= row_tolerance
+        }) {
+            *center_y = (*center_y + fragment.bbox.center_y()) / 2.0;
+            append_cell_text(&mut cells[slot_idx], &fragment.text);
+        } else {
+            let mut cells = vec![String::new(), String::new()];
+            append_cell_text(&mut cells[slot_idx], &fragment.text);
+            row_bands.push((fragment.bbox.center_y(), cells));
+        }
+    }
+
+    row_bands.sort_by(|left, right| {
+        right
+            .0
+            .partial_cmp(&left.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let rows = row_bands
+        .into_iter()
+        .map(|(_, cells)| cells)
+        .filter(|cells| cells.iter().all(|cell| !cell.trim().is_empty()))
+        .collect::<Vec<_>>();
+    if !(3..=8).contains(&rows.len()) {
+        return None;
+    }
+
+    let caption = normalize_layout_dashboard_text(&bbox_layout_block_text(caption_block));
+    if caption.trim().is_empty() {
+        return None;
+    }
+
+    Some(OpenPlateCandidate {
+        heading: heading.trim().to_string(),
+        header_row: vec![heading.trim().to_string(), infer_open_plate_secondary_header(&rows)],
+        rows,
+        caption,
+        cutoff_top_y: caption_block.bbox.bottom_y,
+    })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -8900,6 +9030,36 @@ mod tests {
         assert!(rendered.contains("| 2016 (Dec) | 1,393 |"));
         assert!(rendered.contains("| 2021 (Dec) | 1,200 |"));
         assert!(rendered.contains("Source: Department of Statistics, Malaysia (2022). Figure for 2021 is an estimate."));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_render_layout_open_plate_document_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000132.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let rendered = render_layout_open_plate_document(&doc).unwrap();
+        assert!(rendered.contains("# Fish species on IUCN Red List"));
+        assert!(rendered.contains("| Potosi Pupfish | Cyprinodon alvarezi |"));
+        assert!(rendered.contains("| Golden Skiffia | Skiffia francesae |"));
+        assert!(rendered.contains("*Table 6.1: Four fish species on IUCN Red List"));
+        assert!(rendered.contains("---"));
+        assert!(rendered.contains("Public aquariums, because of their inhouse expertise"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_open_plate_document_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000132.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(md.contains("# Fish species on IUCN Red List"), "{md}");
+        assert!(md.contains("| Potosi Pupfish | Cyprinodon alvarezi |"), "{md}");
+        assert!(md.contains("| Golden Skiffia | Skiffia francesae |"), "{md}");
+        assert!(md.contains("*Table 6.1: Four fish species on IUCN Red List"), "{md}");
+        assert!(md.contains("The breeding colonies of the Butterfly Splitfin"), "{md}");
     }
 
     #[test]
