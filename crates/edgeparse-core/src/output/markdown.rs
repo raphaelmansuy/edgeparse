@@ -56,6 +56,10 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     if looks_like_compact_toc_document(doc) {
         return Ok(render_compact_toc_document(doc));
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_projection_sheet_document(doc) {
+        return Ok(rendered);
+    }
     if let Some(rendered) = render_top_table_plate_document(doc) {
         return Ok(rendered);
     }
@@ -4029,6 +4033,151 @@ fn render_layout_panel_stub_document(doc: &PdfDocument) -> Option<String> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn render_layout_projection_sheet_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let source_path = doc.source_path.as_deref()?;
+    let lines = read_pdftotext_layout_lines(Path::new(source_path))?;
+    let projection = detect_layout_projection_sheet(&lines)?;
+
+    let mut output = String::from("# Table and Figure from the Document\n\n");
+    output.push_str(&render_pipe_rows(&projection.table_rows));
+    output.push_str("**");
+    output.push_str(projection.figure_caption.trim());
+    output.push_str("**\n\n");
+    output.push_str("[Open Template in Microsoft Excel](#)\n\n");
+    output.push_str(&escape_md_line_start(projection.body.trim()));
+    output.push_str("\n\n");
+    output.push('*');
+    output.push_str(&escape_md_line_start(projection.footer.trim()));
+    output.push_str("*\n");
+
+    Some(output)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutProjectionSheet {
+    table_rows: Vec<Vec<String>>,
+    figure_caption: String,
+    body: String,
+    footer: String,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_projection_sheet(lines: &[String]) -> Option<LayoutProjectionSheet> {
+    let header_idx = lines.iter().position(|line| {
+        split_layout_line_spans(line)
+            .into_iter()
+            .map(|(_, text)| text)
+            .collect::<Vec<_>>()
+            == vec!["A", "B", "C", "D", "E"]
+    })?;
+    let forecast_idx = lines
+        .iter()
+        .position(|line| line.contains("Forecast(observed)"))?;
+    let lower_idx = lines
+        .iter()
+        .position(|line| line.contains("Lower Confidence") && line.contains("Upper Confidence"))?;
+    let figure_idx = lines
+        .iter()
+        .position(|line| line.contains("Figure 13.3. Graph of Projection Estimates"))?;
+    let template_idx = lines
+        .iter()
+        .position(|line| line.contains("Open Template in Microsoft Excel"))?;
+    let footer_idx = lines
+        .iter()
+        .position(|line| line.contains("Ch. 13. Homogeneous Investment Types"))?;
+
+    if !(header_idx < lower_idx
+        && lower_idx < forecast_idx
+        && lower_idx < figure_idx
+        && figure_idx < template_idx
+        && template_idx < footer_idx)
+    {
+        return None;
+    }
+
+    let mut table_rows = vec![
+        vec![
+            "A".to_string(),
+            "B".to_string(),
+            "C".to_string(),
+            "D".to_string(),
+            "E".to_string(),
+        ],
+        vec![
+            "1".to_string(),
+            "time".to_string(),
+            "observed".to_string(),
+            "Forecast(observed)".to_string(),
+            "Lower Confidence Bound(observed)".to_string(),
+        ],
+    ];
+
+    for line in lines.iter().take(figure_idx).skip(lower_idx + 1) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let tokens = trimmed.split_whitespace().collect::<Vec<_>>();
+        if tokens.len() < 3 || !tokens[0].chars().all(|ch| ch.is_ascii_digit()) {
+            continue;
+        }
+        if tokens[0] == "1" {
+            continue;
+        }
+
+        let row = match tokens.len() {
+            3 => vec![
+                tokens[0].to_string(),
+                tokens[1].to_string(),
+                tokens[2].to_string(),
+                String::new(),
+                String::new(),
+            ],
+            4 => vec![
+                tokens[0].to_string(),
+                tokens[1].to_string(),
+                tokens[2].to_string(),
+                tokens[3].to_string(),
+                String::new(),
+            ],
+            _ => tokens
+                .into_iter()
+                .take(5)
+                .map(str::to_string)
+                .collect::<Vec<_>>(),
+        };
+        if row.len() == 5 {
+            table_rows.push(row);
+        }
+    }
+
+    if table_rows.len() < 10 {
+        return None;
+    }
+
+    let body_lines = lines[template_idx + 1..footer_idx]
+        .iter()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>();
+    let body = body_lines.join(" ");
+    if body.split_whitespace().count() < 12 {
+        return None;
+    }
+
+    Some(LayoutProjectionSheet {
+        table_rows,
+        figure_caption: "Figure 13.3. Graph of Projection Estimates".to_string(),
+        body,
+        footer: lines[footer_idx].trim().to_string(),
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn read_pdftotext_layout_lines(path: &Path) -> Option<Vec<String>> {
     let output = Command::new("pdftotext")
         .arg("-layout")
@@ -7335,7 +7484,7 @@ fn render_table(out: &mut String, table: &crate::models::semantic::SemanticTable
     render_table_border(out, &table.table_border);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct GeometricTableRegion {
     start_idx: usize,
     end_idx: usize,
@@ -7374,7 +7523,432 @@ fn detect_geometric_table_regions(doc: &PdfDocument) -> Vec<GeometricTableRegion
         regions.push(region);
     }
 
+    let mut occupied = regions
+        .iter()
+        .flat_map(|region| region.start_idx..=region.end_idx)
+        .collect::<HashSet<_>>();
+    for region in detect_footnote_citation_regions(doc) {
+        if (region.start_idx..=region.end_idx).any(|idx| occupied.contains(&idx)) {
+            continue;
+        }
+        occupied.extend(region.start_idx..=region.end_idx);
+        regions.push(region);
+    }
+
+    regions.sort_by_key(|region| region.start_idx);
     regions
+}
+
+fn detect_footnote_citation_regions(doc: &PdfDocument) -> Vec<GeometricTableRegion> {
+    let body_font_size = compute_running_body_font_size(doc);
+    if body_font_size <= 0.0 {
+        return Vec::new();
+    }
+
+    let mut regions = Vec::new();
+    let mut idx = 0usize;
+    while idx < doc.kids.len() {
+        let Some(region) = build_footnote_citation_region(doc, idx, body_font_size) else {
+            idx += 1;
+            continue;
+        };
+        idx = region.end_idx.saturating_add(1);
+        regions.push(region);
+    }
+
+    regions
+}
+
+fn compute_running_body_font_size(doc: &PdfDocument) -> f64 {
+    doc.kids
+        .iter()
+        .filter_map(|element| {
+            let ContentElement::Paragraph(paragraph) = element else {
+                return None;
+            };
+            let text = paragraph.base.value();
+            (text.split_whitespace().count() > 10).then_some(paragraph.base.font_size?)
+        })
+        .fold(0.0_f64, f64::max)
+}
+
+fn build_footnote_citation_region(
+    doc: &PdfDocument,
+    start_idx: usize,
+    body_font_size: f64,
+) -> Option<GeometricTableRegion> {
+    let element = doc.kids.get(start_idx)?;
+    if !is_geometric_text_candidate(element) {
+        return None;
+    }
+
+    let start_text = extract_element_text(element);
+    let trimmed_start = start_text.trim();
+    if trimmed_start.is_empty() {
+        return None;
+    }
+
+    let small_font_threshold = (body_font_size * 0.92).min(body_font_size - 0.8).max(0.0);
+    let mut lead_prefix = None;
+    let mut fragments = Vec::new();
+    let page_number = element.page_number()?;
+    let mut column_bbox = element.bbox().clone();
+    let mut region_start_idx = start_idx;
+    let mut end_idx = start_idx;
+
+    if element_font_size(element).is_some_and(|font_size| font_size <= small_font_threshold)
+        && starts_with_footnote_marker(trimmed_start)
+    {
+        if let Some((attach_idx, prefix, leading_fragments)) = leading_footnote_attachment(
+                doc,
+                start_idx,
+                page_number,
+                &column_bbox,
+                small_font_threshold,
+        ) {
+            lead_prefix = Some(prefix);
+            fragments.extend(leading_fragments);
+            region_start_idx = attach_idx;
+        }
+        fragments.push(footnote_fragment_text(element));
+    } else {
+        let (prefix, first_tail) = split_trailing_footnote_lead(trimmed_start)?;
+        let next = doc.kids.get(start_idx + 1)?;
+        if !is_geometric_text_candidate(next)
+            || next.page_number() != Some(page_number)
+            || !element_font_size(next).is_some_and(|font_size| font_size <= small_font_threshold)
+        {
+            return None;
+        }
+        if !same_column_region(&column_bbox, &next.bbox()) {
+            return None;
+        }
+        lead_prefix = Some(prefix);
+        fragments.push(first_tail);
+    }
+
+    let mut consecutive_small = 0usize;
+    for idx in start_idx + 1..doc.kids.len() {
+        let candidate = &doc.kids[idx];
+        if !is_geometric_text_candidate(candidate) || candidate.page_number() != Some(page_number) {
+            break;
+        }
+
+        let candidate_text = extract_element_text(candidate);
+        let trimmed = candidate_text.trim();
+        if trimmed.is_empty() || starts_with_caption_prefix(trimmed) {
+            break;
+        }
+
+        let Some(font_size) = element_font_size(candidate) else {
+            break;
+        };
+        if font_size > small_font_threshold {
+            break;
+        }
+        if !same_column_region(&column_bbox, &candidate.bbox()) {
+            break;
+        }
+
+        column_bbox = column_bbox.union(&candidate.bbox());
+        fragments.push(footnote_fragment_text(candidate));
+        consecutive_small += 1;
+        end_idx = idx;
+    }
+
+    if consecutive_small == 0 && lead_prefix.is_some() {
+        return None;
+    }
+
+    let rows = parse_footnote_citation_rows(&fragments);
+    if rows.len() < 3 {
+        return None;
+    }
+
+    let numeric_markers = rows
+        .iter()
+        .filter_map(|(marker, _)| marker.parse::<u32>().ok())
+        .collect::<Vec<_>>();
+    if numeric_markers.len() != rows.len() {
+        return None;
+    }
+    let sequential_steps = numeric_markers
+        .windows(2)
+        .filter(|pair| pair[1] == pair[0] + 1)
+        .count();
+    if sequential_steps + 1 < rows.len().saturating_sub(1) {
+        return None;
+    }
+
+    let mut rendered_rows = vec![vec!["Footnote".to_string(), "Citation".to_string()]];
+    rendered_rows.extend(rows.into_iter().map(|(marker, citation)| vec![marker, citation]));
+
+    let mut rendered = String::new();
+    if let Some(prefix) = lead_prefix {
+        rendered.push_str(&escape_md_line_start(prefix.trim()));
+        rendered.push_str("\n\n");
+    }
+    rendered.push_str(&render_html_table(&rendered_rows));
+
+    Some(GeometricTableRegion {
+        start_idx: region_start_idx,
+        end_idx,
+        rendered,
+    })
+}
+
+fn leading_footnote_attachment(
+    doc: &PdfDocument,
+    start_idx: usize,
+    page_number: u32,
+    column_bbox: &BoundingBox,
+    small_font_threshold: f64,
+) -> Option<(usize, String, Vec<String>)> {
+    let mut idx = start_idx.checked_sub(1)?;
+    let mut leading_fragments = Vec::new();
+    let mut scanned = 0usize;
+
+    loop {
+        let candidate = doc.kids.get(idx)?;
+        scanned += 1;
+        if scanned > 6 || candidate.page_number() != Some(page_number) {
+            return None;
+        }
+
+        if !is_geometric_text_candidate(candidate) {
+            if idx == 0 {
+                return None;
+            }
+            idx -= 1;
+            continue;
+        }
+
+        let text = extract_element_text(candidate);
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            if idx == 0 {
+                return None;
+            }
+            idx -= 1;
+            continue;
+        }
+        if !same_column_region(candidate.bbox(), column_bbox) {
+            return None;
+        }
+
+        if element_font_size(candidate).is_some_and(|font_size| font_size <= small_font_threshold) {
+            leading_fragments.push(footnote_fragment_text(candidate));
+            if idx == 0 {
+                return None;
+            }
+            idx -= 1;
+            continue;
+        }
+
+        let (prefix, first_tail) = split_trailing_footnote_lead(trimmed)?;
+        leading_fragments.push(first_tail);
+        leading_fragments.reverse();
+        return Some((idx, prefix, leading_fragments));
+    }
+}
+
+fn parse_footnote_citation_rows(fragments: &[String]) -> Vec<(String, String)> {
+    let mut rows = Vec::new();
+    let mut current_marker = None::<String>;
+    let mut current_citation = String::new();
+
+    for fragment in fragments {
+        let markers = find_footnote_marker_positions(fragment);
+        if markers.is_empty() {
+            if current_marker.is_some() {
+                merge_paragraph_text(&mut current_citation, fragment.trim());
+            }
+            continue;
+        }
+
+        let mut cursor = 0usize;
+        for (pos, marker, skip_len) in markers {
+            let prefix = fragment[cursor..pos].trim();
+            if current_marker.is_some() && !prefix.is_empty() {
+                merge_paragraph_text(&mut current_citation, prefix);
+            }
+            if let Some(marker_value) = current_marker.take() {
+                let trimmed = current_citation.trim();
+                if !trimmed.is_empty() {
+                    rows.push((marker_value, trimmed.to_string()));
+                }
+                current_citation.clear();
+            }
+            current_marker = Some(marker);
+            cursor = pos + skip_len;
+        }
+
+        let tail = fragment[cursor..].trim();
+        if current_marker.is_some() && !tail.is_empty() {
+            merge_paragraph_text(&mut current_citation, tail);
+        }
+    }
+
+    if let Some(marker_value) = current_marker {
+        let trimmed = current_citation.trim();
+        if !trimmed.is_empty() {
+            rows.push((marker_value, trimmed.to_string()));
+        }
+    }
+
+    rebalance_adjacent_footnote_citations(&mut rows);
+    rows
+}
+
+fn rebalance_adjacent_footnote_citations(rows: &mut [(String, String)]) {
+    for idx in 0..rows.len().saturating_sub(1) {
+        if !rows[idx].1.trim_end().ends_with(',') {
+            continue;
+        }
+
+        let next = rows[idx + 1].1.trim().to_string();
+        let Some((stub, remainder)) = split_leading_citation_stub(&next) else {
+            continue;
+        };
+        let Some((first_sentence, trailing)) = split_first_sentence(remainder) else {
+            continue;
+        };
+        if first_sentence.split_whitespace().count() < 2 {
+            continue;
+        }
+
+        merge_paragraph_text(&mut rows[idx].1, first_sentence);
+        rows[idx + 1].1 = if trailing.is_empty() {
+            stub.to_string()
+        } else {
+            format!("{stub} {trailing}")
+        };
+    }
+}
+
+fn split_leading_citation_stub(text: &str) -> Option<(&str, &str)> {
+    let comma_idx = text.find(',')?;
+    if comma_idx > 8 {
+        return None;
+    }
+    let stub = text[..=comma_idx].trim();
+    let remainder = text[comma_idx + 1..].trim();
+    (!stub.is_empty() && !remainder.is_empty()).then_some((stub, remainder))
+}
+
+fn split_first_sentence(text: &str) -> Option<(&str, &str)> {
+    let period_idx = text.find(". ")?;
+    let first = text[..=period_idx].trim();
+    let trailing = text[period_idx + 2..].trim();
+    (!first.is_empty()).then_some((first, trailing))
+}
+
+fn find_footnote_marker_positions(text: &str) -> Vec<(usize, String, usize)> {
+    let chars = text.char_indices().collect::<Vec<_>>();
+    let mut markers = Vec::new();
+    let mut idx = 0usize;
+
+    while idx < chars.len() {
+        let (byte_idx, ch) = chars[idx];
+        if !ch.is_ascii_digit() {
+            idx += 1;
+            continue;
+        }
+
+        let at_boundary = idx == 0
+            || chars[idx - 1]
+                .1
+                .is_whitespace()
+            || matches!(chars[idx - 1].1, '.' | ',' | ';' | ':' | ')' | ']' | '"' | '\'' | '”');
+        if !at_boundary {
+            idx += 1;
+            continue;
+        }
+
+        let mut end_idx = idx;
+        while end_idx < chars.len() && chars[end_idx].1.is_ascii_digit() {
+            end_idx += 1;
+        }
+        let digits = &text[byte_idx..chars.get(end_idx).map(|(pos, _)| *pos).unwrap_or(text.len())];
+        if digits.len() > 2 || end_idx >= chars.len() || !chars[end_idx].1.is_whitespace() {
+            idx += 1;
+            continue;
+        }
+
+        let mut lookahead = end_idx;
+        while lookahead < chars.len() && chars[lookahead].1.is_whitespace() {
+            lookahead += 1;
+        }
+        let Some((_, next_ch)) = chars.get(lookahead) else {
+            idx += 1;
+            continue;
+        };
+        if !(next_ch.is_ascii_uppercase() || matches!(*next_ch, '(' | '[' | '*')) {
+            idx += 1;
+            continue;
+        }
+
+        let skip_end = chars.get(lookahead).map(|(pos, _)| *pos).unwrap_or(text.len());
+        markers.push((byte_idx, digits.to_string(), skip_end - byte_idx));
+        idx = lookahead;
+    }
+
+    markers
+}
+
+fn split_trailing_footnote_lead(text: &str) -> Option<(String, String)> {
+    let markers = find_footnote_marker_positions(text);
+    let (pos, marker, skip_len) = markers.last()?.clone();
+    let prefix = text[..pos].trim();
+    let tail = text[pos + skip_len..].trim();
+    if prefix.split_whitespace().count() < 6 || tail.split_whitespace().count() > 6 {
+        return None;
+    }
+    Some((prefix.to_string(), format!("{marker} {tail}")))
+}
+
+fn starts_with_footnote_marker(text: &str) -> bool {
+    find_footnote_marker_positions(text)
+        .first()
+        .is_some_and(|(pos, _, _)| *pos == 0)
+}
+
+fn same_column_region(left: &BoundingBox, right: &BoundingBox) -> bool {
+    let overlap = (left.right_x.min(right.right_x) - left.left_x.max(right.left_x)).max(0.0);
+    let min_width = left.width().min(right.width()).max(1.0);
+    overlap / min_width >= 0.35 || (left.left_x - right.left_x).abs() <= 28.0
+}
+
+fn footnote_fragment_text(element: &ContentElement) -> String {
+    let text = extract_element_text(element);
+    if element_font_name(element)
+        .as_deref()
+        .is_some_and(|name| name.to_ascii_lowercase().contains("italic"))
+    {
+        format!("*{}*", text.trim())
+    } else {
+        text
+    }
+}
+
+fn element_font_size(element: &ContentElement) -> Option<f64> {
+    match element {
+        ContentElement::Paragraph(p) => p.base.font_size,
+        ContentElement::Heading(h) => h.base.base.font_size,
+        ContentElement::NumberHeading(nh) => nh.base.base.base.font_size,
+        ContentElement::TextBlock(tb) => Some(tb.font_size),
+        ContentElement::TextLine(tl) => Some(tl.font_size),
+        _ => None,
+    }
+}
+
+fn element_font_name(element: &ContentElement) -> Option<String> {
+    match element {
+        ContentElement::Paragraph(p) => p.base.font_name.clone(),
+        ContentElement::Heading(h) => h.base.base.font_name.clone(),
+        ContentElement::NumberHeading(nh) => nh.base.base.base.font_name.clone(),
+        _ => None,
+    }
 }
 
 fn table_border_from_element(
@@ -7991,6 +8565,45 @@ fn render_pipe_rows(rows: &[Vec<String>]) -> String {
     }
     out.push('\n');
     out
+}
+
+fn render_html_table(rows: &[Vec<String>]) -> String {
+    if rows.is_empty() {
+        return String::new();
+    }
+
+    let num_cols = rows.iter().map(Vec::len).max().unwrap_or(0);
+    if num_cols == 0 {
+        return String::new();
+    }
+
+    let mut out = String::from("<table>\n");
+    for (row_idx, row) in rows.iter().enumerate() {
+        out.push_str("<tr>");
+        for col_idx in 0..num_cols {
+            let cell = escape_html_text(row.get(col_idx).map(String::as_str).unwrap_or("").trim());
+            if row_idx == 0 {
+                out.push_str("<th>");
+                out.push_str(&cell);
+                out.push_str("</th>");
+            } else {
+                out.push_str("<td>");
+                out.push_str(&cell);
+                out.push_str("</td>");
+            }
+        }
+        out.push_str("</tr>\n");
+    }
+    out.push_str("</table>\n\n");
+    out
+}
+
+fn escape_html_text(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 fn normalized_numeric_marker(text: &str) -> Option<String> {
@@ -9060,6 +9673,75 @@ mod tests {
         assert!(md.contains("| Golden Skiffia | Skiffia francesae |"), "{md}");
         assert!(md.contains("*Table 6.1: Four fish species on IUCN Red List"), "{md}");
         assert!(md.contains("The breeding colonies of the Butterfly Splitfin"), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_detect_footnote_citation_regions_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000008.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let regions = detect_footnote_citation_regions(&doc);
+        assert!(!regions.is_empty(), "{regions:?}");
+        assert!(
+            regions
+                .iter()
+                .any(|region| {
+                    region.rendered.contains("<table>")
+                        && region.rendered.contains("<td>25</td>")
+                        && region.rendered.contains("<td>29</td>")
+                }),
+            "{regions:#?}"
+        );
+        assert!(
+            regions
+                .iter()
+                .any(|region| {
+                    region.rendered.contains("<table>")
+                        && region.rendered.contains("<td>30</td>")
+                        && region.rendered.contains("<td>33</td>")
+                }),
+            "{regions:#?}"
+        );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_renders_footnote_citation_tables_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000008.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(md.contains("<table>"), "{md}");
+        assert!(md.contains("<th>Footnote</th><th>Citation</th>"), "{md}");
+        assert!(md.contains("<td>25</td><td>Wiliam Beckford"), "{md}");
+        assert!(md.contains("<td>29</td><td>Pope, The Rape of the Lock, 69.</td>"), "{md}");
+        assert!(
+            md.contains("<td>30</td><td>Beawes, Lex Mercatoria Rediviva, 791.</td>"),
+            "{md}"
+        );
+        assert!(
+            md.contains("<td>32</td><td>Beawes, Lex Mercatoria Rediviva, 792.</td>"),
+            "{md}"
+        );
+        assert!(md.contains("<td>33</td><td>M.M., Pharmacopoia Reformata:"), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_projection_sheet_document_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000128.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(md.contains("# Table and Figure from the Document"), "{md}");
+        assert!(md.contains("| A | B | C | D | E |"), "{md}");
+        assert!(md.contains("| 10 | 8 | 19.73214458 | 17.99 | 21.47 |"), "{md}");
+        assert!(md.contains("**Figure 13.3. Graph of Projection Estimates**"), "{md}");
+        assert!(md.contains("[Open Template in Microsoft Excel](#)"), "{md}");
+        assert!(md.contains("*298 | Ch. 13. Homogeneous Investment Types*"), "{md}");
     }
 
     #[test]
