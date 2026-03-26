@@ -4010,6 +4010,9 @@ fn detect_layout_open_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> Option
     if heading.trim().is_empty() {
         return None;
     }
+    if has_substantive_layout_prose_before(lines, heading_idx, page_width) {
+        return None;
+    }
 
     let caption_idx = (heading_idx + 1..lines.len()).find(|idx| {
         let line = &lines[*idx];
@@ -4101,6 +4104,9 @@ fn detect_layout_open_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> Option
     if caption.trim().is_empty() {
         return None;
     }
+    if !starts_with_caption_prefix(caption.trim()) {
+        return None;
+    }
 
     let secondary_header = infer_open_plate_secondary_header(&rows);
     let cutoff_top_y = caption_lines
@@ -4151,6 +4157,41 @@ fn infer_open_plate_secondary_header(rows: &[Vec<String>]) -> String {
     } else {
         String::new()
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn has_substantive_layout_prose_before(
+    lines: &[BBoxLayoutLine],
+    line_idx: usize,
+    page_width: f64,
+) -> bool {
+    lines.iter().take(line_idx).any(|line| {
+        let text = bbox_layout_line_text(line);
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return false;
+        }
+
+        let word_count = trimmed.split_whitespace().count();
+        if word_count < 6 {
+            return false;
+        }
+
+        if starts_with_caption_prefix(trimmed)
+            || looks_like_numeric_axis_blob(trimmed)
+            || (word_count <= 10
+                && (looks_like_yearish_label(trimmed)
+                    || looks_like_layout_month_label(trimmed)
+                    || trimmed == "Lockdown Period"))
+            || trimmed
+                .chars()
+                .all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace())
+        {
+            return false;
+        }
+
+        line.bbox.width() >= page_width * 0.32
+    })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -9753,6 +9794,72 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
         t.starts_with('|') && t.ends_with('|') && t.len() > 2
     }
 
+    fn pipe_cells(line: &str) -> Vec<String> {
+        let t = line.trim();
+        if !is_pipe_row(t) {
+            return Vec::new();
+        }
+        let parts = t.split('|').collect::<Vec<_>>();
+        parts[1..parts.len() - 1]
+            .iter()
+            .map(|cell| cell.trim().to_string())
+            .collect()
+    }
+
+    fn normalize_header_cell(cell: &str) -> String {
+        cell.chars()
+            .filter(|ch| ch.is_alphanumeric())
+            .flat_map(|ch| ch.to_lowercase())
+            .collect()
+    }
+
+    fn looks_like_header_row(line: &str) -> bool {
+        let cells = pipe_cells(line);
+        if cells.len() < 2 {
+            return false;
+        }
+
+        let non_empty = cells
+            .iter()
+            .filter(|cell| !cell.trim().is_empty())
+            .collect::<Vec<_>>();
+        if non_empty.len() < 2 {
+            return false;
+        }
+
+        let headerish = non_empty.iter().all(|cell| {
+            let trimmed = cell.trim();
+            let word_count = trimmed.split_whitespace().count();
+            let has_alpha = trimmed.chars().any(|ch| ch.is_alphabetic());
+            has_alpha && word_count <= 4 && trimmed.len() <= 28
+        });
+        headerish
+    }
+
+    fn header_overlap_ratio(left: &str, right: &str) -> f64 {
+        let left_cells = pipe_cells(left)
+            .into_iter()
+            .map(|cell| normalize_header_cell(&cell))
+            .collect::<Vec<_>>();
+        let right_cells = pipe_cells(right)
+            .into_iter()
+            .map(|cell| normalize_header_cell(&cell))
+            .collect::<Vec<_>>();
+        let width = left_cells.len().min(right_cells.len());
+        if width == 0 {
+            return 0.0;
+        }
+
+        let matches = (0..width)
+            .filter(|idx| {
+                !left_cells[*idx].is_empty()
+                    && !right_cells[*idx].is_empty()
+                    && left_cells[*idx] == right_cells[*idx]
+            })
+            .count();
+        matches as f64 / width as f64
+    }
+
     fn pad_pipe_row(line: &str, target_cols: usize) -> String {
         let t = line.trim();
         let current_cols = count_pipe_cols(t);
@@ -9856,9 +9963,14 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
             } else {
                 false
             };
+        let curr_has_distinct_header = curr.end >= curr.sep + 2
+            && looks_like_header_row(lines[curr.start])
+            && header_overlap_ratio(lines[prev.start], lines[curr.start]) < 0.5;
+
         if (gap_all_blank || gap_heading_only || gap_short_fragment)
             && prev.cols > 0
             && curr.cols > 0
+            && !curr_has_distinct_header
         {
             merge_leader[bi] = Some(leader_idx);
             // Update group max cols
@@ -10665,6 +10777,54 @@ mod tests {
         assert!(md.contains("| Golden Skiffia | Skiffia francesae |"), "{md}");
         assert!(md.contains("*Table 6.1: Four fish species on IUCN Red List"), "{md}");
         assert!(md.contains("The breeding colonies of the Butterfly Splitfin"), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_does_not_misclassify_open_plate_pdf_36() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000036.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(md.contains("# 2. General Profile of MSMEs"), "{md}");
+        assert!(md.contains("In July 2020, the survey established a general profile"), "{md}");
+        assert!(
+            md.contains("The tourism sub-sectors interviewed included lodging, restaurants and bars"),
+            "{md}"
+        );
+        assert!(!md.starts_with("# Business characteristics. Business size was"), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_does_not_misclassify_open_plate_pdf_40() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000040.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(
+            md.contains("Thailand, Philippines and Indonesia in particular, identifying known experts"),
+            "{md}"
+        );
+        assert!(md.contains("Figure 1: Age by gender of respondents"), "{md}");
+        assert!(md.contains("Gender Analysis of Violent Extremism"), "{md}");
+        assert!(!md.starts_with("# Thailand, Philippines and Indonesia in"), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_does_not_misclassify_open_plate_pdf_64() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000064.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(md.contains("estuarine influenced areas."), "{md}");
+        assert!(md.contains("| MANILA | 2454 | 6,125 |"), "{md}");
+        assert!(md.contains("The port of Manila has been documented"), "{md}");
+        assert!(!md.starts_with("# CAGAYAN DE ORO"), "{md}");
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -12290,6 +12450,25 @@ mod tests {
             "Row3 should exist: {}",
             result
         );
+    }
+
+    #[test]
+    fn test_merge_tables_does_not_cross_distinct_headers() {
+        let input = "| Model | Score |\n\
+                     | --- | --- |\n\
+                     | A | 1 |\n\
+                     \n\
+                     Table 6: Performance comparison amongst the merge candidates.\n\
+                     \n\
+                     | Model | Method | Score |\n\
+                     | --- | --- | --- |\n\
+                     | B | Avg | 2 |\n";
+        let result = merge_adjacent_pipe_tables(input);
+
+        assert!(result.contains("Table 6: Performance comparison amongst the merge candidates."));
+        assert!(result.contains("| Model | Score |"));
+        assert!(result.contains("| Model | Method | Score |"));
+        assert!(!result.contains("| Table 6: Performance comparison amongst the merge candidates. |"));
     }
 
     #[test]
