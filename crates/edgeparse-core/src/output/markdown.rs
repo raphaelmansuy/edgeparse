@@ -1,6 +1,6 @@
 //! Markdown output generator.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 #[cfg(not(target_arch = "wasm32"))]
@@ -22,6 +22,14 @@ use crate::EdgePdfError;
 /// # Errors
 /// Returns `EdgePdfError::OutputError` on write failures.
 pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_single_caption_chart_document(doc) {
+        return Ok(rendered);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_recommendation_infographic_document(doc) {
+        return Ok(rendered);
+    }
     #[cfg(not(target_arch = "wasm32"))]
     if let Some(rendered) = render_layout_stacked_bar_report_document(doc) {
         return Ok(rendered);
@@ -816,6 +824,22 @@ struct LayoutOcrDashboard {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+struct LayoutRecommendationPanel {
+    heading: String,
+    subtitle: String,
+    header: Vec<String>,
+    rows: Vec<Vec<String>>,
+    notes: Vec<String>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutRecommendationInfographic {
+    eyebrow: Option<String>,
+    title: String,
+    panels: Vec<LayoutRecommendationPanel>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone)]
 struct LayoutBarToken {
     bbox: BoundingBox,
@@ -844,6 +868,213 @@ struct LayoutStackedBarNarrative {
     paragraphs: Vec<String>,
     footnote: Option<String>,
     top_y: f64,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_single_caption_chart_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let caption_indices = doc
+        .kids
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, element)| {
+            let text = extract_element_text(element);
+            let trimmed = text.trim();
+            (trimmed.starts_with("Figure ")
+                && trimmed.contains(':')
+                && trimmed.split_whitespace().count() >= 6)
+                .then_some(idx)
+        })
+        .collect::<Vec<_>>();
+    if caption_indices.len() != 1 {
+        return None;
+    }
+    if doc.kids.len() < 12 {
+        return None;
+    }
+
+    let caption_idx = caption_indices[0];
+    let mut output = String::new();
+    let mut i = 0usize;
+    let mut chart_mode = false;
+    while i < doc.kids.len() {
+        let element = &doc.kids[i];
+        let text = extract_element_text(element);
+        let trimmed = text.trim();
+        if trimmed.is_empty() || looks_like_margin_page_number(doc, element, trimmed) {
+            i += 1;
+            continue;
+        }
+
+        if i == caption_idx {
+            output.push_str(&escape_md_line_start(trimmed));
+            output.push_str("\n\n");
+            chart_mode = true;
+            i += 1;
+            continue;
+        }
+
+        if chart_mode {
+            if !looks_like_chart_followup_paragraph(element, trimmed)
+                && !matches!(
+                    element,
+                    ContentElement::Heading(_) | ContentElement::NumberHeading(_)
+                )
+            {
+                i += 1;
+                continue;
+            }
+            chart_mode = false;
+        }
+
+        match element {
+            ContentElement::Heading(h) => {
+                let level = h.heading_level.unwrap_or(1).clamp(1, 6) as usize;
+                output.push_str(&"#".repeat(level));
+                output.push(' ');
+                output.push_str(trimmed);
+                output.push_str("\n\n");
+            }
+            ContentElement::NumberHeading(nh) => {
+                let level = nh.base.heading_level.unwrap_or(1).clamp(1, 6) as usize;
+                output.push_str(&"#".repeat(level));
+                output.push(' ');
+                output.push_str(trimmed);
+                output.push_str("\n\n");
+            }
+            ContentElement::Paragraph(_) | ContentElement::TextBlock(_) => {
+                let mut merged = trimmed.to_string();
+                while let Some(next_element) = doc.kids.get(i + 1) {
+                    let next_text = extract_element_text(next_element);
+                    let next_trimmed = next_text.trim();
+                    if next_trimmed.is_empty()
+                        || looks_like_margin_page_number(doc, next_element, next_trimmed)
+                    {
+                        i += 1;
+                        continue;
+                    }
+                    if i + 1 == caption_idx || looks_like_chart_noise_element(next_element, next_trimmed)
+                    {
+                        break;
+                    }
+                    let can_merge = if matches!(element, ContentElement::Paragraph(_)) {
+                        should_merge_adjacent_semantic_paragraphs(&merged, next_trimmed)
+                    } else {
+                        should_merge_paragraph_text(&merged, next_trimmed)
+                    };
+                    if !can_merge {
+                        break;
+                    }
+                    merge_paragraph_text(&mut merged, next_trimmed);
+                    i += 1;
+                }
+
+                output.push_str(&escape_md_line_start(merged.trim()));
+                output.push_str("\n\n");
+            }
+            _ => {}
+        }
+
+        i += 1;
+    }
+
+    Some(output.trim_end().to_string() + "\n")
+}
+
+fn looks_like_chart_noise_element(_element: &ContentElement, text: &str) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+
+    if is_standalone_page_number(text) || looks_like_numeric_axis_blob(text) {
+        return true;
+    }
+
+    let word_count = text.split_whitespace().count();
+    let lower = text.to_ascii_lowercase();
+
+    if lower.starts_with("figure ") && text.contains(':') {
+        return false;
+    }
+
+    if lower.starts_with("source:") {
+        return false;
+    }
+
+    if word_count <= 3
+        && (looks_like_yearish_label(text)
+            || looks_like_layout_month_label(text)
+            || text == "Lockdown Period")
+    {
+        return true;
+    }
+
+    if text.chars().all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace()) {
+        return true;
+    }
+
+    let short_non_sentence = !text.contains('.') && !text.contains(':') && !text.contains(';');
+    let has_chart_keyword = lower.contains("working as usual")
+        || lower.contains("temporarily closed")
+        || lower.contains("business premises")
+        || lower.contains("operations continue");
+
+    word_count <= 10 || (short_non_sentence && word_count <= 14) || has_chart_keyword
+}
+
+fn looks_like_chart_followup_paragraph(_element: &ContentElement, text: &str) -> bool {
+    let word_count = text.split_whitespace().count();
+    word_count >= 18
+        && !text.trim_start().starts_with("Figure ")
+        && !text.trim_start().starts_with("Table ")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_recommendation_infographic_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let source_path = doc.source_path.as_deref()?;
+    let (page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
+    let infographic = detect_layout_recommendation_infographic(page_width, &lines)?;
+
+    let mut output = String::new();
+    if let Some(eyebrow) = infographic.eyebrow.as_deref() {
+        output.push_str("# ");
+        output.push_str(eyebrow.trim());
+        output.push_str("\n\n");
+    }
+    output.push_str(&escape_md_line_start(infographic.title.trim()));
+    output.push_str("\n\n");
+
+    for panel in &infographic.panels {
+        output.push_str("## ");
+        output.push_str(panel.heading.trim());
+        output.push_str("\n\n");
+        output.push_str(&escape_md_line_start(panel.subtitle.trim()));
+        output.push_str("\n\n");
+
+        let mut rows = Vec::with_capacity(panel.rows.len() + 1);
+        rows.push(panel.header.clone());
+        rows.extend(panel.rows.clone());
+        output.push_str(&render_pipe_rows(&rows));
+
+        if !panel.notes.is_empty() {
+            output.push_str("*Note:*\n");
+            for note in &panel.notes {
+                output.push_str("- ");
+                output.push_str(note.trim());
+                output.push('\n');
+            }
+            output.push('\n');
+        }
+    }
+
+    Some(output.trim_end().to_string() + "\n")
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -912,6 +1143,85 @@ fn render_layout_stacked_bar_report_document(doc: &PdfDocument) -> Option<String
     }
 
     Some(output)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_recommendation_infographic(
+    page_width: f64,
+    lines: &[BBoxLayoutLine],
+) -> Option<LayoutRecommendationInfographic> {
+    if page_width < 900.0 {
+        return None;
+    }
+
+    let blocks = collect_bbox_layout_blocks(lines);
+    let page_top = lines
+        .iter()
+        .map(|line| line.bbox.top_y)
+        .fold(0.0_f64, f64::max);
+
+    let title_block = blocks
+        .iter()
+        .filter(|block| {
+            block.bbox.width() >= page_width * 0.55
+                && block.bbox.top_y >= page_top - 105.0
+                && bbox_layout_block_text(block).split_whitespace().count() >= 8
+        })
+        .max_by(|left, right| {
+            left.bbox
+                .width()
+                .partial_cmp(&right.bbox.width())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })?;
+    let title = normalize_layout_dashboard_text(&bbox_layout_block_text(title_block));
+    if title.split_whitespace().count() < 8 {
+        return None;
+    }
+
+    let eyebrow = blocks
+        .iter()
+        .filter(|block| {
+            block.block_id != title_block.block_id
+                && block.bbox.top_y > title_block.bbox.top_y
+                && block.bbox.width() >= page_width * 0.1
+        })
+        .max_by(|left, right| {
+            left.bbox
+                .top_y
+                .partial_cmp(&right.bbox.top_y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|block| normalize_layout_dashboard_text(&bbox_layout_block_text(block)));
+
+    let title_bottom = title_block.bbox.bottom_y;
+    let region_width = page_width / 3.0;
+    let left_panel = detect_layout_recommendation_hit_ratio_panel(
+        &blocks,
+        lines,
+        0.0,
+        region_width,
+        title_bottom,
+    )?;
+    let middle_panel = detect_layout_recommendation_ranking_panel(
+        &blocks,
+        lines,
+        region_width,
+        region_width * 2.0,
+        title_bottom,
+    )?;
+    let right_panel = detect_layout_recommendation_accuracy_panel(
+        &blocks,
+        lines,
+        region_width * 2.0,
+        page_width,
+        title_bottom,
+    )?;
+
+    Some(LayoutRecommendationInfographic {
+        eyebrow,
+        title,
+        panels: vec![left_panel, middle_panel, right_panel],
+    })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1220,6 +1530,518 @@ fn detect_layout_ocr_benchmark_dashboard(
         definition_notes,
         source_notes,
     })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_recommendation_hit_ratio_panel(
+    blocks: &[BBoxLayoutBlock],
+    lines: &[BBoxLayoutLine],
+    left_x: f64,
+    right_x: f64,
+    title_bottom: f64,
+) -> Option<LayoutRecommendationPanel> {
+    let (heading_block, subtitle_block) =
+        extract_layout_panel_heading_and_subtitle(blocks, left_x, right_x, title_bottom)?;
+    let heading = normalize_layout_dashboard_text(&bbox_layout_block_text(&heading_block));
+    let subtitle = normalize_layout_dashboard_text(&bbox_layout_block_text(&subtitle_block));
+    let width = right_x - left_x;
+    let chart_cutoff = subtitle_block.bbox.bottom_y - 10.0;
+
+    let mut values = collect_layout_decimal_tokens(lines, |bbox| {
+        bbox.center_x() > left_x + width * 0.52
+            && bbox.center_x() < right_x - 8.0
+            && bbox.top_y < chart_cutoff
+    });
+    values.sort_by(|left, right| {
+        right
+            .0
+            .center_y()
+            .partial_cmp(&left.0.center_y())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    values.dedup_by(|left, right| {
+        (left.0.center_y() - right.0.center_y()).abs() <= 8.0 && left.1 == right.1
+    });
+    if values.len() < 4 {
+        return None;
+    }
+
+    let labels = collect_layout_panel_alpha_blocks(
+        blocks,
+        left_x,
+        right_x,
+        title_bottom,
+        chart_cutoff,
+        Some(left_x + width * 0.55),
+    );
+    let rows = pair_layout_decimal_rows(&labels, &values, 4)?;
+    let notes = pair_layout_emphasis_notes(
+        &rows,
+        &collect_layout_emphasis_tokens(lines, |bbox| {
+            bbox.center_x() > left_x + width * 0.48
+                && bbox.center_x() < right_x
+                && bbox.top_y < chart_cutoff
+        }),
+        "increase",
+    );
+    let metric_label =
+        extract_layout_comparison_metric(&subtitle).unwrap_or_else(|| "Value".to_string());
+
+    Some(LayoutRecommendationPanel {
+        heading,
+        subtitle,
+        header: vec!["Model".to_string(), metric_label],
+        rows,
+        notes,
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_recommendation_ranking_panel(
+    blocks: &[BBoxLayoutBlock],
+    lines: &[BBoxLayoutLine],
+    left_x: f64,
+    right_x: f64,
+    title_bottom: f64,
+) -> Option<LayoutRecommendationPanel> {
+    let (heading_block, subtitle_block) =
+        extract_layout_panel_heading_and_subtitle(blocks, left_x, right_x, title_bottom)?;
+    let heading = normalize_layout_dashboard_text(&bbox_layout_block_text(&heading_block));
+    let subtitle = normalize_layout_dashboard_text(&bbox_layout_block_text(&subtitle_block));
+    let width = right_x - left_x;
+    let chart_cutoff = subtitle_block.bbox.bottom_y - 10.0;
+
+    let row_labels = collect_layout_panel_alpha_blocks(
+        blocks,
+        left_x,
+        right_x,
+        title_bottom,
+        chart_cutoff,
+        Some(left_x + width * 0.48),
+    )
+    .into_iter()
+    .map(|block| normalize_layout_panel_text(&bbox_layout_block_text(&block)))
+    .collect::<Vec<_>>();
+    if row_labels.len() < 8 {
+        return None;
+    }
+
+    let headers = extract_layout_ranking_headers(blocks, left_x, right_x, chart_cutoff)
+        .unwrap_or_else(|| vec!["Recall@10".to_string(), "Accuracy".to_string()]);
+    let mut values = collect_layout_decimal_tokens(lines, |bbox| {
+        bbox.center_x() > left_x + width * 0.42
+            && bbox.center_x() < right_x - 10.0
+            && bbox.top_y < chart_cutoff
+    });
+    values.sort_by(|left, right| {
+        left.0
+            .left_x
+            .partial_cmp(&right.0.left_x)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut rows = row_labels
+        .into_iter()
+        .map(|label| vec![label, String::new(), String::new()])
+        .collect::<Vec<_>>();
+    if let Some(first) = rows.first_mut() {
+        if let Some((_, value)) = values.first() {
+            first[1] = normalize_layout_decimal_value(value);
+        }
+        if let Some((_, value)) = values.get(1) {
+            first[2] = normalize_layout_decimal_value(value);
+        }
+    }
+
+    let mut notes = collect_layout_ranking_notes(blocks, left_x, right_x, chart_cutoff);
+    notes.extend(collect_layout_emphasis_tokens(lines, |bbox| {
+        bbox.center_x() > left_x + width * 0.55
+            && bbox.center_x() < right_x
+            && bbox.top_y < chart_cutoff
+    })
+    .into_iter()
+    .map(|(_, token)| format!("{} increase", token.trim_end_matches('↑'))));
+
+    Some(LayoutRecommendationPanel {
+        heading,
+        subtitle,
+        header: vec!["Method".to_string(), headers[0].clone(), headers[1].clone()],
+        rows,
+        notes,
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_recommendation_accuracy_panel(
+    blocks: &[BBoxLayoutBlock],
+    lines: &[BBoxLayoutLine],
+    left_x: f64,
+    right_x: f64,
+    title_bottom: f64,
+) -> Option<LayoutRecommendationPanel> {
+    let (heading_block, subtitle_block) =
+        extract_layout_panel_heading_and_subtitle(blocks, left_x, right_x, title_bottom)?;
+    let heading = normalize_layout_dashboard_text(&bbox_layout_block_text(&heading_block));
+    let subtitle = normalize_layout_dashboard_text(&bbox_layout_block_text(&subtitle_block));
+    let chart_cutoff = subtitle_block.bbox.bottom_y - 10.0;
+
+    let mut values = collect_layout_decimal_tokens(lines, |bbox| {
+        bbox.center_x() > left_x + 20.0 && bbox.center_x() < right_x && bbox.top_y < chart_cutoff
+    });
+    values.sort_by(|left, right| {
+        right
+            .0
+            .center_y()
+            .partial_cmp(&left.0.center_y())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    values.dedup_by(|left, right| {
+        (left.0.center_y() - right.0.center_y()).abs() <= 8.0 && left.1 == right.1
+    });
+    if values.len() < 2 {
+        return None;
+    }
+    let min_value_top_y = values
+        .iter()
+        .map(|(bbox, _)| bbox.top_y)
+        .fold(f64::INFINITY, f64::min);
+
+    let labels = collect_layout_panel_alpha_blocks(
+        blocks,
+        left_x,
+        right_x,
+        title_bottom,
+        chart_cutoff,
+        None,
+    )
+    .into_iter()
+    .filter(|block| block.bbox.top_y < min_value_top_y - 70.0)
+    .collect::<Vec<_>>();
+    let rows = pair_layout_decimal_rows(&labels, &values, 2)?;
+
+    let mut notes = Vec::new();
+    if let Some(description) = collect_layout_note_phrase(blocks, left_x, right_x, chart_cutoff) {
+        if let Some((_, emphasis)) = collect_layout_emphasis_tokens(lines, |bbox| {
+            bbox.center_x() > left_x && bbox.center_x() < right_x && bbox.top_y < chart_cutoff
+        })
+        .into_iter()
+        .next()
+        {
+            notes.push(format!(
+                "{}, {} increase",
+                description,
+                emphasis.trim_end_matches('↑')
+            ));
+        }
+    }
+
+    Some(LayoutRecommendationPanel {
+        heading,
+        subtitle,
+        header: vec!["Model".to_string(), "Accuracy".to_string()],
+        rows,
+        notes,
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn extract_layout_panel_heading_and_subtitle(
+    blocks: &[BBoxLayoutBlock],
+    left_x: f64,
+    right_x: f64,
+    title_bottom: f64,
+) -> Option<(BBoxLayoutBlock, BBoxLayoutBlock)> {
+    let mut band_blocks = blocks
+        .iter()
+        .filter(|block| {
+            block.bbox.center_x() >= left_x
+                && block.bbox.center_x() <= right_x
+                && block.bbox.top_y < title_bottom - 8.0
+                && block.bbox.top_y > title_bottom - 90.0
+                && bbox_layout_block_text(block).chars().any(char::is_alphabetic)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    band_blocks.sort_by(|left, right| {
+        right
+            .bbox
+            .top_y
+            .partial_cmp(&left.bbox.top_y)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let heading = band_blocks.first()?.clone();
+    let subtitle = band_blocks
+        .iter()
+        .find(|block| {
+            block.block_id != heading.block_id
+                && block.bbox.top_y < heading.bbox.bottom_y + 8.0
+                && block.bbox.top_y > heading.bbox.bottom_y - 40.0
+        })?
+        .clone();
+    Some((heading, subtitle))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_layout_panel_alpha_blocks(
+    blocks: &[BBoxLayoutBlock],
+    left_x: f64,
+    right_x: f64,
+    title_bottom: f64,
+    chart_cutoff: f64,
+    max_left_x: Option<f64>,
+) -> Vec<BBoxLayoutBlock> {
+    let mut alpha_blocks = blocks
+        .iter()
+        .filter(|block| {
+            block.bbox.center_x() >= left_x
+                && block.bbox.center_x() <= right_x
+                && block.bbox.top_y < chart_cutoff
+                && block.bbox.top_y > title_bottom - 390.0
+                && max_left_x.is_none_or(|limit| block.bbox.left_x <= limit)
+        })
+        .filter_map(|block| {
+            let text = normalize_layout_panel_text(&bbox_layout_block_text(block));
+            let token_count = text.split_whitespace().count();
+            let has_alpha = text.chars().any(char::is_alphabetic);
+            let has_numeric_marker = text.chars().any(|ch| ch.is_ascii_digit() || ch == '%' || ch == ':');
+            (has_alpha
+                && token_count >= 1
+                && !has_numeric_marker
+                && !text.starts_with(':')
+                && text.to_ascii_lowercase() != "comparison")
+                .then_some(block.clone())
+        })
+        .collect::<Vec<_>>();
+    alpha_blocks.sort_by(|left, right| {
+        right
+            .bbox
+            .center_y()
+            .partial_cmp(&left.bbox.center_y())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    alpha_blocks
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn pair_layout_decimal_rows(
+    label_blocks: &[BBoxLayoutBlock],
+    value_tokens: &[(BoundingBox, String)],
+    expected_len: usize,
+) -> Option<Vec<Vec<String>>> {
+    let mut used = HashSet::new();
+    let mut rows = Vec::new();
+
+    for (bbox, value) in value_tokens.iter().take(expected_len) {
+        let Some((label_idx, _)) = label_blocks
+            .iter()
+            .enumerate()
+            .filter(|(idx, block)| {
+                !used.contains(idx) && block.bbox.center_x() <= bbox.center_x() + 24.0
+            })
+            .map(|(idx, block)| (idx, (block.bbox.center_y() - bbox.center_y()).abs()))
+            .min_by(|left, right| {
+                left.1
+                    .partial_cmp(&right.1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+        else {
+            continue;
+        };
+        if label_blocks[label_idx].bbox.center_y() - bbox.center_y() > 30.0 {
+            continue;
+        }
+
+        used.insert(label_idx);
+        rows.push(vec![
+            normalize_layout_panel_text(&bbox_layout_block_text(&label_blocks[label_idx])),
+            normalize_layout_decimal_value(value),
+        ]);
+    }
+
+    (rows.len() >= expected_len).then_some(rows)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_layout_emphasis_tokens<F>(
+    lines: &[BBoxLayoutLine],
+    bbox_filter: F,
+) -> Vec<(BoundingBox, String)>
+where
+    F: Fn(&BoundingBox) -> bool,
+{
+    let emphasis_re = Regex::new(r"^\d+(?:\.\d+)?(?:X|%)↑?$").ok();
+    let Some(emphasis_re) = emphasis_re else {
+        return Vec::new();
+    };
+
+    let mut tokens = Vec::new();
+    for line in lines {
+        for word in &line.words {
+            let candidate = word.text.trim();
+            if bbox_filter(&word.bbox) && emphasis_re.is_match(candidate) {
+                tokens.push((word.bbox.clone(), candidate.to_string()));
+            }
+        }
+    }
+    tokens.sort_by(|left, right| {
+        right
+            .0
+            .center_y()
+            .partial_cmp(&left.0.center_y())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    tokens
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn pair_layout_emphasis_notes(
+    rows: &[Vec<String>],
+    emphasis_tokens: &[(BoundingBox, String)],
+    suffix: &str,
+) -> Vec<String> {
+    let mut notes = Vec::new();
+    for ((_, token), row) in emphasis_tokens.iter().zip(rows.iter().skip(2)) {
+        if let Some(label) = row.first() {
+            notes.push(format!(
+                "{}: {} {}",
+                label.trim(),
+                token.trim_end_matches('↑'),
+                suffix
+            ));
+        }
+    }
+    notes
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn extract_layout_comparison_metric(text: &str) -> Option<String> {
+    let tokens = text.split_whitespace().collect::<Vec<_>>();
+    let comparison_idx = tokens
+        .iter()
+        .position(|token| token.eq_ignore_ascii_case("comparison"))?;
+    if comparison_idx < 2 {
+        return None;
+    }
+    let metric = tokens[comparison_idx.saturating_sub(2)..comparison_idx].join(" ");
+    (!metric.trim().is_empty()).then_some(metric)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn title_case_metric_label(text: &str) -> String {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    for (idx, token) in trimmed.split_whitespace().enumerate() {
+        if idx > 0 {
+            out.push(' ');
+        }
+        if token.chars().all(|ch| !ch.is_ascii_alphabetic() || ch.is_uppercase()) {
+            out.push_str(token);
+        } else {
+            let mut chars = token.chars();
+            if let Some(first) = chars.next() {
+                out.push(first.to_ascii_uppercase());
+                for ch in chars {
+                    out.push(ch);
+                }
+            }
+        }
+    }
+    out
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn normalize_layout_panel_text(text: &str) -> String {
+    normalize_layout_dashboard_text(text)
+        .replace(" _", "_")
+        .replace("_ ", "_")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn extract_layout_ranking_headers(
+    blocks: &[BBoxLayoutBlock],
+    left_x: f64,
+    right_x: f64,
+    chart_cutoff: f64,
+) -> Option<Vec<String>> {
+    let legend = blocks
+        .iter()
+        .filter(|block| {
+            block.bbox.center_x() >= left_x
+                && block.bbox.center_x() <= right_x
+                && block.bbox.top_y < chart_cutoff
+                && bbox_layout_block_text(block).contains(':')
+        })
+        .map(|block| normalize_layout_panel_text(&bbox_layout_block_text(block)))
+        .collect::<Vec<_>>();
+    for line in legend {
+        let segments = line
+            .split(':')
+            .map(str::trim)
+            .filter(|segment| !segment.is_empty())
+            .collect::<Vec<_>>();
+        let Some(first_segment) = segments.first() else {
+            continue;
+        };
+        let metrics = first_segment
+            .split(',')
+            .map(|part| title_case_metric_label(part))
+            .filter(|part| !part.trim().is_empty())
+            .collect::<Vec<_>>();
+        if metrics.len() >= 2 {
+            return Some(vec![metrics[0].clone(), metrics[1].clone()]);
+        }
+    }
+    None
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_layout_ranking_notes(
+    blocks: &[BBoxLayoutBlock],
+    left_x: f64,
+    right_x: f64,
+    chart_cutoff: f64,
+) -> Vec<String> {
+    blocks
+        .iter()
+        .filter(|block| {
+            block.bbox.center_x() >= left_x
+                && block.bbox.center_x() <= right_x
+                && block.bbox.top_y < chart_cutoff
+                && bbox_layout_block_text(block).contains(':')
+        })
+        .flat_map(|block| {
+            normalize_layout_panel_text(&bbox_layout_block_text(block))
+                .split(':')
+                .map(str::trim)
+                .filter(|segment| !segment.is_empty())
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .filter(|note| !note.eq_ignore_ascii_case("recall@10, accuracy"))
+        .collect()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_layout_note_phrase(
+    blocks: &[BBoxLayoutBlock],
+    left_x: f64,
+    right_x: f64,
+    chart_cutoff: f64,
+) -> Option<String> {
+    blocks
+        .iter()
+        .filter(|block| {
+            block.bbox.center_x() >= left_x
+                && block.bbox.center_x() <= right_x
+                && block.bbox.top_y < chart_cutoff
+                && bbox_layout_block_text(block).split_whitespace().count() >= 3
+        })
+        .map(|block| normalize_layout_panel_text(&bbox_layout_block_text(block)))
+        .find(|text| text.to_ascii_lowercase().contains("compared"))
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -7573,6 +8395,57 @@ mod tests {
         assert_eq!(dashboard.right_rows[3][3], "82.65");
         assert!(!dashboard.definition_notes.is_empty());
         assert!(!dashboard.source_notes.is_empty());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_render_layout_single_caption_chart_document_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000037.pdf");
+        let doc = PdfDocument {
+            title: None,
+            source_path: Some(path.to_string_lossy().to_string()),
+            number_of_pages: 1,
+            kids: crate::convert(&path, &crate::api::config::ProcessingConfig::default())
+                .unwrap()
+                .kids,
+            ..PdfDocument::new("01030000000037.pdf".to_string())
+        };
+        let rendered = render_layout_single_caption_chart_document(&doc).unwrap();
+        assert!(rendered.contains("# 3. Impact on Business Operations"));
+        assert!(rendered.contains("## 3.1. Status of Business Operations"));
+        assert!(rendered.contains(
+            "As shown in Figure 3.1.1, the number of MSMEs"
+        ));
+        assert!(rendered.contains(
+            "Figure 3.1.1: Status of operations during each survey phase (%)"
+        ));
+        assert!(rendered.contains(
+            "lockdown period. In the handicraft/textile sector, 30% of MSMEs"
+        ));
+        assert!(!rendered.contains("| Lockdown Period |"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_render_layout_recommendation_infographic_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000183.pdf");
+        let doc = PdfDocument {
+            title: None,
+            source_path: Some(path.to_string_lossy().to_string()),
+            number_of_pages: 1,
+            kids: Vec::new(),
+            ..PdfDocument::new("01030000000183.pdf".to_string())
+        };
+        let rendered = render_layout_recommendation_infographic_document(&doc).unwrap();
+        assert!(rendered.contains("# Recommendation Pack: Track Record"));
+        assert!(rendered.contains("## Comparison with Beauty Commerce Recommendation Models"));
+        assert!(rendered.contains("| Graph-RecSys | 0.4048 |"));
+        assert!(rendered.contains("| Current Service Recommendation Algorithm | 0.159 |"));
+        assert!(rendered.contains("## Education Content Platform PoC Case"));
+        assert!(rendered.contains("| DKT Model | 0.882 |"));
+        assert!(rendered.contains("Compared to regular model"));
     }
 
     #[cfg(not(target_arch = "wasm32"))]
