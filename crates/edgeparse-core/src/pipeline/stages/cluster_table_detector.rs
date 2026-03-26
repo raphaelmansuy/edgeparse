@@ -2117,8 +2117,14 @@ fn augment_panel_cluster_table(
     let header_like_rows = rows
         .iter()
         .take(2)
-        .filter(|row| row.cells.iter().skip(1).filter(|cell| !cell.trim().is_empty()).count()
-            >= slot_ranges.len().saturating_sub(2))
+        .filter(|row| {
+            row.cells
+                .iter()
+                .skip(1)
+                .filter(|cell| !cell.trim().is_empty())
+                .count()
+                >= slot_ranges.len().saturating_sub(2)
+        })
         .count();
     let stub_rows = rows
         .iter()
@@ -2236,7 +2242,12 @@ fn augment_grouped_header_cluster_table(
 
     let max_header_fill = header_rows
         .iter()
-        .map(|row| row.cells.iter().filter(|cell| !cell.trim().is_empty()).count())
+        .map(|row| {
+            row.cells
+                .iter()
+                .filter(|cell| !cell.trim().is_empty())
+                .count()
+        })
         .max()
         .unwrap_or(0);
     if max_header_fill < 2 {
@@ -2247,10 +2258,11 @@ fn augment_grouped_header_cluster_table(
     if existing_rows.is_empty() {
         return None;
     }
-    if header_rows
-        .iter()
-        .any(|header| existing_rows.first().is_some_and(|row| row.cells == header.cells))
-    {
+    if header_rows.iter().any(|header| {
+        existing_rows
+            .first()
+            .is_some_and(|row| row.cells == header.cells)
+    }) {
         return None;
     }
 
@@ -2386,7 +2398,10 @@ fn grouped_table_rows(table: &ClusterTable) -> Vec<PanelRow> {
         .collect()
 }
 
-fn collect_panel_band_indices(elements: &[ContentElement], table: &ClusterTable) -> Option<Vec<usize>> {
+fn collect_panel_band_indices(
+    elements: &[ContentElement],
+    table: &ClusterTable,
+) -> Option<Vec<usize>> {
     let start_idx = *table.consumed_block_indices.iter().min()?;
     let end_idx = *table.consumed_block_indices.iter().max()?;
     let page_number = table.table_border.bbox.page_number;
@@ -2435,7 +2450,10 @@ fn collect_panel_band_indices(elements: &[ContentElement], table: &ClusterTable)
 }
 
 fn is_panel_text_candidate(elem: &ContentElement) -> bool {
-    matches!(elem, ContentElement::TextBlock(_) | ContentElement::TextLine(_))
+    matches!(
+        elem,
+        ContentElement::TextBlock(_) | ContentElement::TextLine(_)
+    )
 }
 
 fn derive_panel_slot_ranges(
@@ -2531,7 +2549,9 @@ fn reconstruct_panel_rows(
                 .iter()
                 .position(|row| (row.bbox.center_y() - row_center).abs() <= tolerance);
 
-            if filled == 1 && line.bbox.width() > (slot_ranges.last().unwrap().1 - slot_ranges[0].0) * 0.65 {
+            if filled == 1
+                && line.bbox.width() > (slot_ranges.last().unwrap().1 - slot_ranges[0].0) * 0.65
+            {
                 continue;
             }
 
@@ -2562,8 +2582,16 @@ fn reconstruct_panel_rows(
     });
     rows.into_iter()
         .filter(|row| {
-            let filled = row.cells.iter().filter(|cell| !cell.trim().is_empty()).count();
-            filled >= 2 || row.cells.first().is_some_and(|cell| !cell.trim().is_empty())
+            let filled = row
+                .cells
+                .iter()
+                .filter(|cell| !cell.trim().is_empty())
+                .count();
+            filled >= 2
+                || row
+                    .cells
+                    .first()
+                    .is_some_and(|cell| !cell.trim().is_empty())
         })
         .collect()
 }
@@ -2587,12 +2615,20 @@ fn merge_panel_continuation_rows(rows: &mut Vec<PanelRow>) {
     let mut merged: Vec<PanelRow> = Vec::with_capacity(rows.len());
     for row in rows.drain(..) {
         let empty_stub = row.cells.first().is_some_and(|cell| cell.trim().is_empty());
-        let filled_data = row.cells.iter().skip(1).filter(|cell| !cell.trim().is_empty()).count();
+        let filled_data = row
+            .cells
+            .iter()
+            .skip(1)
+            .filter(|cell| !cell.trim().is_empty())
+            .count();
         if empty_stub && filled_data >= 1 {
             if let Some(prev) = merged.last_mut() {
                 let gap = prev.bbox.bottom_y - row.bbox.top_y;
                 let max_gap = prev.bbox.height().max(row.bbox.height()).max(8.0) * 0.75;
-                if prev.cells.first().is_some_and(|cell| !cell.trim().is_empty())
+                if prev
+                    .cells
+                    .first()
+                    .is_some_and(|cell| !cell.trim().is_empty())
                     && (-2.0..=max_gap).contains(&gap)
                 {
                     prev.bbox = prev.bbox.union(&row.bbox);
@@ -2609,10 +2645,26 @@ fn merge_panel_continuation_rows(rows: &mut Vec<PanelRow>) {
 }
 
 fn should_merge_panel_stub_companions(upper: &PanelRow, lower: &PanelRow) -> bool {
-    let upper_stub = upper.cells.first().is_some_and(|cell| !cell.trim().is_empty());
-    let lower_stub = lower.cells.first().is_some_and(|cell| !cell.trim().is_empty());
-    let upper_data = upper.cells.iter().skip(1).filter(|cell| !cell.trim().is_empty()).count();
-    let lower_data = lower.cells.iter().skip(1).filter(|cell| !cell.trim().is_empty()).count();
+    let upper_stub = upper
+        .cells
+        .first()
+        .is_some_and(|cell| !cell.trim().is_empty());
+    let lower_stub = lower
+        .cells
+        .first()
+        .is_some_and(|cell| !cell.trim().is_empty());
+    let upper_data = upper
+        .cells
+        .iter()
+        .skip(1)
+        .filter(|cell| !cell.trim().is_empty())
+        .count();
+    let lower_data = lower
+        .cells
+        .iter()
+        .skip(1)
+        .filter(|cell| !cell.trim().is_empty())
+        .count();
 
     let complementary = (upper_stub && upper_data == 0 && !lower_stub && lower_data >= 2)
         || (!upper_stub && upper_data >= 2 && lower_stub && lower_data == 0);
@@ -3782,8 +3834,24 @@ mod tests {
             &[310.0, 296.0, 282.0],
             &[300.0, 286.0, 272.0],
             &[
-                vec!["Total # Samples", "52K", "2.91M", "126K", "12.9K", "60.8K", "126K"],
-                vec!["Maximum # Samples Used", "52K", "100K", "52K", "12.9K", "60.8K", "20.1K"],
+                vec![
+                    "Total # Samples",
+                    "52K",
+                    "2.91M",
+                    "126K",
+                    "12.9K",
+                    "60.8K",
+                    "126K",
+                ],
+                vec![
+                    "Maximum # Samples Used",
+                    "52K",
+                    "100K",
+                    "52K",
+                    "12.9K",
+                    "60.8K",
+                    "20.1K",
+                ],
                 vec!["Open Source", "O", "O", "✗", "O", "O", "✗"],
             ],
             vec![4, 5, 6],
@@ -3794,18 +3862,22 @@ mod tests {
 
         assert_eq!(augmented.table_border.num_columns, 7);
         assert_eq!(augmented.table_border.num_rows, 5);
-        assert_eq!(cell_text(&augmented.table_border.rows[0].cells[0]), "Properties");
-        assert_eq!(cell_text(&augmented.table_border.rows[0].cells[1]), "Instruction");
+        assert_eq!(
+            cell_text(&augmented.table_border.rows[0].cells[0]),
+            "Properties"
+        );
+        assert_eq!(
+            cell_text(&augmented.table_border.rows[0].cells[1]),
+            "Instruction"
+        );
         assert_eq!(
             cell_text(&augmented.table_border.rows[0].cells[4]),
             "Training Datasets"
         );
-        assert!(
-            augmented.table_border.rows[0]
-                .cells
-                .iter()
-                .any(|cell| cell_text(cell) == "Alignment")
-        );
+        assert!(augmented.table_border.rows[0]
+            .cells
+            .iter()
+            .any(|cell| cell_text(cell) == "Alignment"));
         assert_eq!(
             cell_text(&augmented.table_border.rows[1].cells[1]),
             "Alpaca-GPT4"
@@ -4303,5 +4375,4 @@ mod tests {
         eprintln!("markdown has pipe table {}", md.contains("| --- |"));
         eprintln!("{md}");
     }
-
 }

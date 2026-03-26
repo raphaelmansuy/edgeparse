@@ -215,7 +215,11 @@ pub fn recover_page_raster_table_cell_text(
     let candidate_indices: Vec<usize> = elements
         .iter()
         .enumerate()
-        .filter_map(|(idx, elem)| table_candidate_ref(elem).filter(|table| table_needs_page_raster_ocr(table)).map(|_| idx))
+        .filter_map(|(idx, elem)| {
+            table_candidate_ref(elem)
+                .filter(|table| table_needs_page_raster_ocr(table))
+                .map(|_| idx)
+        })
         .take(MAX_EMPTY_TABLES_FOR_PAGE_RASTER_OCR)
         .collect();
     if candidate_indices.is_empty() {
@@ -405,7 +409,12 @@ fn table_needs_page_raster_ocr(table: &TableBorder) -> bool {
             .rows
             .iter()
             .flat_map(|row| row.cells.iter())
-            .all(|cell| !cell.content.iter().any(|token| matches!(token.token_type, TableTokenType::Text)))
+            .all(|cell| {
+                !cell
+                    .content
+                    .iter()
+                    .any(|token| matches!(token.token_type, TableTokenType::Text))
+            })
 }
 
 fn enrich_empty_table_from_page_raster(
@@ -422,7 +431,8 @@ fn enrich_empty_table_from_page_raster(
             {
                 continue;
             }
-            let Some((x1, y1, x2, y2)) = page_bbox_to_raster_box(gray, page_bbox, &cell.bbox) else {
+            let Some((x1, y1, x2, y2)) = page_bbox_to_raster_box(gray, page_bbox, &cell.bbox)
+            else {
                 continue;
             };
             let Some(text) = extract_page_raster_cell_text(gray, &cell.bbox, x1, y1, x2, y2) else {
@@ -468,14 +478,13 @@ fn page_bbox_to_raster_box(
 
     let left = ((bbox.left_x - page_bbox.left_x) / page_bbox.width() * f64::from(gray.width()))
         .clamp(0.0, f64::from(gray.width()));
-    let right =
-        ((bbox.right_x - page_bbox.left_x) / page_bbox.width() * f64::from(gray.width()))
-            .clamp(0.0, f64::from(gray.width()));
+    let right = ((bbox.right_x - page_bbox.left_x) / page_bbox.width() * f64::from(gray.width()))
+        .clamp(0.0, f64::from(gray.width()));
     let top = ((page_bbox.top_y - bbox.top_y) / page_bbox.height() * f64::from(gray.height()))
         .clamp(0.0, f64::from(gray.height()));
-    let bottom =
-        ((page_bbox.top_y - bbox.bottom_y) / page_bbox.height() * f64::from(gray.height()))
-            .clamp(0.0, f64::from(gray.height()));
+    let bottom = ((page_bbox.top_y - bbox.bottom_y) / page_bbox.height()
+        * f64::from(gray.height()))
+    .clamp(0.0, f64::from(gray.height()));
 
     let x1 = left.floor() as u32;
     let x2 = right.ceil() as u32;
@@ -502,7 +511,9 @@ fn extract_page_raster_cell_text(
         return Some(String::new());
     }
 
-    let cropped = gray.view(crop_left, crop_top, crop_width, crop_height).to_image();
+    let cropped = gray
+        .view(crop_left, crop_top, crop_width, crop_height)
+        .to_image();
     let bordered = expand_white_border(&cropped, 12);
     let scaled = image::imageops::resize(
         &bordered,
@@ -1131,7 +1142,8 @@ fn detect_bordered_raster_grid(gray: &GrayImage) -> Option<RasterTableGrid> {
     let min_vertical_dark = (f64::from(height) * MIN_LINE_DARK_RATIO).ceil() as u32;
     let min_horizontal_dark = (f64::from(width) * MIN_LINE_DARK_RATIO).ceil() as u32;
 
-    let vertical_runs = merge_runs((0..width).filter(|&x| count_dark_in_column(gray, x) >= min_vertical_dark));
+    let vertical_runs =
+        merge_runs((0..width).filter(|&x| count_dark_in_column(gray, x) >= min_vertical_dark));
     let horizontal_runs =
         merge_runs((0..height).filter(|&y| count_dark_in_row(gray, y) >= min_horizontal_dark));
     if vertical_runs.len() < MIN_BORDERED_VERTICAL_LINES
@@ -1148,8 +1160,12 @@ fn detect_bordered_raster_grid(gray: &GrayImage) -> Option<RasterTableGrid> {
         .into_iter()
         .map(|(start, end)| (start + end) / 2)
         .collect();
-    if vertical_lines.windows(2).any(|w| w[1] <= w[0] + MIN_CELL_SIZE_PX)
-        || horizontal_lines.windows(2).any(|w| w[1] <= w[0] + MIN_CELL_SIZE_PX)
+    if vertical_lines
+        .windows(2)
+        .any(|w| w[1] <= w[0] + MIN_CELL_SIZE_PX)
+        || horizontal_lines
+            .windows(2)
+            .any(|w| w[1] <= w[0] + MIN_CELL_SIZE_PX)
     {
         return None;
     }
@@ -1230,7 +1246,8 @@ fn raster_boundaries_to_page(
     }
     let scale = (right_edge - left_edge) / f64::from(image_width);
     Some(
-        lines.iter()
+        lines
+            .iter()
             .map(|line| left_edge + f64::from(*line) * scale)
             .collect(),
     )
@@ -1247,7 +1264,8 @@ fn raster_boundaries_to_page_desc(
     }
     let page_height = top_edge - bottom_edge;
     Some(
-        lines.iter()
+        lines
+            .iter()
             .map(|line| top_edge - f64::from(*line) / f64::from(image_height) * page_height)
             .collect(),
     )
@@ -1266,8 +1284,7 @@ fn raster_box_to_page_bbox(
         return None;
     }
     let left_x = image.bbox.left_x + image.bbox.width() * (f64::from(x1) / f64::from(image_width));
-    let right_x =
-        image.bbox.left_x + image.bbox.width() * (f64::from(x2) / f64::from(image_width));
+    let right_x = image.bbox.left_x + image.bbox.width() * (f64::from(x2) / f64::from(image_width));
     let top_y = image.bbox.top_y - image.bbox.height() * (f64::from(y1) / f64::from(image_height));
     let bottom_y =
         image.bbox.top_y - image.bbox.height() * (f64::from(y2) / f64::from(image_height));
@@ -1299,7 +1316,9 @@ fn extract_raster_cell_text(
         return Some(String::new());
     }
 
-    let cropped = gray.view(crop_left, crop_top, crop_width, crop_height).to_image();
+    let cropped = gray
+        .view(crop_left, crop_top, crop_width, crop_height)
+        .to_image();
     let bordered = expand_white_border(&cropped, 12);
     let scaled = image::imageops::resize(
         &bordered,
@@ -1312,8 +1331,11 @@ fn extract_raster_cell_text(
 }
 
 fn expand_white_border(image: &GrayImage, border: u32) -> GrayImage {
-    let mut expanded =
-        GrayImage::from_pixel(image.width() + border * 2, image.height() + border * 2, Luma([255]));
+    let mut expanded = GrayImage::from_pixel(
+        image.width() + border * 2,
+        image.height() + border * 2,
+        Luma([255]),
+    );
     for y in 0..image.height() {
         for x in 0..image.width() {
             expanded.put_pixel(x + border, y + border, *image.get_pixel(x, y));
@@ -1457,7 +1479,11 @@ fn normalize_raster_cell_text(row_idx: usize, col_idx: usize, text: String) -> S
     if row_idx > 0 && !normalized.chars().any(|ch| ch.is_ascii_digit()) && normalized.len() <= 2 {
         return String::new();
     }
-    if row_idx > 0 && normalized.chars().all(|ch| matches!(ch, 'O' | 'o' | 'S' | 'B')) {
+    if row_idx > 0
+        && normalized
+            .chars()
+            .all(|ch| matches!(ch, 'O' | 'o' | 'S' | 'B'))
+    {
         return String::new();
     }
 
@@ -1552,7 +1578,10 @@ mod tests {
 
     #[test]
     fn test_normalize_raster_cell_text_fixes_units_and_artifacts() {
-        assert_eq!(normalize_raster_cell_text(1, 1, "3 ywL".to_string()), "3 μL");
+        assert_eq!(
+            normalize_raster_cell_text(1, 1, "3 ywL".to_string()),
+            "3 μL"
+        );
         assert_eq!(normalize_raster_cell_text(1, 4, "OS".to_string()), "");
         assert_eq!(normalize_raster_cell_text(0, 6, "H,O".to_string()), "H2O");
     }

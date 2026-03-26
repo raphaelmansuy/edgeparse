@@ -1,12 +1,12 @@
 //! Markdown output generator.
 
+#[cfg(not(target_arch = "wasm32"))]
+use regex::Regex;
 use std::collections::{HashMap, HashSet};
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 #[cfg(not(target_arch = "wasm32"))]
 use std::process::Command;
-#[cfg(not(target_arch = "wasm32"))]
-use regex::Regex;
 
 use crate::models::bbox::BoundingBox;
 use crate::models::chunks::TextChunk;
@@ -92,14 +92,12 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) =
-        render_layout_stacked_bar_report_document_cached(doc, &mut layout_cache)
+    if let Some(rendered) = render_layout_stacked_bar_report_document_cached(doc, &mut layout_cache)
     {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) =
-        render_layout_multi_figure_chart_document_cached(doc, &mut layout_cache)
+    if let Some(rendered) = render_layout_multi_figure_chart_document_cached(doc, &mut layout_cache)
     {
         return Ok(rendered);
     }
@@ -120,26 +118,20 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
         return Ok(render_compact_toc_document(doc));
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) =
-        render_layout_projection_sheet_document_cached(doc, &mut layout_cache)
+    if let Some(rendered) = render_layout_projection_sheet_document_cached(doc, &mut layout_cache) {
+        return Ok(rendered);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_appendix_tables_document_cached(doc, &mut layout_cache) {
+        return Ok(rendered);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_titled_dual_table_document_cached(doc, &mut layout_cache)
     {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) =
-        render_layout_appendix_tables_document_cached(doc, &mut layout_cache)
-    {
-        return Ok(rendered);
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) =
-        render_layout_titled_dual_table_document_cached(doc, &mut layout_cache)
-    {
-        return Ok(rendered);
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) =
-        render_layout_dual_table_article_document_cached(doc, &mut layout_cache)
+    if let Some(rendered) = render_layout_dual_table_article_document_cached(doc, &mut layout_cache)
     {
         return Ok(rendered);
     }
@@ -562,11 +554,10 @@ fn render_top_table_plate_document(doc: &PdfDocument) -> Option<String> {
         return None;
     }
 
-    let (table_idx, table) = doc
-        .kids
-        .iter()
-        .enumerate()
-        .find_map(|(idx, element)| table_border_from_element(element).map(|table| (idx, table)))?;
+    let (table_idx, table) =
+        doc.kids.iter().enumerate().find_map(|(idx, element)| {
+            table_border_from_element(element).map(|table| (idx, table))
+        })?;
     if table.num_columns < 5 || table.rows.len() < 4 {
         return None;
     }
@@ -617,13 +608,16 @@ fn render_top_table_plate_document(doc: &PdfDocument) -> Option<String> {
         return None;
     }
 
-    let has_body_below = doc.kids.iter().enumerate().skip(caption_indices.last().copied()? + 1).any(
-        |(_, element)| {
+    let has_body_below = doc
+        .kids
+        .iter()
+        .enumerate()
+        .skip(caption_indices.last().copied()? + 1)
+        .any(|(_, element)| {
             is_geometric_text_candidate(element)
                 && !extract_element_text(element).trim().is_empty()
                 && table_bottom - element.bbox().top_y > caption_gap_limit
-        },
-    );
+        });
     if !has_body_below {
         return None;
     }
@@ -763,7 +757,11 @@ fn render_late_section_boundary_document(doc: &PdfDocument) -> Option<String> {
 
     let colon_ended = leading_text_indices
         .iter()
-        .filter(|idx| extract_element_text(&doc.kids[**idx]).trim_end().ends_with(':'))
+        .filter(|idx| {
+            extract_element_text(&doc.kids[**idx])
+                .trim_end()
+                .ends_with(':')
+        })
         .count();
     if colon_ended * 2 < leading_text_indices.len() {
         return None;
@@ -1028,9 +1026,7 @@ fn render_layout_captioned_media_document_cached(
         .filter(|element| {
             matches!(
                 element,
-                ContentElement::Image(_)
-                    | ContentElement::Figure(_)
-                    | ContentElement::Picture(_)
+                ContentElement::Image(_) | ContentElement::Figure(_) | ContentElement::Picture(_)
             )
         })
         .count();
@@ -1094,8 +1090,8 @@ fn render_layout_captioned_media_document_cached(
                 output.push_str(&render_layout_caption_section(&section));
             }
             LayoutCaptionedMediaEvent::Paragraph(paragraph) => {
-            output.push_str(&escape_md_line_start(paragraph.trim()));
-            output.push_str("\n\n");
+                output.push_str(&escape_md_line_start(paragraph.trim()));
+                output.push_str("\n\n");
             }
         }
     }
@@ -1131,7 +1127,9 @@ fn build_layout_captioned_media_profile(
                 (!trimmed.is_empty()
                     && trimmed.split_whitespace().count() >= 8
                     && !starts_with_caption_prefix(trimmed)
-                    && !trimmed.chars().all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace())
+                    && !trimmed
+                        .chars()
+                        .all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace())
                     && !trimmed.chars().next().is_some_and(|ch| ch.is_ascii_digit())
                     && !looks_like_footer_banner(trimmed))
                 .then_some((element.bbox().top_y, trimmed.to_string()))
@@ -1176,12 +1174,17 @@ fn build_layout_captioned_media_profile(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn render_layout_captioned_media_explainer(profile: &LayoutCaptionedMediaProfile) -> Option<String> {
+fn render_layout_captioned_media_explainer(
+    profile: &LayoutCaptionedMediaProfile,
+) -> Option<String> {
     if profile.sections.len() != 1
         || profile.prose.len() != 2
         || profile.image_count != 1
         || profile.footnote.is_none()
-        || !profile.sections.iter().all(|section| section.label.starts_with("Figure "))
+        || !profile
+            .sections
+            .iter()
+            .all(|section| section.label.starts_with("Figure "))
     {
         return None;
     }
@@ -1207,7 +1210,12 @@ fn render_layout_captioned_media_explainer(profile: &LayoutCaptionedMediaProfile
 fn detect_layout_caption_sections(blocks: &[BBoxLayoutBlock]) -> Vec<LayoutCaptionSection> {
     let normalized_blocks = blocks
         .iter()
-        .map(|block| (block, normalize_common_ocr_text(&bbox_layout_block_text(block))))
+        .map(|block| {
+            (
+                block,
+                normalize_common_ocr_text(&bbox_layout_block_text(block)),
+            )
+        })
         .collect::<Vec<_>>();
 
     let mut used_titles = HashSet::new();
@@ -1240,8 +1248,11 @@ fn detect_layout_caption_sections(blocks: &[BBoxLayoutBlock]) -> Vec<LayoutCapti
                 } else {
                     0.0
                 };
-                (vertical_gap <= 28.0 && horizontal_gap <= 180.0)
-                    .then_some((vertical_gap + horizontal_gap * 0.15, *candidate, text.clone()))
+                (vertical_gap <= 28.0 && horizontal_gap <= 180.0).then_some((
+                    vertical_gap + horizontal_gap * 0.15,
+                    *candidate,
+                    text.clone(),
+                ))
             })
             .min_by(|left, right| {
                 left.0
@@ -1289,11 +1300,17 @@ fn split_trailing_caption_footnote_marker(text: &str) -> (String, Option<String>
 fn detect_layout_bottom_footnote(lines: &[BBoxLayoutLine]) -> Option<String> {
     let normalized_lines = lines
         .iter()
-        .map(|line| (line.bbox.top_y, normalize_common_ocr_text(&bbox_layout_line_text(line))))
+        .map(|line| {
+            (
+                line.bbox.top_y,
+                normalize_common_ocr_text(&bbox_layout_line_text(line)),
+            )
+        })
         .filter(|(_, text)| !text.is_empty() && !is_page_number_like(text))
         .collect::<Vec<_>>();
     let start_idx = normalized_lines.iter().rposition(|(_, text)| {
-        text.chars().next().is_some_and(|ch| ch.is_ascii_digit()) && text.split_whitespace().count() >= 6
+        text.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+            && text.split_whitespace().count() >= 6
     })?;
 
     let mut collected = vec![normalized_lines[start_idx].1.clone()];
@@ -1500,7 +1517,8 @@ fn render_layout_single_caption_chart_document_cached(
                         i += 1;
                         continue;
                     }
-                    if i + 1 == caption_idx || looks_like_chart_noise_element(next_element, next_trimmed)
+                    if i + 1 == caption_idx
+                        || looks_like_chart_noise_element(next_element, next_trimmed)
                     {
                         break;
                     }
@@ -1556,7 +1574,10 @@ fn looks_like_chart_noise_element(_element: &ContentElement, text: &str) -> bool
         return true;
     }
 
-    if text.chars().all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace()) {
+    if text
+        .chars()
+        .all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace())
+    {
         return true;
     }
 
@@ -1768,7 +1789,9 @@ fn render_layout_multi_figure_chart_document_cached(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn detect_layout_multi_figure_chart_sections(lines: &[BBoxLayoutLine]) -> Option<Vec<LayoutSeriesFigure>> {
+fn detect_layout_multi_figure_chart_sections(
+    lines: &[BBoxLayoutLine],
+) -> Option<Vec<LayoutSeriesFigure>> {
     let caption_indices = lines
         .iter()
         .enumerate()
@@ -1783,10 +1806,7 @@ fn detect_layout_multi_figure_chart_sections(lines: &[BBoxLayoutLine]) -> Option
 
     let mut figures = Vec::new();
     for (pos, caption_idx) in caption_indices.iter().enumerate() {
-        let next_caption_idx = caption_indices
-            .get(pos + 1)
-            .copied()
-            .unwrap_or(lines.len());
+        let next_caption_idx = caption_indices.get(pos + 1).copied().unwrap_or(lines.len());
         let caption = bbox_layout_line_text(&lines[*caption_idx]);
 
         let source_idx = (*caption_idx + 1..next_caption_idx).find(|idx| {
@@ -1800,7 +1820,8 @@ fn detect_layout_multi_figure_chart_sections(lines: &[BBoxLayoutLine]) -> Option
             let mut cursor = idx + 1;
             while cursor < next_caption_idx {
                 let text = bbox_layout_line_text(&lines[cursor]);
-                if text.starts_with("Figure ") || looks_like_footer_banner(&text) || text.is_empty() {
+                if text.starts_with("Figure ") || looks_like_footer_banner(&text) || text.is_empty()
+                {
                     break;
                 }
                 source_lines.push(&lines[cursor]);
@@ -1817,7 +1838,10 @@ fn detect_layout_multi_figure_chart_sections(lines: &[BBoxLayoutLine]) -> Option
         let (labels, values) = if anchors.len() >= 4 {
             let values = map_series_values_to_label_anchors(&anchors, series_region);
             (
-                anchors.into_iter().map(|anchor| anchor.text).collect::<Vec<_>>(),
+                anchors
+                    .into_iter()
+                    .map(|anchor| anchor.text)
+                    .collect::<Vec<_>>(),
                 values,
             )
         } else {
@@ -1907,7 +1931,9 @@ fn extract_year_label_anchors_from_section(lines: &[BBoxLayoutLine]) -> Vec<Layo
         let mut bbox = band_words[idx].bbox.clone();
         let mut label = token.to_string();
         if let Some(next) = band_words.get(idx + 1) {
-            let suffix = next.text.trim_matches(|ch: char| matches!(ch, ',' | ';' | '.'));
+            let suffix = next
+                .text
+                .trim_matches(|ch: char| matches!(ch, ',' | ';' | '.'));
             let gap = next.bbox.left_x - band_words[idx].bbox.right_x;
             if suffix.starts_with('(') && suffix.ends_with(')') && gap <= 18.0 {
                 label.push(' ');
@@ -1949,7 +1975,9 @@ fn map_series_values_to_label_anchors(
     for line in lines {
         for word in &line.words {
             let raw = word.text.trim();
-            if raw.contains('/') || looks_like_year_token(raw.trim_matches(|ch: char| matches!(ch, ',' | ';' | '.'))) {
+            if raw.contains('/')
+                || looks_like_year_token(raw.trim_matches(|ch: char| matches!(ch, ',' | ';' | '.')))
+            {
                 continue;
             }
             let Some(value) = parse_integer_token(raw) else {
@@ -2164,7 +2192,9 @@ fn detect_layout_ocr_benchmark_dashboard(
 
     let title_block = blocks
         .iter()
-        .filter(|block| block.bbox.width() >= page_width * 0.45 && block.bbox.top_y >= page_top - 40.0)
+        .filter(|block| {
+            block.bbox.width() >= page_width * 0.45 && block.bbox.top_y >= page_top - 40.0
+        })
         .max_by(|left, right| {
             left.bbox
                 .width()
@@ -2197,7 +2227,9 @@ fn detect_layout_ocr_benchmark_dashboard(
             block.bbox.right_x <= page_mid
                 && block.bbox.top_y < title_block.bbox.bottom_y - 25.0
                 && block.bbox.top_y > title_block.bbox.bottom_y - 95.0
-                && !bbox_layout_block_text(block).chars().all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace())
+                && !bbox_layout_block_text(block)
+                    .chars()
+                    .all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace())
         })
         .cloned()
         .collect::<Vec<_>>();
@@ -2207,7 +2239,9 @@ fn detect_layout_ocr_benchmark_dashboard(
             block.bbox.left_x >= page_mid
                 && block.bbox.top_y < title_block.bbox.bottom_y - 25.0
                 && block.bbox.top_y > title_block.bbox.bottom_y - 95.0
-                && !bbox_layout_block_text(block).chars().all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace())
+                && !bbox_layout_block_text(block)
+                    .chars()
+                    .all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace())
         })
         .cloned()
         .collect::<Vec<_>>();
@@ -2513,13 +2547,15 @@ fn detect_layout_recommendation_ranking_panel(
     }
 
     let mut notes = collect_layout_ranking_notes(blocks, left_x, right_x, chart_cutoff);
-    notes.extend(collect_layout_emphasis_tokens(lines, |bbox| {
-        bbox.center_x() > left_x + width * 0.55
-            && bbox.center_x() < right_x
-            && bbox.top_y < chart_cutoff
-    })
-    .into_iter()
-    .map(|(_, token)| format!("{} increase", token.trim_end_matches('↑'))));
+    notes.extend(
+        collect_layout_emphasis_tokens(lines, |bbox| {
+            bbox.center_x() > left_x + width * 0.55
+                && bbox.center_x() < right_x
+                && bbox.top_y < chart_cutoff
+        })
+        .into_iter()
+        .map(|(_, token)| format!("{} increase", token.trim_end_matches('↑'))),
+    );
 
     Some(LayoutRecommendationPanel {
         heading,
@@ -2617,7 +2653,9 @@ fn extract_layout_panel_heading_and_subtitle(
                 && block.bbox.center_x() <= right_x
                 && block.bbox.top_y < title_bottom - 8.0
                 && block.bbox.top_y > title_bottom - 90.0
-                && bbox_layout_block_text(block).chars().any(char::is_alphabetic)
+                && bbox_layout_block_text(block)
+                    .chars()
+                    .any(char::is_alphabetic)
         })
         .cloned()
         .collect::<Vec<_>>();
@@ -2663,13 +2701,15 @@ fn collect_layout_panel_alpha_blocks(
             let text = normalize_layout_panel_text(&bbox_layout_block_text(block));
             let token_count = text.split_whitespace().count();
             let has_alpha = text.chars().any(char::is_alphabetic);
-            let has_numeric_marker = text.chars().any(|ch| ch.is_ascii_digit() || ch == '%' || ch == ':');
+            let has_numeric_marker = text
+                .chars()
+                .any(|ch| ch.is_ascii_digit() || ch == '%' || ch == ':');
             (has_alpha
                 && token_count >= 1
                 && !has_numeric_marker
                 && !text.starts_with(':')
                 && !text.eq_ignore_ascii_case("comparison"))
-                .then_some(block.clone())
+            .then_some(block.clone())
         })
         .collect::<Vec<_>>();
     alpha_blocks.sort_by(|left, right| {
@@ -2797,7 +2837,10 @@ fn title_case_metric_label(text: &str) -> String {
         if idx > 0 {
             out.push(' ');
         }
-        if token.chars().all(|ch| !ch.is_ascii_alphabetic() || ch.is_uppercase()) {
+        if token
+            .chars()
+            .all(|ch| !ch.is_ascii_alphabetic() || ch.is_uppercase())
+        {
             out.push_str(token);
         } else {
             let mut chars = token.chars();
@@ -3147,9 +3190,12 @@ fn normalize_layout_dashboard_text(text: &str) -> String {
     let with_inline = trailing_marker_re
         .as_ref()
         .map(|re| {
-            re.replace_all(&collapsed_terminal_marker, |captures: &regex::Captures<'_>| {
-                format!("{}{}", &captures[1], superscript_digits(&captures[2]))
-            })
+            re.replace_all(
+                &collapsed_terminal_marker,
+                |captures: &regex::Captures<'_>| {
+                    format!("{}{}", &captures[1], superscript_digits(&captures[2]))
+                },
+            )
             .to_string()
         })
         .unwrap_or(collapsed_terminal_marker);
@@ -3212,10 +3258,7 @@ fn collect_layout_figure_captions(blocks: &[BBoxLayoutBlock]) -> Vec<BBoxLayoutB
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn collect_layout_integer_tokens<F>(
-    lines: &[BBoxLayoutLine],
-    bbox_filter: F,
-) -> Vec<LayoutBarToken>
+fn collect_layout_integer_tokens<F>(lines: &[BBoxLayoutLine], bbox_filter: F) -> Vec<LayoutBarToken>
 where
     F: Fn(&BoundingBox) -> bool,
 {
@@ -3273,7 +3316,12 @@ fn detect_layout_three_month_stacked_figure(
 
     let month_centers = month_blocks
         .iter()
-        .map(|block| (block.bbox.center_x(), normalize_layout_dashboard_text(&bbox_layout_block_text(block))))
+        .map(|block| {
+            (
+                block.bbox.center_x(),
+                normalize_layout_dashboard_text(&bbox_layout_block_text(block)),
+            )
+        })
         .collect::<Vec<_>>();
     let month_top_y = month_blocks
         .iter()
@@ -3371,7 +3419,12 @@ fn detect_layout_sector_bar_figure(
                 && !text.starts_with("Will ")
                 && text != "Don’t know"
         })
-        .map(|block| (block.bbox.center_x(), normalize_layout_dashboard_text(&bbox_layout_block_text(block))))
+        .map(|block| {
+            (
+                block.bbox.center_x(),
+                normalize_layout_dashboard_text(&bbox_layout_block_text(block)),
+            )
+        })
         .collect::<Vec<_>>();
     if sector_blocks.len() != 3 {
         return None;
@@ -3456,9 +3509,7 @@ fn detect_layout_stacked_bar_narrative(
 ) -> Option<LayoutStackedBarNarrative> {
     let heading_block = blocks.iter().find(|block| {
         let text = bbox_layout_block_text(block);
-        text.starts_with("6.")
-            && text.contains("Expectations")
-            && text.contains("Employees")
+        text.starts_with("6.") && text.contains("Expectations") && text.contains("Employees")
     })?;
     let heading = normalize_layout_dashboard_text(&bbox_layout_block_text(heading_block));
 
@@ -3597,7 +3648,12 @@ fn collect_layout_legend_blocks(
                 && block.bbox.top_y >= top_max
                 && (text.starts_with("Will ") || text == "Don’t know")
         })
-        .map(|block| (block.bbox.center_x(), normalize_layout_dashboard_text(&bbox_layout_block_text(block))))
+        .map(|block| {
+            (
+                block.bbox.center_x(),
+                normalize_layout_dashboard_text(&bbox_layout_block_text(block)),
+            )
+        })
         .collect::<Vec<_>>();
     legend_blocks.sort_by(|left, right| {
         left.0
@@ -3683,10 +3739,7 @@ fn render_layout_open_plate_document_cached(
             return false;
         }
 
-        if let Some(body_start_top_y) = bridge
-            .as_ref()
-            .and_then(|bridge| bridge.body_start_top_y)
-        {
+        if let Some(body_start_top_y) = bridge.as_ref().and_then(|bridge| bridge.body_start_top_y) {
             if element.bbox().top_y > body_start_top_y + 6.0 {
                 return false;
             }
@@ -3739,7 +3792,10 @@ fn render_layout_open_plate_document_cached(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn detect_layout_block_pair_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> Option<OpenPlateCandidate> {
+fn detect_layout_block_pair_plate(
+    page_width: f64,
+    lines: &[BBoxLayoutLine],
+) -> Option<OpenPlateCandidate> {
     let blocks = collect_bbox_layout_blocks(lines);
     let page_top = blocks
         .iter()
@@ -3805,7 +3861,11 @@ fn detect_layout_block_pair_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> 
         .windows(2)
         .enumerate()
         .map(|(idx, pair)| (idx, pair[1] - pair[0]))
-        .max_by(|left, right| left.1.partial_cmp(&right.1).unwrap_or(std::cmp::Ordering::Equal))?;
+        .max_by(|left, right| {
+            left.1
+                .partial_cmp(&right.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })?;
     if max_gap < page_width * 0.04 {
         return None;
     }
@@ -3826,9 +3886,10 @@ fn detect_layout_block_pair_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> 
     let mut row_bands: Vec<(f64, Vec<String>)> = Vec::new();
     for fragment in sorted_fragments {
         let slot_idx = usize::from(fragment.bbox.center_x() > split_x);
-        if let Some((center_y, cells)) = row_bands.iter_mut().find(|(center_y, _)| {
-            (*center_y - fragment.bbox.center_y()).abs() <= row_tolerance
-        }) {
+        if let Some((center_y, cells)) = row_bands
+            .iter_mut()
+            .find(|(center_y, _)| (*center_y - fragment.bbox.center_y()).abs() <= row_tolerance)
+        {
             *center_y = (*center_y + fragment.bbox.center_y()) / 2.0;
             append_cell_text(&mut cells[slot_idx], &fragment.text);
         } else {
@@ -3860,7 +3921,10 @@ fn detect_layout_block_pair_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> 
 
     Some(OpenPlateCandidate {
         heading: heading.trim().to_string(),
-        header_row: vec![heading.trim().to_string(), infer_open_plate_secondary_header(&rows)],
+        header_row: vec![
+            heading.trim().to_string(),
+            infer_open_plate_secondary_header(&rows),
+        ],
         rows,
         caption,
         cutoff_top_y: caption_block.bbox.bottom_y,
@@ -3927,7 +3991,9 @@ fn extract_layout_toc_entries(lines: &[String]) -> Option<(String, Vec<LayoutToc
         }
 
         let spans = split_layout_line_spans(line);
-        if let Some((title_start, title_text, page_text, page_col)) = parse_layout_toc_entry_spans(&spans) {
+        if let Some((title_start, title_text, page_text, page_col)) =
+            parse_layout_toc_entry_spans(&spans)
+        {
             if let Some(prev) = entries.last_mut() {
                 if prev.page == page_text
                     && title_start <= prev.title_start + 2
@@ -4016,7 +4082,10 @@ fn parse_layout_toc_entry_spans(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn detect_layout_open_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> Option<OpenPlateCandidate> {
+fn detect_layout_open_plate(
+    page_width: f64,
+    lines: &[BBoxLayoutLine],
+) -> Option<OpenPlateCandidate> {
     let heading_idx = lines.iter().position(|line| {
         let text = bbox_layout_line_text(line);
         let word_count = text.split_whitespace().count();
@@ -4059,13 +4128,20 @@ fn detect_layout_open_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> Option
         return None;
     }
 
-    let mut centers = fragments.iter().map(|fragment| fragment.bbox.center_x()).collect::<Vec<_>>();
+    let mut centers = fragments
+        .iter()
+        .map(|fragment| fragment.bbox.center_x())
+        .collect::<Vec<_>>();
     centers.sort_by(|left, right| left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal));
     let (split_idx, max_gap) = centers
         .windows(2)
         .enumerate()
         .map(|(idx, pair)| (idx, pair[1] - pair[0]))
-        .max_by(|left, right| left.1.partial_cmp(&right.1).unwrap_or(std::cmp::Ordering::Equal))?;
+        .max_by(|left, right| {
+            left.1
+                .partial_cmp(&right.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })?;
     if max_gap < page_width * 0.04 {
         return None;
     }
@@ -4086,9 +4162,10 @@ fn detect_layout_open_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> Option
     let mut row_bands: Vec<(f64, Vec<String>)> = Vec::new();
     for fragment in sorted_fragments {
         let slot_idx = usize::from(fragment.bbox.center_x() > split_x);
-        if let Some((center_y, cells)) = row_bands.iter_mut().find(|(center_y, _)| {
-            (*center_y - fragment.bbox.center_y()).abs() <= row_tolerance
-        }) {
+        if let Some((center_y, cells)) = row_bands
+            .iter_mut()
+            .find(|(center_y, _)| (*center_y - fragment.bbox.center_y()).abs() <= row_tolerance)
+        {
             *center_y = (*center_y + fragment.bbox.center_y()) / 2.0;
             append_cell_text(&mut cells[slot_idx], &fragment.text);
         } else {
@@ -4171,7 +4248,11 @@ fn infer_open_plate_secondary_header(rows: &[Vec<String>]) -> String {
         .filter_map(|row| row.get(1))
         .map(|cell| cell.trim())
         .collect::<Vec<_>>();
-    if right_cells.len() >= 3 && right_cells.iter().all(|cell| looks_like_scientific_name(cell)) {
+    if right_cells.len() >= 3
+        && right_cells
+            .iter()
+            .all(|cell| looks_like_scientific_name(cell))
+    {
         "Scientific name".to_string()
     } else {
         String::new()
@@ -4266,10 +4347,7 @@ fn extract_layout_narrative_bridge(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn collect_deferred_caption_blocks(
-    page_width: f64,
-    lines: &[&BBoxLayoutLine],
-) -> Vec<String> {
+fn collect_deferred_caption_blocks(page_width: f64, lines: &[&BBoxLayoutLine]) -> Vec<String> {
     let mut captions = Vec::new();
     let mut consumed_block_ids = Vec::new();
     let mut idx = 0usize;
@@ -4380,7 +4458,10 @@ fn looks_like_scientific_name(text: &str) -> bool {
     }
 
     tokens[0].chars().next().is_some_and(char::is_uppercase)
-        && tokens[0].chars().skip(1).all(|ch| ch.is_lowercase() || ch == '-')
+        && tokens[0]
+            .chars()
+            .skip(1)
+            .all(|ch| ch.is_lowercase() || ch == '-')
         && tokens[1].chars().all(|ch| ch.is_lowercase() || ch == '-')
 }
 
@@ -4419,7 +4500,11 @@ fn split_bbox_layout_line_fragments(line: &BBoxLayoutLine) -> Vec<LayoutTextFrag
     let median_gap = sorted_gaps[sorted_gaps.len() / 2];
     let (split_idx, max_gap) = gaps
         .iter()
-        .max_by(|left, right| left.1.partial_cmp(&right.1).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|left, right| {
+            left.1
+                .partial_cmp(&right.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
         .copied()
         .unwrap();
 
@@ -4487,8 +4572,7 @@ fn read_pdftotext_bbox_layout_lines(path: &Path) -> Option<(f64, Vec<BBoxLayoutL
     }
 
     let xml = String::from_utf8_lossy(&output.stdout);
-    let page_re =
-        Regex::new(r#"(?s)<page width="([^"]+)" height="([^"]+)">(.*?)</page>"#).ok()?;
+    let page_re = Regex::new(r#"(?s)<page width="([^"]+)" height="([^"]+)">(.*?)</page>"#).ok()?;
     let block_re = Regex::new(
         r#"(?s)<block xMin="([^"]+)" yMin="([^"]+)" xMax="([^"]+)" yMax="([^"]+)">(.*?)</block>"#,
     )
@@ -4551,8 +4635,20 @@ fn read_pdftotext_bbox_layout_lines(path: &Path) -> Option<(f64, Vec<BBoxLayoutL
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn bbox_layout_box(page_height: f64, x_min: f64, y_min: f64, x_max: f64, y_max: f64) -> BoundingBox {
-    BoundingBox::new(Some(1), x_min, page_height - y_max, x_max, page_height - y_min)
+fn bbox_layout_box(
+    page_height: f64,
+    x_min: f64,
+    y_min: f64,
+    x_max: f64,
+    y_max: f64,
+) -> BoundingBox {
+    BoundingBox::new(
+        Some(1),
+        x_min,
+        page_height - y_max,
+        x_max,
+        page_height - y_min,
+    )
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -5031,7 +5127,9 @@ fn find_layout_dual_table_article_body_start_idx(doc: &PdfDocument) -> usize {
         .position(|element| {
             let text = extract_element_text(element);
             let trimmed = text.trim();
-            body_markers.iter().any(|marker| trimmed.starts_with(marker))
+            body_markers
+                .iter()
+                .any(|marker| trimmed.starts_with(marker))
         })
         .unwrap_or(4.min(doc.kids.len()))
 }
@@ -5118,7 +5216,10 @@ fn parse_layout_anchor_table(
     if header_spans.len() < 4 {
         return None;
     }
-    let column_starts = header_spans.iter().map(|(start, _)| *start).collect::<Vec<_>>();
+    let column_starts = header_spans
+        .iter()
+        .map(|(start, _)| *start)
+        .collect::<Vec<_>>();
     let header = header_spans
         .into_iter()
         .map(|(_, text)| text)
@@ -5147,7 +5248,10 @@ fn parse_layout_anchor_table(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn assign_layout_spans_to_columns(spans: &[(usize, String)], column_starts: &[usize]) -> Vec<String> {
+fn assign_layout_spans_to_columns(
+    spans: &[(usize, String)],
+    column_starts: &[usize],
+) -> Vec<String> {
     let mut cells = vec![String::new(); column_starts.len()];
     for (start, text) in spans {
         let Some((col_idx, _)) = column_starts
@@ -5205,7 +5309,9 @@ fn render_layout_titled_dual_table_document_cached(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn detect_layout_titled_dual_table_document(lines: &[String]) -> Option<LayoutTitledDualTableDocument> {
+fn detect_layout_titled_dual_table_document(
+    lines: &[String],
+) -> Option<LayoutTitledDualTableDocument> {
     let title_idx = lines
         .iter()
         .position(|line| normalize_heading_text(line.trim()) == "jailedfordoingbusiness")?;
@@ -5230,7 +5336,9 @@ fn detect_layout_titled_dual_table_document(lines: &[String]) -> Option<LayoutTi
         let header_idx = (*caption_idx + 1..next_caption_idx).find(|idx| {
             let spans = split_layout_line_spans(&lines[*idx]);
             (spans.len() == 3 || spans.len() == 4)
-                && spans.iter().all(|(_, text)| text.split_whitespace().count() <= 3)
+                && spans
+                    .iter()
+                    .all(|(_, text)| text.split_whitespace().count() <= 3)
         })?;
         let note_idx = (header_idx + 1..next_caption_idx)
             .find(|idx| lines[*idx].trim_start().starts_with('*'))
@@ -5244,7 +5352,13 @@ fn detect_layout_titled_dual_table_document(lines: &[String]) -> Option<LayoutTi
 
         let rows = parse_layout_titled_stub_table(lines, header_idx, note_idx)?;
         let note = (note_idx < next_caption_idx)
-            .then(|| lines[note_idx].trim().trim_start_matches('*').trim().to_string())
+            .then(|| {
+                lines[note_idx]
+                    .trim()
+                    .trim_start_matches('*')
+                    .trim()
+                    .to_string()
+            })
             .filter(|text| !text.is_empty());
 
         sections.push(LayoutTitledTableSection {
@@ -5289,9 +5403,9 @@ fn parse_layout_titled_stub_table(
         }
 
         let first_data_start = column_starts.get(1).copied().unwrap_or(usize::MAX);
-        let stub_only_line = spans.iter().all(|(start, text)| {
-            *start < first_data_start && !looks_like_layout_value(text)
-        });
+        let stub_only_line = spans
+            .iter()
+            .all(|(start, text)| *start < first_data_start && !looks_like_layout_value(text));
         if stub_only_line {
             let stub_text = spans
                 .iter()
@@ -5317,7 +5431,8 @@ fn parse_layout_titled_stub_table(
 
         let row = assign_layout_spans_to_columns(&spans, &column_starts);
         let row_has_values = row.iter().skip(1).any(|cell| looks_like_layout_value(cell));
-        let only_stub = !row[0].trim().is_empty() && row.iter().skip(1).all(|cell| cell.trim().is_empty());
+        let only_stub =
+            !row[0].trim().is_empty() && row.iter().skip(1).all(|cell| cell.trim().is_empty());
 
         if row_has_values {
             let mut finalized = row;
@@ -5392,14 +5507,13 @@ fn render_layout_registration_report_document_cached(
 fn detect_layout_registration_report_document(
     lines: &[String],
 ) -> Option<LayoutRegistrationReportDocument> {
-    let title_idx = lines
-        .iter()
-        .position(|line| normalize_heading_text(line.trim()) == "anfrelpreelectionassessmentmissionreport")?;
+    let title_idx = lines.iter().position(|line| {
+        normalize_heading_text(line.trim()) == "anfrelpreelectionassessmentmissionreport"
+    })?;
     let title = lines[title_idx].trim().to_string();
 
     let first_row_idx = (title_idx + 1..lines.len()).find(|idx| {
-        lines[*idx].trim_start().starts_with("11")
-            && lines[*idx].contains("Khmer United Party")
+        lines[*idx].trim_start().starts_with("11") && lines[*idx].contains("Khmer United Party")
     })?;
     let footer_idx = (first_row_idx + 1..lines.len())
         .find(|idx| is_standalone_page_number(lines[*idx].trim()))
@@ -5487,14 +5601,13 @@ fn collect_layout_caption_paragraph(lines: &[String], start_idx: usize) -> Optio
             }
             continue;
         }
-        if !caption_lines.is_empty()
-            && trimmed.contains("H6 (Avg.)")
-            && trimmed.contains("GSM8K")
-        {
+        if !caption_lines.is_empty() && trimmed.contains("H6 (Avg.)") && trimmed.contains("GSM8K") {
             break;
         }
         if !caption_lines.is_empty()
-            && (trimmed.starts_with("Table ") || trimmed.starts_with("5 ") || trimmed == "5 Conclusion")
+            && (trimmed.starts_with("Table ")
+                || trimmed.starts_with("5 ")
+                || trimmed == "5 Conclusion")
         {
             break;
         }
@@ -5506,7 +5619,9 @@ fn collect_layout_caption_paragraph(lines: &[String], start_idx: usize) -> Optio
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn detect_layout_appendix_tables_document(lines: &[String]) -> Option<LayoutAppendixTablesDocument> {
+fn detect_layout_appendix_tables_document(
+    lines: &[String],
+) -> Option<LayoutAppendixTablesDocument> {
     let title_idx = lines
         .iter()
         .position(|line| normalize_heading_text(line.trim()) == "appendices")?;
@@ -5523,10 +5638,7 @@ fn detect_layout_appendix_tables_document(lines: &[String]) -> Option<LayoutAppe
 
     let mut sections = Vec::new();
     for (pos, caption_idx) in caption_indices.iter().enumerate() {
-        let next_caption_idx = caption_indices
-            .get(pos + 1)
-            .copied()
-            .unwrap_or(lines.len());
+        let next_caption_idx = caption_indices.get(pos + 1).copied().unwrap_or(lines.len());
 
         let mut heading_lines = vec![lines[*caption_idx].trim().to_string()];
         let mut cursor = caption_idx + 1;
@@ -5573,7 +5685,10 @@ fn detect_layout_appendix_tables_document(lines: &[String]) -> Option<LayoutAppe
         if first_row_spans.len() != 4 {
             return None;
         }
-        let column_starts = first_row_spans.iter().map(|(start, _)| *start).collect::<Vec<_>>();
+        let column_starts = first_row_spans
+            .iter()
+            .map(|(start, _)| *start)
+            .collect::<Vec<_>>();
 
         let mut header_cells = vec![String::new(); column_starts.len()];
         for line in lines.iter().take(data_start).skip(cursor) {
@@ -5661,26 +5776,23 @@ fn read_pdftotext_layout_lines(path: &Path) -> Option<Vec<String>> {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn find_layout_header_candidate(lines: &[String]) -> Option<LayoutHeaderCandidate> {
-    lines
-        .iter()
-        .enumerate()
-        .find_map(|(line_idx, line)| {
-            let spans = split_layout_line_spans(line);
-            if spans.len() != 4 {
-                return None;
-            }
-            let headers: Vec<String> = spans.iter().map(|(_, text)| text.clone()).collect();
-            let starts: Vec<usize> = spans.iter().map(|(start, _)| *start).collect();
-            let short_headers = headers
-                .iter()
-                .all(|text| text.split_whitespace().count() <= 3 && text.len() <= 24);
-            let increasing = starts.windows(2).all(|pair| pair[1] > pair[0] + 6);
-            (short_headers && increasing).then_some(LayoutHeaderCandidate {
-                line_idx,
-                headers,
-                starts,
-            })
+    lines.iter().enumerate().find_map(|(line_idx, line)| {
+        let spans = split_layout_line_spans(line);
+        if spans.len() != 4 {
+            return None;
+        }
+        let headers: Vec<String> = spans.iter().map(|(_, text)| text.clone()).collect();
+        let starts: Vec<usize> = spans.iter().map(|(start, _)| *start).collect();
+        let short_headers = headers
+            .iter()
+            .all(|text| text.split_whitespace().count() <= 3 && text.len() <= 24);
+        let increasing = starts.windows(2).all(|pair| pair[1] > pair[0] + 6);
+        (short_headers && increasing).then_some(LayoutHeaderCandidate {
+            line_idx,
+            headers,
+            starts,
         })
+    })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -5929,7 +6041,13 @@ fn infer_layout_panel_body_starts(
 
     Some(
         (0..3)
-            .map(|col_idx| candidates.iter().map(|starts| starts[col_idx]).min().unwrap_or(0))
+            .map(|col_idx| {
+                candidates
+                    .iter()
+                    .map(|starts| starts[col_idx])
+                    .min()
+                    .unwrap_or(0)
+            })
             .collect(),
     )
 }
@@ -5988,7 +6106,9 @@ fn build_layout_anchor_rows(
             continue;
         }
 
-        let next_pos = anchor_indices.iter().position(|anchor| *anchor > entry.line_idx);
+        let next_pos = anchor_indices
+            .iter()
+            .position(|anchor| *anchor > entry.line_idx);
         let prev_pos = next_pos
             .map(|pos| pos.saturating_sub(1))
             .unwrap_or(rows.len().saturating_sub(1));
@@ -6010,8 +6130,8 @@ fn build_layout_anchor_rows(
 
             if (previous_line_blank && anchor_indices[next_pos].saturating_sub(entry.line_idx) <= 1)
                 || (filled_slots == [3]
-                && anchor_indices[next_pos].saturating_sub(entry.line_idx) <= 1
-                && !rows[prev_pos].cells[3].trim().is_empty())
+                    && anchor_indices[next_pos].saturating_sub(entry.line_idx) <= 1
+                    && !rows[prev_pos].cells[3].trim().is_empty())
             {
                 next_pos
             } else if prev_stage_empty && next_stage_empty {
@@ -6239,9 +6359,7 @@ fn toc_heading_level(text: &str, has_contents_title: bool) -> Option<usize> {
         return None;
     }
 
-    if lower.starts_with("part ")
-        || lower.starts_with("chapter ")
-        || lower.starts_with("appendix ")
+    if lower.starts_with("part ") || lower.starts_with("chapter ") || lower.starts_with("appendix ")
     {
         return Some(1);
     }
@@ -6808,10 +6926,7 @@ fn trim_large_top_table_plate(blocks: &[&str], start: usize) -> Option<String> {
         let trimmed = block.trim();
         trimmed.starts_with("# ")
             || trimmed.starts_with("## ")
-            || trimmed
-                .chars()
-                .next()
-                .is_some_and(|ch| ch.is_ascii_digit())
+            || trimmed.chars().next().is_some_and(|ch| ch.is_ascii_digit())
                 && trimmed.contains(" Main Results")
     });
     has_following_section.then_some(blocks[0].trim().to_string())
@@ -7055,7 +7170,10 @@ fn should_drop_artifact_table_block(blocks: &[&str], start: usize) -> bool {
         .and_then(|idx| blocks.get(idx))
         .map(|block| block.trim())
         .unwrap_or("");
-    let next = blocks.get(start + 1).map(|block| block.trim()).unwrap_or("");
+    let next = blocks
+        .get(start + 1)
+        .map(|block| block.trim())
+        .unwrap_or("");
 
     if rows.len() == 2 && rows.first().is_some_and(|row| row.len() == 1) {
         let header = rows[0][0].trim();
@@ -7268,7 +7386,9 @@ fn chart_value_header(caption: &str) -> String {
     let mut base = title.to_string();
     if let Some(idx) = base.rfind(" in ") {
         let tail = base[idx + 4..].trim();
-        if tail.split_whitespace().count() <= 2 && tail.chars().next().is_some_and(char::is_uppercase) {
+        if tail.split_whitespace().count() <= 2
+            && tail.chars().next().is_some_and(char::is_uppercase)
+        {
             base.truncate(idx);
         }
     }
@@ -7306,10 +7426,12 @@ fn strip_structural_caption_prefix(text: &str) -> &str {
     };
 
     let first_lower = first.to_ascii_lowercase();
-    if matches!(first_lower.as_str(), "figure" | "table" | "diagram" | "chart")
-        && second
-            .chars()
-            .all(|ch| ch.is_ascii_digit() || matches!(ch, '.' | ':'))
+    if matches!(
+        first_lower.as_str(),
+        "figure" | "table" | "diagram" | "chart"
+    ) && second
+        .chars()
+        .all(|ch| ch.is_ascii_digit() || matches!(ch, '.' | ':'))
     {
         rest.trim()
     } else {
@@ -7466,7 +7588,9 @@ fn normalize_degree_spacing(text: &str) -> String {
 
 fn normalize_list_text(text: &str) -> String {
     let normalized = normalize_common_ocr_text(text);
-    let trimmed = normalized.trim_start_matches(|ch: char| is_bullet_like(ch)).trim();
+    let trimmed = normalized
+        .trim_start_matches(|ch: char| is_bullet_like(ch))
+        .trim();
     trimmed.to_string()
 }
 
@@ -7501,9 +7625,10 @@ fn should_merge_list_continuation(previous: &str, current: &str) -> bool {
         return true;
     }
 
-    trimmed.chars().next().is_some_and(|ch| {
-        ch.is_ascii_lowercase() || matches!(ch, ',' | ';' | ')' | ']' | '%')
-    })
+    trimmed
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_lowercase() || matches!(ch, ',' | ';' | ')' | ']' | '%'))
 }
 
 fn is_pure_bullet_marker(text: &str) -> bool {
@@ -7517,7 +7642,22 @@ fn looks_like_stray_list_page_number(text: &str) -> bool {
 }
 
 fn is_bullet_like(ch: char) -> bool {
-    matches!(ch, '•' | '◦' | '▪' | '▸' | '▹' | '►' | '▻' | '●' | '○' | '■' | '□' | '◆' | '◇' | '-')
+    matches!(
+        ch,
+        '•' | '◦'
+            | '▪'
+            | '▸'
+            | '▹'
+            | '►'
+            | '▻'
+            | '●'
+            | '○'
+            | '■'
+            | '□'
+            | '◆'
+            | '◇'
+            | '-'
+    )
 }
 
 fn looks_like_isolated_caption_context(caption: &str, next_block: &str) -> bool {
@@ -7551,10 +7691,7 @@ fn looks_like_numeric_noise_block(block: &str) -> bool {
 }
 
 fn looks_like_yearish_label(label: &str) -> bool {
-    label
-        .chars()
-        .next()
-        .is_some_and(|ch| ch.is_ascii_digit())
+    label.chars().next().is_some_and(|ch| ch.is_ascii_digit())
 }
 
 fn looks_like_year_token(token: &str) -> bool {
@@ -7562,7 +7699,9 @@ fn looks_like_year_token(token: &str) -> bool {
 }
 
 fn looks_like_category_label(token: &str) -> bool {
-    token.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '/' | '%'))
+    token
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '/' | '%'))
         && token.chars().any(|ch| ch.is_ascii_alphabetic())
 }
 
@@ -8541,9 +8680,13 @@ fn should_skip_leading_figure_carryover(doc: &PdfDocument, idx: usize, text: &st
             ContentElement::Paragraph(_)
             | ContentElement::TextBlock(_)
             | ContentElement::TextLine(_) => {
-                should_render_paragraph_as_heading(doc, lookahead_idx, next_trimmed, doc.kids.get(lookahead_idx + 1))
-                    && (looks_like_numbered_section(next_trimmed)
-                        || looks_like_keyword_numbered_section(next_trimmed))
+                should_render_paragraph_as_heading(
+                    doc,
+                    lookahead_idx,
+                    next_trimmed,
+                    doc.kids.get(lookahead_idx + 1),
+                ) && (looks_like_numbered_section(next_trimmed)
+                    || looks_like_keyword_numbered_section(next_trimmed))
             }
             _ => false,
         };
@@ -8552,7 +8695,8 @@ fn should_skip_leading_figure_carryover(doc: &PdfDocument, idx: usize, text: &st
             return true;
         }
 
-        if !starts_with_caption_prefix(next_trimmed) && next_trimmed.split_whitespace().count() >= 5 {
+        if !starts_with_caption_prefix(next_trimmed) && next_trimmed.split_whitespace().count() >= 5
+        {
             return false;
         }
     }
@@ -8914,8 +9058,14 @@ fn preserve_grouped_header_rows(rows: &mut [Vec<String>]) -> bool {
         return false;
     }
 
-    let first_filled = rows[0].iter().filter(|cell| !cell.trim().is_empty()).count();
-    let second_filled = rows[1].iter().filter(|cell| !cell.trim().is_empty()).count();
+    let first_filled = rows[0]
+        .iter()
+        .filter(|cell| !cell.trim().is_empty())
+        .count();
+    let second_filled = rows[1]
+        .iter()
+        .filter(|cell| !cell.trim().is_empty())
+        .count();
     if first_filled < 2 || second_filled <= first_filled || !has_internal_header_gap(&rows[0]) {
         return false;
     }
@@ -9203,11 +9353,11 @@ fn build_footnote_citation_region(
         && starts_with_footnote_marker(trimmed_start)
     {
         if let Some((attach_idx, prefix, leading_fragments)) = leading_footnote_attachment(
-                doc,
-                start_idx,
-                page_number,
-                &column_bbox,
-                small_font_threshold,
+            doc,
+            start_idx,
+            page_number,
+            &column_bbox,
+            small_font_threshold,
         ) {
             lead_prefix = Some(prefix);
             fragments.extend(leading_fragments);
@@ -9284,7 +9434,10 @@ fn build_footnote_citation_region(
     }
 
     let mut rendered_rows = vec![vec!["Footnote".to_string(), "Citation".to_string()]];
-    rendered_rows.extend(rows.into_iter().map(|(marker, citation)| vec![marker, citation]));
+    rendered_rows.extend(
+        rows.into_iter()
+            .map(|(marker, citation)| vec![marker, citation]),
+    );
 
     let mut rendered = String::new();
     if let Some(prefix) = lead_prefix {
@@ -9459,10 +9612,11 @@ fn find_footnote_marker_positions(text: &str) -> Vec<(usize, String, usize)> {
         }
 
         let at_boundary = idx == 0
-            || chars[idx - 1]
-                .1
-                .is_whitespace()
-            || matches!(chars[idx - 1].1, '.' | ',' | ';' | ':' | ')' | ']' | '"' | '\'' | '”');
+            || chars[idx - 1].1.is_whitespace()
+            || matches!(
+                chars[idx - 1].1,
+                '.' | ',' | ';' | ':' | ')' | ']' | '"' | '\'' | '”'
+            );
         if !at_boundary {
             idx += 1;
             continue;
@@ -9472,7 +9626,11 @@ fn find_footnote_marker_positions(text: &str) -> Vec<(usize, String, usize)> {
         while end_idx < chars.len() && chars[end_idx].1.is_ascii_digit() {
             end_idx += 1;
         }
-        let digits = &text[byte_idx..chars.get(end_idx).map(|(pos, _)| *pos).unwrap_or(text.len())];
+        let digits = &text[byte_idx
+            ..chars
+                .get(end_idx)
+                .map(|(pos, _)| *pos)
+                .unwrap_or(text.len())];
         if digits.len() > 2 || end_idx >= chars.len() || !chars[end_idx].1.is_whitespace() {
             idx += 1;
             continue;
@@ -9491,7 +9649,10 @@ fn find_footnote_marker_positions(text: &str) -> Vec<(usize, String, usize)> {
             continue;
         }
 
-        let skip_end = chars.get(lookahead).map(|(pos, _)| *pos).unwrap_or(text.len());
+        let skip_end = chars
+            .get(lookahead)
+            .map(|(pos, _)| *pos)
+            .unwrap_or(text.len());
         markers.push((byte_idx, digits.to_string(), skip_end - byte_idx));
         idx = lookahead;
     }
@@ -9606,7 +9767,10 @@ fn build_geometric_table_region(
     let slot_count = slot_ranges.len();
     let dense_header_rows = header_rows
         .iter()
-        .filter(|row| row.iter().filter(|cell| !cell.trim().is_empty()).count() >= slot_count.saturating_sub(1).max(2))
+        .filter(|row| {
+            row.iter().filter(|cell| !cell.trim().is_empty()).count()
+                >= slot_count.saturating_sub(1).max(2)
+        })
         .count();
     if dense_header_rows == 0 {
         return None;
@@ -9617,8 +9781,13 @@ fn build_geometric_table_region(
 
     let following_indices = collect_table_footer_candidate_indices(doc, table_idx, table);
     let body_rows = if needs_external_stub && should_merge_panel_body_rows(&table_rows) {
-        let trailing_rows = reconstruct_aligned_rows(doc, &following_indices, &slot_ranges, false, 1);
-        vec![merge_panel_body_row(&table_rows, &trailing_rows, slot_count)]
+        let trailing_rows =
+            reconstruct_aligned_rows(doc, &following_indices, &slot_ranges, false, 1);
+        vec![merge_panel_body_row(
+            &table_rows,
+            &trailing_rows,
+            slot_count,
+        )]
     } else if needs_external_stub {
         table_rows
             .iter()
@@ -9640,10 +9809,7 @@ fn build_geometric_table_region(
     let rendered = render_pipe_rows(&combined_rows);
     Some(GeometricTableRegion {
         start_idx: candidate_indices[0],
-        end_idx: following_indices
-            .last()
-            .copied()
-            .unwrap_or(table_idx),
+        end_idx: following_indices.last().copied().unwrap_or(table_idx),
         rendered,
     })
 }
@@ -9770,7 +9936,8 @@ fn infer_left_stub_requirement(
     let first_width = (column_ranges[0].1 - column_ranges[0].0).max(1.0);
     let has_left_label = candidate_indices.iter().any(|idx| {
         let bbox = doc.kids[*idx].bbox();
-        bbox.right_x <= column_ranges[0].0 + first_width * 0.12 && bbox.width() <= first_width * 0.45
+        bbox.right_x <= column_ranges[0].0 + first_width * 0.12
+            && bbox.width() <= first_width * 0.45
     });
     if !has_left_label {
         return false;
@@ -9977,7 +10144,10 @@ fn chunk_lines_from_semantic_node(node: &SemanticTextNode) -> Vec<ChunkLine> {
     lines
 }
 
-fn split_line_into_slot_fragments(line: &ChunkLine, slot_ranges: &[(f64, f64)]) -> Vec<SlotFragment> {
+fn split_line_into_slot_fragments(
+    line: &ChunkLine,
+    slot_ranges: &[(f64, f64)],
+) -> Vec<SlotFragment> {
     let mut groups: Vec<(usize, Vec<TextChunk>, BoundingBox)> = Vec::new();
 
     for chunk in line
@@ -10001,12 +10171,17 @@ fn split_line_into_slot_fragments(line: &ChunkLine, slot_ranges: &[(f64, f64)]) 
     groups
         .into_iter()
         .filter_map(|(slot_idx, chunks, bbox)| {
-            let text =
-                normalize_common_ocr_text(&crate::models::text::TextLine::concatenate_chunks(&chunks));
+            let text = normalize_common_ocr_text(
+                &crate::models::text::TextLine::concatenate_chunks(&chunks),
+            );
             if text.trim().is_empty() {
                 None
             } else {
-                Some(SlotFragment { slot_idx, bbox, text })
+                Some(SlotFragment {
+                    slot_idx,
+                    bbox,
+                    text,
+                })
             }
         })
         .collect()
@@ -10100,7 +10275,9 @@ fn promote_embedded_stub_header(header_rows: &mut [Vec<String>], table_rows: &[V
         .skip(1)
         .filter(|cell| !cell.trim().is_empty())
         .count();
-    if header_fill < header_row.len().saturating_sub(1) || body_fill < first_body_row.len().saturating_sub(1) {
+    if header_fill < header_row.len().saturating_sub(1)
+        || body_fill < first_body_row.len().saturating_sub(1)
+    {
         return;
     }
 
@@ -10392,7 +10569,9 @@ fn cell_text_content(cell: &crate::models::table::TableBorderCell) -> String {
     // is collapsed correctly.
     if !cell.content.is_empty() {
         let chunks: Vec<_> = cell.content.iter().map(|t| t.base.clone()).collect();
-        return normalize_common_ocr_text(&crate::models::text::TextLine::concatenate_chunks(&chunks));
+        return normalize_common_ocr_text(&crate::models::text::TextLine::concatenate_chunks(
+            &chunks,
+        ));
     }
     // Fall back to processed contents
     let mut text = String::new();
@@ -10650,7 +10829,8 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
         let curr_has_distinct_header = prev_has_header
             && curr_has_header
             && !header_schema_matches(lines[prev.start], lines[curr.start])
-            && (curr.cols != prev.cols || header_overlap_ratio(lines[prev.start], lines[curr.start]) < 1.0);
+            && (curr.cols != prev.cols
+                || header_overlap_ratio(lines[prev.start], lines[curr.start]) < 1.0);
 
         if (gap_all_blank || gap_heading_only || gap_short_fragment)
             && prev.cols > 0
@@ -10848,7 +11028,8 @@ mod tests {
         ];
 
         let header = find_layout_header_candidate(&lines).unwrap();
-        let rows = build_layout_anchor_rows(&lines, &extract_layout_entries(&lines, &header)).unwrap();
+        let rows =
+            build_layout_anchor_rows(&lines, &extract_layout_entries(&lines, &header)).unwrap();
 
         assert_eq!(
             header.headers,
@@ -11072,7 +11253,9 @@ mod tests {
                 "Cyprinodon longidorsalis".to_string()
             ]
         );
-        assert!(plate.caption.starts_with("Table 6.1: Four fish species on IUCN Red List"));
+        assert!(plate
+            .caption
+            .starts_with("Table 6.1: Four fish species on IUCN Red List"));
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -11090,17 +11273,29 @@ mod tests {
         };
         let lines = vec![
             make_bbox_layout_line(
-                &[("Public", 56.0, 83.0), ("aquariums,", 88.0, 135.0), ("because", 140.0, 174.0)],
+                &[
+                    ("Public", 56.0, 83.0),
+                    ("aquariums,", 88.0, 135.0),
+                    ("because", 140.0, 174.0),
+                ],
                 509.0,
                 521.0,
             ),
             make_bbox_layout_line(
-                &[("of", 180.0, 188.0), ("their", 194.0, 214.0), ("in-", 220.0, 233.0)],
+                &[
+                    ("of", 180.0, 188.0),
+                    ("their", 194.0, 214.0),
+                    ("in-", 220.0, 233.0),
+                ],
                 509.0,
                 521.0,
             ),
             make_bbox_layout_line(
-                &[("house", 56.0, 82.0), ("expertise,", 84.0, 125.0), ("can", 128.0, 143.0)],
+                &[
+                    ("house", 56.0, 82.0),
+                    ("expertise,", 84.0, 125.0),
+                    ("can", 128.0, 143.0),
+                ],
                 495.0,
                 507.0,
             ),
@@ -11111,40 +11306,69 @@ mod tests {
             ),
             make_bbox_layout_line_in_block(
                 1,
-                &[("Figure", 242.0, 265.0), ("6.3:", 267.0, 280.0), ("Photo", 282.0, 303.0)],
+                &[
+                    ("Figure", 242.0, 265.0),
+                    ("6.3:", 267.0, 280.0),
+                    ("Photo", 282.0, 303.0),
+                ],
                 355.0,
                 366.0,
             ),
             make_bbox_layout_line_in_block(
                 1,
-                &[("of", 305.0, 312.0), ("the", 314.0, 325.0), ("species.", 327.0, 360.0)],
+                &[
+                    ("of", 305.0, 312.0),
+                    ("the", 314.0, 325.0),
+                    ("species.", 327.0, 360.0),
+                ],
                 355.0,
                 366.0,
             ),
             make_bbox_layout_line(
-                &[("The", 56.0, 73.0), ("breeding", 77.0, 114.0), ("colonies", 118.0, 153.0)],
+                &[
+                    ("The", 56.0, 73.0),
+                    ("breeding", 77.0, 114.0),
+                    ("colonies", 118.0, 153.0),
+                ],
                 330.0,
                 342.0,
             ),
             make_bbox_layout_line(
-                &[("of", 157.0, 165.0), ("the", 169.0, 183.0), ("Butterfly", 187.0, 224.0), ("Splitfin", 228.0, 258.0), ("at", 314.0, 323.0), ("the", 327.0, 341.0), ("London", 345.0, 377.0), ("Zoo", 381.0, 397.0), ("and", 401.0, 416.0), ("elsewhere", 420.0, 463.0), ("serve", 467.0, 489.0), ("as", 493.0, 502.0), ("ark", 506.0, 519.0)],
+                &[
+                    ("of", 157.0, 165.0),
+                    ("the", 169.0, 183.0),
+                    ("Butterfly", 187.0, 224.0),
+                    ("Splitfin", 228.0, 258.0),
+                    ("at", 314.0, 323.0),
+                    ("the", 327.0, 341.0),
+                    ("London", 345.0, 377.0),
+                    ("Zoo", 381.0, 397.0),
+                    ("and", 401.0, 416.0),
+                    ("elsewhere", 420.0, 463.0),
+                    ("serve", 467.0, 489.0),
+                    ("as", 493.0, 502.0),
+                    ("ark", 506.0, 519.0),
+                ],
                 330.0,
                 342.0,
             ),
             make_bbox_layout_line(
-                &[("Figure", 56.0, 79.0), ("6.4:", 81.0, 94.0), ("Lake", 96.0, 116.0), ("Sturgeon", 118.0, 158.0)],
+                &[
+                    ("Figure", 56.0, 79.0),
+                    ("6.4:", 81.0, 94.0),
+                    ("Lake", 96.0, 116.0),
+                    ("Sturgeon", 118.0, 158.0),
+                ],
                 104.0,
                 116.0,
             ),
         ];
 
         let bridge = extract_layout_narrative_bridge(576.0, &lines, &plate).unwrap();
-        assert!(
-            bridge
-                .bridge_paragraph
-                .as_deref()
-                .is_some_and(|text| text.contains("Public aquariums") && text.contains("expertise"))
-        );
+        assert!(bridge
+            .bridge_paragraph
+            .as_deref()
+            .is_some_and(|text| text.contains("Public aquariums") && text.contains("expertise")));
         assert_eq!(bridge.deferred_captions.len(), 2);
         assert!(bridge.deferred_captions[0].contains("Figure 6.3:"));
         assert!(bridge.deferred_captions[0].contains("species."));
@@ -11153,12 +11377,15 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_detect_layout_ocr_benchmark_dashboard_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000199.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000199.pdf");
         let (page_width, lines) = read_pdftotext_bbox_layout_lines(&path).unwrap();
         let dashboard = detect_layout_ocr_benchmark_dashboard(page_width, &lines).unwrap();
 
-        assert_eq!(dashboard.title, "Base Model Performance Evaluation of Upstage OCR Pack");
+        assert_eq!(
+            dashboard.title,
+            "Base Model Performance Evaluation of Upstage OCR Pack"
+        );
         assert_eq!(dashboard.left_columns.len(), 2);
         assert_eq!(
             dashboard.left_columns[0],
@@ -11166,7 +11393,11 @@ mod tests {
         );
         assert_eq!(
             dashboard.left_rows[0],
-            vec!["Company A²".to_string(), "70.23".to_string(), "80.41".to_string()]
+            vec![
+                "Company A²".to_string(),
+                "70.23".to_string(),
+                "80.41".to_string()
+            ]
         );
         assert_eq!(
             dashboard.right_rows[0],
@@ -11200,8 +11431,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_render_layout_single_caption_chart_document_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000037.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000037.pdf");
         let doc = PdfDocument {
             title: None,
             source_path: Some(path.to_string_lossy().to_string()),
@@ -11214,23 +11445,21 @@ mod tests {
         let rendered = render_layout_single_caption_chart_document(&doc).unwrap();
         assert!(rendered.contains("# 3. Impact on Business Operations"));
         assert!(rendered.contains("## 3.1. Status of Business Operations"));
-        assert!(rendered.contains(
-            "As shown in Figure 3.1.1, the number of MSMEs"
-        ));
-        assert!(rendered.contains(
-            "Figure 3.1.1: Status of operations during each survey phase (%)"
-        ));
-        assert!(rendered.contains(
-            "lockdown period. In the handicraft/textile sector, 30% of MSMEs"
-        ));
+        assert!(rendered.contains("As shown in Figure 3.1.1, the number of MSMEs"));
+        assert!(
+            rendered.contains("Figure 3.1.1: Status of operations during each survey phase (%)")
+        );
+        assert!(
+            rendered.contains("lockdown period. In the handicraft/textile sector, 30% of MSMEs")
+        );
         assert!(!rendered.contains("| Lockdown Period |"));
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_captioned_media_document_on_real_pdf_72() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000072.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000072.pdf");
         let doc = PdfDocument {
             title: None,
             source_path: Some(path.to_string_lossy().to_string()),
@@ -11242,17 +11471,28 @@ mod tests {
         };
         let md = to_markdown(&doc).unwrap();
         assert!(md.contains("## Diagram 5"), "{md}");
-        assert!(md.contains("**Distribution of Komnas HAM’s YouTube Content (2019-2020)**"), "{md}");
-        assert!(md.contains("As of 1 December 2021, the Komnas HAM’s YouTube channel has 2,290 subscribers"), "{md}");
+        assert!(
+            md.contains("**Distribution of Komnas HAM’s YouTube Content (2019-2020)**"),
+            "{md}"
+        );
+        assert!(
+            md.contains(
+                "As of 1 December 2021, the Komnas HAM’s YouTube channel has 2,290 subscribers"
+            ),
+            "{md}"
+        );
         assert!(md.contains("**Figure 4**"), "{md}");
-        assert!(md.contains("*Komnas HAM’s YouTube channel as of 1 December 2021*"), "{md}");
+        assert!(
+            md.contains("*Komnas HAM’s YouTube channel as of 1 December 2021*"),
+            "{md}"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_captioned_media_document_on_real_pdf_73() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000073.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000073.pdf");
         let doc = PdfDocument {
             title: None,
             source_path: Some(path.to_string_lossy().to_string()),
@@ -11263,21 +11503,33 @@ mod tests {
             ..PdfDocument::new("01030000000073.pdf".to_string())
         };
         let md = to_markdown(&doc).unwrap();
-        assert!(md.starts_with("# In this content, DPN Argentina provides a brief explanation"), "{md}");
-        assert!(md.contains("Examples of such greetings are as follows:"), "{md}");
+        assert!(
+            md.starts_with("# In this content, DPN Argentina provides a brief explanation"),
+            "{md}"
+        );
+        assert!(
+            md.contains("Examples of such greetings are as follows:"),
+            "{md}"
+        );
         assert!(md.contains("*Image*"), "{md}");
         assert!(md.contains("**Figure 6**"), "{md}");
         assert!(md.contains("**DPN Argentina**"), "{md}");
-        assert!(md.contains("**Content: World Health Day Celebration (7 April 2021).**^98"), "{md}");
+        assert!(
+            md.contains("**Content: World Health Day Celebration (7 April 2021).**^98"),
+            "{md}"
+        );
         assert!(md.contains("**Footnote:**"), "{md}");
-        assert!(md.contains("https://twitter.com/DPNArgentina/status/1379765916259483648."), "{md}");
+        assert!(
+            md.contains("https://twitter.com/DPNArgentina/status/1379765916259483648."),
+            "{md}"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_render_layout_captioned_media_document_does_not_fire_on_real_pdf_14() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000014.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000014.pdf");
         let doc = PdfDocument {
             title: None,
             source_path: Some(path.to_string_lossy().to_string()),
@@ -11293,8 +11545,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_real_pdf_14_preserves_body_paragraphs() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000014.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000014.pdf");
         let doc = PdfDocument {
             title: None,
             source_path: Some(path.to_string_lossy().to_string()),
@@ -11314,8 +11566,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_render_layout_recommendation_infographic_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000183.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000183.pdf");
         let doc = PdfDocument {
             title: None,
             source_path: Some(path.to_string_lossy().to_string()),
@@ -11336,8 +11588,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_render_layout_stacked_bar_report_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000038.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000038.pdf");
         let doc = PdfDocument {
             title: None,
             source_path: Some(path.to_string_lossy().to_string()),
@@ -11414,8 +11666,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_render_layout_multi_figure_chart_document_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000076.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000076.pdf");
         let doc = PdfDocument {
             title: None,
             source_path: Some(path.to_string_lossy().to_string()),
@@ -11425,20 +11677,26 @@ mod tests {
         };
         let rendered = render_layout_multi_figure_chart_document(&doc).unwrap();
         assert!(rendered.contains("# Figures from the Document"));
-        assert!(rendered.contains("## Figure 1.7. Non-citizen population in Malaysia (in thousands)"));
+        assert!(
+            rendered.contains("## Figure 1.7. Non-citizen population in Malaysia (in thousands)")
+        );
         assert!(rendered.contains("| 2016 | 3,230 |"));
         assert!(rendered.contains("| 2021 | 2,693 |"));
-        assert!(rendered.contains("## Figure 1.8. Singapore foreign workforce stock (in thousands)"));
+        assert!(
+            rendered.contains("## Figure 1.8. Singapore foreign workforce stock (in thousands)")
+        );
         assert!(rendered.contains("| 2016 (Dec) | 1,393 |"));
         assert!(rendered.contains("| 2021 (Dec) | 1,200 |"));
-        assert!(rendered.contains("Source: Department of Statistics, Malaysia (2022). Figure for 2021 is an estimate."));
+        assert!(rendered.contains(
+            "Source: Department of Statistics, Malaysia (2022). Figure for 2021 is an estimate."
+        ));
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_render_layout_open_plate_document_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000132.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000132.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let rendered = render_layout_open_plate_document(&doc).unwrap();
         assert!(rendered.contains("# Fish species on IUCN Red List"));
@@ -11452,92 +11710,119 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_open_plate_document_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000132.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000132.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
         assert!(md.contains("# Fish species on IUCN Red List"), "{md}");
-        assert!(md.contains("| Potosi Pupfish | Cyprinodon alvarezi |"), "{md}");
-        assert!(md.contains("| Golden Skiffia | Skiffia francesae |"), "{md}");
-        assert!(md.contains("*Table 6.1: Four fish species on IUCN Red List"), "{md}");
-        assert!(md.contains("The breeding colonies of the Butterfly Splitfin"), "{md}");
+        assert!(
+            md.contains("| Potosi Pupfish | Cyprinodon alvarezi |"),
+            "{md}"
+        );
+        assert!(
+            md.contains("| Golden Skiffia | Skiffia francesae |"),
+            "{md}"
+        );
+        assert!(
+            md.contains("*Table 6.1: Four fish species on IUCN Red List"),
+            "{md}"
+        );
+        assert!(
+            md.contains("The breeding colonies of the Butterfly Splitfin"),
+            "{md}"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_does_not_misclassify_open_plate_pdf_36() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000036.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000036.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
         assert!(md.contains("# 2. General Profile of MSMEs"), "{md}");
-        assert!(md.contains("In July 2020, the survey established a general profile"), "{md}");
         assert!(
-            md.contains("The tourism sub-sectors interviewed included lodging, restaurants and bars"),
+            md.contains("In July 2020, the survey established a general profile"),
             "{md}"
         );
-        assert!(!md.starts_with("# Business characteristics. Business size was"), "{md}");
+        assert!(
+            md.contains(
+                "The tourism sub-sectors interviewed included lodging, restaurants and bars"
+            ),
+            "{md}"
+        );
+        assert!(
+            !md.starts_with("# Business characteristics. Business size was"),
+            "{md}"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_does_not_misclassify_open_plate_pdf_40() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000040.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000040.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
         assert!(
-            md.contains("Thailand, Philippines and Indonesia in particular, identifying known experts"),
+            md.contains(
+                "Thailand, Philippines and Indonesia in particular, identifying known experts"
+            ),
             "{md}"
         );
-        assert!(md.contains("Figure 1: Age by gender of respondents"), "{md}");
+        assert!(
+            md.contains("Figure 1: Age by gender of respondents"),
+            "{md}"
+        );
         assert!(md.contains("Gender Analysis of Violent Extremism"), "{md}");
-        assert!(!md.starts_with("# Thailand, Philippines and Indonesia in"), "{md}");
+        assert!(
+            !md.starts_with("# Thailand, Philippines and Indonesia in"),
+            "{md}"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_does_not_misclassify_open_plate_pdf_64() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000064.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000064.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
         assert!(md.contains("estuarine influenced areas."), "{md}");
         assert!(md.contains("| MANILA | 2454 | 6,125 |"), "{md}");
-        assert!(md.contains("The port of Manila has been documented"), "{md}");
+        assert!(
+            md.contains("The port of Manila has been documented"),
+            "{md}"
+        );
         assert!(!md.starts_with("# CAGAYAN DE ORO"), "{md}");
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_detect_footnote_citation_regions_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000008.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000008.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let regions = detect_footnote_citation_regions(&doc);
         assert!(!regions.is_empty(), "{regions:?}");
         assert!(
-            regions
-                .iter()
-                .any(|region| {
-                    region.rendered.contains("<table>")
-                        && region.rendered.contains("<td>25</td>")
-                        && region.rendered.contains("<td>29</td>")
-                }),
+            regions.iter().any(|region| {
+                region.rendered.contains("<table>")
+                    && region.rendered.contains("<td>25</td>")
+                    && region.rendered.contains("<td>29</td>")
+            }),
             "{regions:#?}"
         );
         assert!(
-            regions
-                .iter()
-                .any(|region| {
-                    region.rendered.contains("<table>")
-                        && region.rendered.contains("<td>30</td>")
-                        && region.rendered.contains("<td>33</td>")
-                }),
+            regions.iter().any(|region| {
+                region.rendered.contains("<table>")
+                    && region.rendered.contains("<td>30</td>")
+                    && region.rendered.contains("<td>33</td>")
+            }),
             "{regions:#?}"
         );
     }
@@ -11545,15 +11830,18 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_renders_footnote_citation_tables_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000008.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000008.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
         assert!(md.contains("<table>"), "{md}");
         assert!(md.contains("<th>Footnote</th><th>Citation</th>"), "{md}");
         assert!(md.contains("<td>25</td><td>Wiliam Beckford"), "{md}");
-        assert!(md.contains("<td>29</td><td>Pope, The Rape of the Lock, 69.</td>"), "{md}");
+        assert!(
+            md.contains("<td>29</td><td>Pope, The Rape of the Lock, 69.</td>"),
+            "{md}"
+        );
         assert!(
             md.contains("<td>30</td><td>Beawes, Lex Mercatoria Rediviva, 791.</td>"),
             "{md}"
@@ -11562,30 +11850,42 @@ mod tests {
             md.contains("<td>32</td><td>Beawes, Lex Mercatoria Rediviva, 792.</td>"),
             "{md}"
         );
-        assert!(md.contains("<td>33</td><td>M.M., Pharmacopoia Reformata:"), "{md}");
+        assert!(
+            md.contains("<td>33</td><td>M.M., Pharmacopoia Reformata:"),
+            "{md}"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_projection_sheet_document_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000128.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000128.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
         assert!(md.contains("# Table and Figure from the Document"), "{md}");
         assert!(md.contains("| A | B | C | D | E |"), "{md}");
-        assert!(md.contains("| 10 | 8 | 19.73214458 | 17.99 | 21.47 |"), "{md}");
-        assert!(md.contains("**Figure 13.3. Graph of Projection Estimates**"), "{md}");
+        assert!(
+            md.contains("| 10 | 8 | 19.73214458 | 17.99 | 21.47 |"),
+            "{md}"
+        );
+        assert!(
+            md.contains("**Figure 13.3. Graph of Projection Estimates**"),
+            "{md}"
+        );
         assert!(md.contains("[Open Template in Microsoft Excel](#)"), "{md}");
-        assert!(md.contains("*298 | Ch. 13. Homogeneous Investment Types*"), "{md}");
+        assert!(
+            md.contains("*298 | Ch. 13. Homogeneous Investment Types*"),
+            "{md}"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_appendix_tables_document_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000082.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000082.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
@@ -11595,22 +11895,33 @@ mod tests {
             "{md}"
         );
         assert!(md.contains("| Imprisonment terms | Number of clauses | Percentage of all states | Percentage of total |"), "{md}");
-        assert!(md.contains("| Less than 3 months | 4,448 | 21.3% | 17.0% |"), "{md}");
+        assert!(
+            md.contains("| Less than 3 months | 4,448 | 21.3% | 17.0% |"),
+            "{md}"
+        );
         assert!(
             md.contains("## TABLE 29: STATES WITH MORE THAN 1,000 IMPRISONMENT CLAUSES"),
             "{md}"
         );
-        assert!(md.contains("| State | Number of clauses | GSDP (In Rs lakh crore) | GSDP (In $ billion) |"), "{md}");
+        assert!(
+            md.contains(
+                "| State | Number of clauses | GSDP (In Rs lakh crore) | GSDP (In $ billion) |"
+            ),
+            "{md}"
+        );
         assert!(md.contains("| Gujarat | 1469 | 15.6 | 200.4 |"), "{md}");
-        assert!(md.contains("*Sources: TeamLease Regtech, and Reserve Bank of India for GSDPs*"), "{md}");
+        assert!(
+            md.contains("*Sources: TeamLease Regtech, and Reserve Bank of India for GSDPs*"),
+            "{md}"
+        );
         assert!(md.contains("*Exchange rate: Rs 75 to USD*"), "{md}");
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_titled_dual_table_document_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000084.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000084.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
@@ -11627,34 +11938,57 @@ mod tests {
             md.contains("## TABLE 39: BREAKDOWN OF IMPRISONMENT CLAUSES IN NBFC CASE STUDIES*"),
             "{md}"
         );
-        assert!(md.contains("| 5 years to 10 years | 19 | 19 | 19 |"), "{md}");
-        assert!(md.contains("*These are real data from three NBFCs*"), "{md}");
+        assert!(
+            md.contains("| 5 years to 10 years | 19 | 19 | 19 |"),
+            "{md}"
+        );
+        assert!(
+            md.contains("*These are real data from three NBFCs*"),
+            "{md}"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_registration_report_document_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000047.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000047.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
-        assert!(md.starts_with("# ANFREL Pre-Election Assessment Mission Report"), "{md}");
-        assert!(md.contains("| 14 | Cambodian Indigeneous Peoples Democracy Party | 19 | 194 | 19 | 202 | +8 |"), "{md}");
-        assert!(md.contains("|  | Total |  | 84,208 |  | 86,092 | +1,884 |"), "{md}");
+        assert!(
+            md.starts_with("# ANFREL Pre-Election Assessment Mission Report"),
+            "{md}"
+        );
+        assert!(
+            md.contains(
+                "| 14 | Cambodian Indigeneous Peoples Democracy Party | 19 | 194 | 19 | 202 | +8 |"
+            ),
+            "{md}"
+        );
+        assert!(
+            md.contains("|  | Total |  | 84,208 |  | 86,092 | +1,884 |"),
+            "{md}"
+        );
         assert!(!md.contains("|  | Democracy Party |"), "{md}");
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_to_markdown_dual_table_article_document_on_real_pdf() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../benchmark/pdfs/01030000000190.pdf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmark/pdfs/01030000000190.pdf");
         let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
         let md = to_markdown(&doc).unwrap();
 
-        assert!(md.starts_with("# Table 6: Performance comparison amongst the merge candidates"), "{md}");
-        assert!(md.contains("*Table 6*: Performance comparison amongst the merge candidates."), "{md}");
+        assert!(
+            md.starts_with("# Table 6: Performance comparison amongst the merge candidates"),
+            "{md}"
+        );
+        assert!(
+            md.contains("*Table 6*: Performance comparison amongst the merge candidates."),
+            "{md}"
+        );
         assert!(md.contains("# Table 7: Ablation studies on the different merge methods used for obtaining the final model"), "{md}");
         assert!(!md.contains("*Table 6*: Table 6:"), "{md}");
         assert!(!md.contains("| Merge v1"), "{md}");
@@ -11662,7 +11996,10 @@ mod tests {
 
     #[test]
     fn test_normalize_list_text_strips_redundant_bullets() {
-        assert_eq!(normalize_list_text("• Collected via surveys"), "Collected via surveys");
+        assert_eq!(
+            normalize_list_text("• Collected via surveys"),
+            "Collected via surveys"
+        );
         assert!(is_pure_bullet_marker("•"));
     }
 
@@ -11768,13 +12105,7 @@ mod tests {
         })
     }
 
-    fn make_heading_at(
-        left: f64,
-        bottom: f64,
-        right: f64,
-        top: f64,
-        text: &str,
-    ) -> ContentElement {
+    fn make_heading_at(left: f64, bottom: f64, right: f64, top: f64, text: &str) -> ContentElement {
         let bbox = BoundingBox::new(Some(1), left, bottom, right, top);
         let chunk = TextChunk {
             value: text.to_string(),
@@ -11863,7 +12194,13 @@ mod tests {
         make_paragraph_at(72.0, bottom, 300.0, top, text)
     }
 
-    fn make_paragraph_at(left: f64, bottom: f64, right: f64, top: f64, text: &str) -> ContentElement {
+    fn make_paragraph_at(
+        left: f64,
+        bottom: f64,
+        right: f64,
+        top: f64,
+        text: &str,
+    ) -> ContentElement {
         let bbox = BoundingBox::new(Some(1), left, bottom, right, top);
         let chunk = TextChunk {
             value: text.to_string(),
@@ -11972,7 +12309,13 @@ mod tests {
         }
 
         ContentElement::List(PDFList {
-            bbox: BoundingBox::new(Some(1), 72.0, 700.0 - items.len() as f64 * 18.0, 320.0, 700.0),
+            bbox: BoundingBox::new(
+                Some(1),
+                72.0,
+                700.0 - items.len() as f64 * 18.0,
+                320.0,
+                700.0,
+            ),
             index: None,
             level: None,
             list_items,
@@ -12332,8 +12675,12 @@ mod tests {
     #[test]
     fn test_list_renderer_strips_duplicate_bullets_and_skips_bullet_only_items() {
         let mut doc = PdfDocument::new("bullets.pdf".to_string());
-        doc.kids
-            .push(make_fallback_list(&["• First item", "•", "• Second item", "133"]));
+        doc.kids.push(make_fallback_list(&[
+            "• First item",
+            "•",
+            "• Second item",
+            "133",
+        ]));
 
         let md = to_markdown(&doc).unwrap();
         assert!(md.contains("- First item"));
@@ -12620,7 +12967,10 @@ mod tests {
                     Some(1),
                     column_bounds.first().map(|(left, _)| *left).unwrap_or(72.0),
                     bottom,
-                    column_bounds.last().map(|(_, right)| *right).unwrap_or(420.0),
+                    column_bounds
+                        .last()
+                        .map(|(_, right)| *right)
+                        .unwrap_or(420.0),
                     top,
                 ),
                 index: None,
@@ -12631,8 +12981,14 @@ mod tests {
             });
         }
 
-        let left = column_bounds.first().map(|(value, _)| *value).unwrap_or(72.0);
-        let right = column_bounds.last().map(|(_, value)| *value).unwrap_or(420.0);
+        let left = column_bounds
+            .first()
+            .map(|(value, _)| *value)
+            .unwrap_or(72.0);
+        let right = column_bounds
+            .last()
+            .map(|(_, value)| *value)
+            .unwrap_or(420.0);
         let x_coordinates = std::iter::once(left)
             .chain(column_bounds.iter().map(|(_, right)| *right))
             .collect::<Vec<_>>();
@@ -12734,7 +13090,15 @@ mod tests {
                     "Ultrafeedback Cleaned",
                     "Synth. Math-Alignment",
                 ],
-                vec!["Total # Samples", "52K", "2.91M", "126K", "12.9K", "60.8K", "126K"],
+                vec![
+                    "Total # Samples",
+                    "52K",
+                    "2.91M",
+                    "126K",
+                    "12.9K",
+                    "60.8K",
+                    "126K",
+                ],
             ],
             &[
                 (72.0, 120.0),
@@ -12762,13 +13126,8 @@ mod tests {
     fn test_top_table_plate_renderer_stops_before_article_body() {
         let mut doc = PdfDocument::new("table-plate.pdf".to_string());
         doc.number_of_pages = 1;
-        doc.kids.push(make_paragraph_at(
-            72.0,
-            724.0,
-            200.0,
-            736.0,
-            "SOLAR 10.7B",
-        ));
+        doc.kids
+            .push(make_paragraph_at(72.0, 724.0, 200.0, 736.0, "SOLAR 10.7B"));
         doc.kids.push(make_paragraph_at(
             72.0,
             704.0,
@@ -12788,8 +13147,24 @@ mod tests {
                     "Ultrafeedback Cleaned",
                     "Synth. Math-Alignment",
                 ],
-                vec!["Total # Samples", "52K", "2.91M", "126K", "12.9K", "60.8K", "126K"],
-                vec!["Maximum # Samples Used", "52K", "100K", "52K", "12.9K", "60.8K", "20.1K"],
+                vec![
+                    "Total # Samples",
+                    "52K",
+                    "2.91M",
+                    "126K",
+                    "12.9K",
+                    "60.8K",
+                    "126K",
+                ],
+                vec![
+                    "Maximum # Samples Used",
+                    "52K",
+                    "100K",
+                    "52K",
+                    "12.9K",
+                    "60.8K",
+                    "20.1K",
+                ],
                 vec!["Open Source", "O", "O", "✗", "O", "O", "✗"],
             ],
             &[
@@ -13009,13 +13384,19 @@ mod tests {
         ));
         assert!(!md.contains("right required to acquire desert lands"));
         assert!(!md.contains("The Law Library of Congress 7"));
-        assert!(md.contains("| Finland | N | Y | Prior approval from the Government of Aland may be required. |  |"));
+        assert!(md.contains(
+            "| Finland | N | Y | Prior approval from the Government of Aland may be required. |  |"
+        ));
     }
 
     #[test]
     fn test_geometric_panel_headers_are_promoted_into_table() {
         let mut doc = PdfDocument::new("ai-pack-panel.pdf".to_string());
-        doc.kids.push(make_chunked_paragraph_line(&[("OCR", 220.0, 250.0)], 720.0, 732.0));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("OCR", 220.0, 250.0)],
+            720.0,
+            732.0,
+        ));
         doc.kids.push(make_chunked_paragraph_line(
             &[("Recommendation", 430.0, 540.0)],
             720.0,
@@ -13026,7 +13407,11 @@ mod tests {
             720.0,
             732.0,
         ));
-        doc.kids.push(make_chunked_paragraph_line(&[("Pack", 72.0, 110.0)], 684.0, 696.0));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("Pack", 72.0, 110.0)],
+            684.0,
+            696.0,
+        ));
         doc.kids.push(make_chunked_paragraph_line(
             &[("A solution that recognizes characters", 140.0, 340.0)],
             684.0,
@@ -13062,7 +13447,11 @@ mod tests {
             ],
             &[(120.0, 360.0), (360.0, 630.0), (630.0, 910.0)],
         ));
-        doc.kids.push(make_chunked_paragraph_line(&[("models", 430.0, 490.0)], 552.0, 564.0));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("models", 430.0, 490.0)],
+            552.0,
+            564.0,
+        ));
 
         let md = to_markdown(&doc).unwrap();
         assert!(md.contains("| Pack | OCR | Recommendation | Product semantic search |"));
@@ -13075,7 +13464,11 @@ mod tests {
     #[test]
     fn test_embedded_stub_header_is_promoted_from_first_table_column() {
         let mut doc = PdfDocument::new("embedded-stub-header.pdf".to_string());
-        doc.kids.push(make_chunked_paragraph_line(&[("OCR", 220.0, 250.0)], 720.0, 732.0));
+        doc.kids.push(make_chunked_paragraph_line(
+            &[("OCR", 220.0, 250.0)],
+            720.0,
+            732.0,
+        ));
         doc.kids.push(make_chunked_paragraph_line(
             &[("Recommendation", 430.0, 540.0)],
             720.0,
@@ -13117,7 +13510,9 @@ mod tests {
 
         let md = to_markdown(&doc).unwrap();
         assert!(md.contains("| Pack | OCR | Recommendation | Product semantic search |"));
-        assert!(md.contains("| Application | Applicable to all fields that require text extraction |"));
+        assert!(
+            md.contains("| Application | Applicable to all fields that require text extraction |")
+        );
         assert!(md.contains("| Highlight | Achieved 1st place in the OCR World Competition |"));
         assert!(!md.contains("OCR\n\nRecommendation\n\nProduct semantic search"));
     }
@@ -13207,7 +13602,9 @@ mod tests {
         assert!(result.contains("Table 6: Performance comparison amongst the merge candidates."));
         assert!(result.contains("| Model | Score |"));
         assert!(result.contains("| Model | Method | Score |"));
-        assert!(!result.contains("| Table 6: Performance comparison amongst the merge candidates. |"));
+        assert!(
+            !result.contains("| Table 6: Performance comparison amongst the merge candidates. |")
+        );
     }
 
     #[test]
@@ -13217,10 +13614,14 @@ mod tests {
                      ASEAN Migration Outlook 19\n";
 
         let normalized = normalize_chart_like_markdown(input);
-        assert!(normalized.contains("## Figure 1.7. Non-citizen population in Malaysia (in thousands)"));
+        assert!(
+            normalized.contains("## Figure 1.7. Non-citizen population in Malaysia (in thousands)")
+        );
         assert!(normalized.contains("| 2016 | 3,323 |"));
         assert!(normalized.contains("| 2021 | 2,693 |"));
-        assert!(normalized.contains("*Source: Department of Statistics, Malaysia (2022). Figure for 2021 is an estimate.*"));
+        assert!(normalized.contains(
+            "*Source: Department of Statistics, Malaysia (2022). Figure for 2021 is an estimate.*"
+        ));
         assert!(!normalized.contains("ASEAN Migration Outlook 19"));
     }
 
@@ -13231,7 +13632,9 @@ mod tests {
                      Body paragraph.\n";
 
         let normalized = normalize_chart_like_markdown(input);
-        assert!(normalized.contains("## Figure 5.1 Mr. Bologna Jun-r as Kalim Azack in Aladdin, or The Wonderful Lamp"));
+        assert!(normalized.contains(
+            "## Figure 5.1 Mr. Bologna Jun-r as Kalim Azack in Aladdin, or The Wonderful Lamp"
+        ));
         assert!(normalized.contains("Body paragraph."));
     }
 
@@ -13313,5 +13716,4 @@ mod tests {
         assert!(!normalized.contains("4.2 Main Results"));
         assert!(!normalized.contains("surrounding prose"));
     }
-
 }

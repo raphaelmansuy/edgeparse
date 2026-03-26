@@ -719,17 +719,20 @@ mod tests {
     #[test]
     fn test_xycut_keeps_spanning_header_and_footer_outside_columns() {
         let mut elements = vec![
-            make_element(40.0, 760.0, 540.0, 810.0), // spanning header
-            make_element(50.0, 640.0, 250.0, 700.0), // left col, top
-            make_element(50.0, 520.0, 250.0, 620.0), // left col, bottom
+            make_element(40.0, 760.0, 540.0, 810.0),  // spanning header
+            make_element(50.0, 640.0, 250.0, 700.0),  // left col, top
+            make_element(50.0, 520.0, 250.0, 620.0),  // left col, bottom
             make_element(320.0, 640.0, 520.0, 700.0), // right col, top
             make_element(320.0, 520.0, 520.0, 620.0), // right col, bottom
-            make_element(40.0, 430.0, 540.0, 480.0), // spanning footer/source
+            make_element(40.0, 430.0, 540.0, 480.0),  // spanning footer/source
         ];
         let page = BoundingBox::new(Some(1), 0.0, 0.0, 595.0, 842.0);
         xycut_sort(&mut elements, &page);
 
-        assert!(elements[0].bbox().top_y >= 800.0, "header should stay first");
+        assert!(
+            elements[0].bbox().top_y >= 800.0,
+            "header should stay first"
+        );
         assert!(elements[1].bbox().left_x < 260.0);
         assert!(elements[2].bbox().left_x < 260.0);
         assert!(elements[3].bbox().left_x > 260.0);
@@ -740,10 +743,10 @@ mod tests {
     #[test]
     fn test_xycut_rejects_vertical_cut_when_spanning_band_sits_between_columns() {
         let mut elements = vec![
-            make_element(50.0, 700.0, 250.0, 760.0), // left col, top
+            make_element(50.0, 700.0, 250.0, 760.0),  // left col, top
             make_element(320.0, 700.0, 520.0, 760.0), // right col, top
-            make_element(40.0, 610.0, 540.0, 680.0), // spanning mid-band graphic
-            make_element(50.0, 500.0, 250.0, 580.0), // left col, bottom
+            make_element(40.0, 610.0, 540.0, 680.0),  // spanning mid-band graphic
+            make_element(50.0, 500.0, 250.0, 580.0),  // left col, bottom
             make_element(320.0, 500.0, 520.0, 580.0), // right col, bottom
         ];
         let page = BoundingBox::new(Some(1), 0.0, 0.0, 595.0, 842.0);
