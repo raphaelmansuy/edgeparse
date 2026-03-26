@@ -150,7 +150,7 @@ METRIC_INFO = {
         "name": "TQS — Text Content Quality",
         "short": "TQS",
         "description": (
-            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4, fragmentation score, boundary integrity, token-boundary F1). "
+            "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4, fragmentation score, boundary integrity, token-boundary F1, boundary contamination). "
             "Measures how accurately the extracted text matches the ground truth "
             "after stripping Markdown formatting."
         ),

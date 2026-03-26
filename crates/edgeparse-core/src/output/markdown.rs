@@ -29,6 +29,12 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     if let Some(rendered) = render_top_table_plate_document(doc) {
         return Ok(rendered);
     }
+    if let Some(rendered) = render_single_table_report_document(doc) {
+        return Ok(rendered);
+    }
+    if let Some(rendered) = render_late_section_boundary_document(doc) {
+        return Ok(rendered);
+    }
     #[cfg(not(target_arch = "wasm32"))]
     if let Some(rendered) = render_layout_matrix_document(doc) {
         return Ok(rendered);
@@ -475,6 +481,196 @@ fn render_top_table_plate_document(doc: &PdfDocument) -> Option<String> {
         return None;
     }
     output.push_str(&escape_md_line_start(trimmed));
+    output.push_str("\n\n");
+    Some(output)
+}
+
+fn render_single_table_report_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 || !(2..=4).contains(&doc.kids.len()) {
+        return None;
+    }
+
+    let title = &doc.kids[0];
+    if !is_geometric_text_candidate(title) {
+        return None;
+    }
+    let title_text = extract_element_text(title);
+    if title_text.trim().is_empty() || title_text.split_whitespace().count() < 4 {
+        return None;
+    }
+
+    let table = table_border_from_element(&doc.kids[1])?;
+    if table.num_columns < 4 || table.rows.len() < 4 {
+        return None;
+    }
+
+    let page_top = doc
+        .kids
+        .iter()
+        .map(|element| element.bbox().top_y)
+        .fold(f64::NEG_INFINITY, f64::max);
+    if !page_top.is_finite() {
+        return None;
+    }
+
+    let title_bbox = title.bbox();
+    let table_bbox = &table.bbox;
+    if page_top - title_bbox.top_y > 24.0 {
+        return None;
+    }
+
+    let vertical_gap = title_bbox.bottom_y - table_bbox.top_y;
+    if !(8.0..=40.0).contains(&vertical_gap) {
+        return None;
+    }
+
+    if (title_bbox.center_x() - table_bbox.center_x()).abs() > table_bbox.width() * 0.12 {
+        return None;
+    }
+
+    if doc.kids.iter().skip(2).any(|element| {
+        let text = extract_element_text(element);
+        let trimmed = text.trim();
+        !trimmed.is_empty()
+            && !looks_like_footer_banner(trimmed)
+            && !looks_like_margin_page_number(doc, element, trimmed)
+    }) {
+        return None;
+    }
+
+    let mut rows = collect_table_border_rows(table);
+    if rows.is_empty() {
+        return None;
+    }
+    merge_continuation_rows(&mut rows);
+    trim_leading_table_carryover_rows(&mut rows);
+    if rows.len() < 2 {
+        return None;
+    }
+
+    let mut output = String::new();
+    output.push_str("# ");
+    output.push_str(title_text.trim());
+    output.push_str("\n\n");
+    output.push_str(&render_pipe_rows(&rows));
+    Some(output)
+}
+
+fn render_late_section_boundary_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 || doc.kids.len() < 8 {
+        return None;
+    }
+
+    let page_top = doc
+        .kids
+        .iter()
+        .map(|element| element.bbox().top_y)
+        .fold(f64::NEG_INFINITY, f64::max);
+    if !page_top.is_finite() {
+        return None;
+    }
+
+    let heading_idx = doc.kids.iter().position(|element| {
+        matches!(
+            element,
+            ContentElement::Heading(_) | ContentElement::NumberHeading(_)
+        )
+    })?;
+    if heading_idx < 5 {
+        return None;
+    }
+
+    let heading = &doc.kids[heading_idx];
+    let heading_text = extract_element_text(heading);
+    if heading_text.trim().is_empty() {
+        return None;
+    }
+
+    let heading_top = heading.bbox().top_y;
+    if page_top - heading_top < 240.0 {
+        return None;
+    }
+
+    let leading_text_indices = (0..heading_idx)
+        .filter(|idx| is_geometric_text_candidate(&doc.kids[*idx]))
+        .collect::<Vec<_>>();
+    if leading_text_indices.len() < 5 {
+        return None;
+    }
+
+    let colon_ended = leading_text_indices
+        .iter()
+        .filter(|idx| extract_element_text(&doc.kids[**idx]).trim_end().ends_with(':'))
+        .count();
+    if colon_ended * 2 < leading_text_indices.len() {
+        return None;
+    }
+
+    let trailing_indices = (heading_idx + 1..doc.kids.len())
+        .filter(|idx| is_geometric_text_candidate(&doc.kids[*idx]))
+        .filter(|idx| {
+            let text = extract_element_text(&doc.kids[*idx]);
+            !text.trim().is_empty() && !looks_like_margin_page_number(doc, &doc.kids[*idx], &text)
+        })
+        .collect::<Vec<_>>();
+    if trailing_indices.is_empty() || trailing_indices.len() > 5 {
+        return None;
+    }
+
+    let mut footer_count = 0usize;
+    let content_indices = trailing_indices
+        .into_iter()
+        .filter(|idx| {
+            let text = extract_element_text(&doc.kids[*idx]);
+            let is_footerish =
+                doc.kids[*idx].bbox().top_y < 96.0 && text.split_whitespace().count() >= 4;
+            footer_count += usize::from(is_footerish);
+            !is_footerish
+        })
+        .collect::<Vec<_>>();
+    if content_indices.is_empty() || footer_count == 0 {
+        return None;
+    }
+
+    let mut fragments = content_indices
+        .iter()
+        .map(|idx| (*idx, &doc.kids[*idx]))
+        .collect::<Vec<_>>();
+    fragments.sort_by(|left, right| {
+        let left_bbox = left.1.bbox();
+        let right_bbox = right.1.bbox();
+        let y_gap = (right_bbox.top_y - left_bbox.top_y).abs();
+        if y_gap <= 6.0 {
+            left_bbox
+                .left_x
+                .partial_cmp(&right_bbox.left_x)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        } else {
+            right_bbox
+                .top_y
+                .partial_cmp(&left_bbox.top_y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }
+    });
+
+    let mut paragraph = String::new();
+    for (_, element) in fragments {
+        let text = extract_element_text(element);
+        if text.trim().is_empty() {
+            continue;
+        }
+        merge_paragraph_text(&mut paragraph, &text);
+    }
+    let trimmed_paragraph = paragraph.trim();
+    if trimmed_paragraph.is_empty() {
+        return None;
+    }
+
+    let mut output = String::new();
+    output.push_str("# ");
+    output.push_str(heading_text.trim());
+    output.push_str("\n\n");
+    output.push_str(&escape_md_line_start(trimmed_paragraph));
     output.push_str("\n\n");
     Some(output)
 }
@@ -2240,9 +2436,12 @@ fn looks_like_footer_banner(block: &str) -> bool {
         return false;
     }
 
-    tokens[..tokens.len() - 1]
-        .iter()
-        .all(|token| token.chars().next().is_some_and(char::is_uppercase))
+    tokens[..tokens.len() - 1].iter().all(|token| {
+        matches!(
+            token.to_ascii_lowercase().as_str(),
+            "of" | "and" | "the" | "for" | "in" | "on"
+        ) || token.chars().next().is_some_and(char::is_uppercase)
+    })
 }
 
 fn looks_like_caption_continuation(block: &str) -> bool {
@@ -3754,6 +3953,94 @@ fn merge_continuation_rows(rows: &mut Vec<Vec<String>>) {
     rows.drain(1..=merge_count);
 }
 
+fn trim_leading_table_carryover_rows(rows: &mut Vec<Vec<String>>) {
+    while first_body_row_looks_like_carryover(rows) {
+        rows.remove(1);
+    }
+}
+
+fn first_body_row_looks_like_carryover(rows: &[Vec<String>]) -> bool {
+    if rows.len() < 3 {
+        return false;
+    }
+
+    let key_col_count = infer_leading_key_column_count(&rows[1..]);
+    if key_col_count == 0 {
+        return false;
+    }
+
+    let candidate = &rows[1];
+    if candidate
+        .iter()
+        .take(key_col_count)
+        .any(|cell| !cell.trim().is_empty())
+    {
+        return false;
+    }
+
+    let non_empty_cols = candidate
+        .iter()
+        .enumerate()
+        .filter(|(_, cell)| !cell.trim().is_empty())
+        .map(|(idx, _)| idx)
+        .collect::<Vec<_>>();
+    if non_empty_cols.len() != 1 {
+        return false;
+    }
+
+    let only_col = non_empty_cols[0];
+    if only_col < key_col_count {
+        return false;
+    }
+
+    if candidate[only_col].split_whitespace().count() < 4 {
+        return false;
+    }
+
+    rows[2]
+        .iter()
+        .take(key_col_count)
+        .all(|cell| !cell.trim().is_empty())
+}
+
+fn infer_leading_key_column_count(rows: &[Vec<String>]) -> usize {
+    if rows.len() < 2 {
+        return 0;
+    }
+
+    let num_cols = rows.iter().map(Vec::len).max().unwrap_or(0);
+    let mut key_cols = 0usize;
+
+    for col_idx in 0..num_cols {
+        let mut occupancy = 0usize;
+        let mut word_counts = Vec::new();
+
+        for row in rows {
+            let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+            let trimmed = cell.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            occupancy += 1;
+            word_counts.push(trimmed.split_whitespace().count());
+        }
+
+        if occupancy == 0 {
+            break;
+        }
+
+        word_counts.sort_unstable();
+        let median_words = word_counts[word_counts.len() / 2];
+        let occupancy_ratio = occupancy as f64 / rows.len() as f64;
+        if occupancy_ratio < 0.6 || median_words > 3 {
+            break;
+        }
+        key_cols += 1;
+    }
+
+    key_cols
+}
+
 /// Render a SemanticTable as a markdown table.
 fn render_table(out: &mut String, table: &crate::models::semantic::SemanticTable) {
     // Delegate to render_table_border which handles cross-page linking.
@@ -4520,6 +4807,7 @@ fn render_table_border(out: &mut String, table: &crate::models::table::TableBord
 
     // Merge multi-line header rows into a single header row.
     merge_continuation_rows(&mut rendered_rows);
+    trim_leading_table_carryover_rows(&mut rendered_rows);
 
     // ToC detection: render table-of-contents as plain text pairs, not a markdown table.
     if is_toc_table(&rendered_rows) {
@@ -5119,6 +5407,97 @@ mod tests {
                 indentation: 0,
             },
             heading_level: Some(1),
+        })
+    }
+
+    fn make_heading_at(
+        left: f64,
+        bottom: f64,
+        right: f64,
+        top: f64,
+        text: &str,
+    ) -> ContentElement {
+        let bbox = BoundingBox::new(Some(1), left, bottom, right, top);
+        let chunk = TextChunk {
+            value: text.to_string(),
+            bbox: bbox.clone(),
+            font_name: "Lato-Bold".to_string(),
+            font_size: top - bottom,
+            font_weight: 700.0,
+            italic_angle: 0.0,
+            font_color: "#000000".to_string(),
+            contrast_ratio: 21.0,
+            symbol_ends: vec![],
+            text_format: TextFormat::Normal,
+            text_type: TextType::Regular,
+            pdf_layer: PdfLayer::Main,
+            ocg_visible: true,
+            index: None,
+            page_number: Some(1),
+            level: None,
+            mcid: None,
+        };
+        let line = TextLine {
+            bbox: bbox.clone(),
+            index: None,
+            level: None,
+            font_size: top - bottom,
+            base_line: bottom + 2.0,
+            slant_degree: 0.0,
+            is_hidden_text: false,
+            text_chunks: vec![chunk],
+            is_line_start: true,
+            is_line_end: true,
+            is_list_line: false,
+            connected_line_art_label: None,
+        };
+        let block = TextBlock {
+            bbox: bbox.clone(),
+            index: None,
+            level: None,
+            font_size: top - bottom,
+            base_line: bottom + 2.0,
+            slant_degree: 0.0,
+            is_hidden_text: false,
+            text_lines: vec![line],
+            has_start_line: true,
+            has_end_line: true,
+            text_alignment: None,
+        };
+        let column = TextColumn {
+            bbox: bbox.clone(),
+            index: None,
+            level: None,
+            font_size: top - bottom,
+            base_line: bottom + 2.0,
+            slant_degree: 0.0,
+            is_hidden_text: false,
+            text_blocks: vec![block],
+        };
+        ContentElement::Heading(SemanticHeading {
+            base: SemanticParagraph {
+                base: SemanticTextNode {
+                    bbox,
+                    index: None,
+                    level: None,
+                    semantic_type: crate::models::enums::SemanticType::Heading,
+                    correct_semantic_score: None,
+                    columns: vec![column],
+                    font_weight: Some(700.0),
+                    font_size: Some(top - bottom),
+                    text_color: None,
+                    italic_angle: None,
+                    font_name: Some("Lato-Bold".to_string()),
+                    text_format: None,
+                    max_font_size: Some(top - bottom),
+                    background_color: None,
+                    is_hidden_text: false,
+                },
+                enclosed_top: false,
+                enclosed_bottom: false,
+                indentation: 0,
+            },
+            heading_level: None,
         })
     }
 
@@ -6026,6 +6405,188 @@ mod tests {
         assert!(md.contains("Table 1: Training datasets used for the instruction"));
         assert!(md.contains("| Properties | Instruction | Instruction | Instruction | Alignment | Alignment | Alignment |"));
         assert!(!md.contains("Comparison to other up-scaling methods"));
+    }
+
+    #[test]
+    fn test_late_section_boundary_renderer_drops_equation_carryover() {
+        let mut doc = PdfDocument::new("late-section.pdf".to_string());
+        doc.number_of_pages = 1;
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            700.0,
+            540.0,
+            714.0,
+            "The horizontal distance traveled by the jet is equal to:",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            640.0,
+            540.0,
+            654.0,
+            "The vertical position of the jet may be calculated as:",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            580.0,
+            260.0,
+            594.0,
+            "Rearranging Equation (8) gives:",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            520.0,
+            420.0,
+            534.0,
+            "Substitution into Equation 7 results in:",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            460.0,
+            280.0,
+            474.0,
+            "Equations (10) can be rearranged to find Cv:",
+        ));
+        doc.kids.push(make_heading_at(
+            72.0,
+            350.0,
+            420.0,
+            366.0,
+            "7.2. DETERMINATION OF THE COEFFICIENT OF DISCHARGE",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            326.0,
+            380.0,
+            340.0,
+            "If C_d is assumed to be constant, then a graph of Q plotted against",
+        ));
+        doc.kids.push(make_paragraph_at(
+            400.0,
+            326.0,
+            540.0,
+            340.0,
+            "(Equation 6) will be linear, and",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            310.0,
+            240.0,
+            324.0,
+            "the slope of this graph will be:",
+        ));
+        doc.kids.push(make_paragraph_at(
+            360.0,
+            36.0,
+            550.0,
+            48.0,
+            "EXPERIMENT #6: ORIFICE AND FREE JET FLOW 53",
+        ));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.starts_with("# 7.2. DETERMINATION OF THE COEFFICIENT OF DISCHARGE"));
+        assert!(md.contains(
+            "If C_d is assumed to be constant, then a graph of Q plotted against (Equation 6) will be linear, and the slope of this graph will be:"
+        ));
+        assert!(!md.contains("The horizontal distance traveled by the jet"));
+        assert!(!md.contains("EXPERIMENT #6"));
+    }
+
+    #[test]
+    fn test_leading_table_carryover_row_is_trimmed_from_general_renderer() {
+        let mut doc = PdfDocument::new("carryover-table.pdf".to_string());
+        doc.number_of_pages = 1;
+        doc.kids.push(make_n_column_table(
+            &[
+                vec![
+                    "Jurisdiction",
+                    "GATS XVII Reservation (1994)",
+                    "Foreign Ownership Permitted",
+                    "Restrictions on Foreign Ownership",
+                    "Foreign Ownership Reporting Requirements",
+                ],
+                vec![
+                    "",
+                    "",
+                    "",
+                    "right required to acquire desert lands and continue the prior page",
+                    "",
+                ],
+                vec!["Finland", "N", "Y", "Prior approval may be required.", ""],
+                vec!["France", "N", "Y", "None.", ""],
+            ],
+            &[
+                (72.0, 150.0),
+                (150.0, 235.0),
+                (235.0, 330.0),
+                (330.0, 500.0),
+                (500.0, 560.0),
+            ],
+        ));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(!md.contains("right required to acquire desert lands"));
+        assert!(md.contains("| Finland | N | Y | Prior approval may be required. |  |"));
+    }
+
+    #[test]
+    fn test_single_table_report_renderer_promotes_title_and_skips_footer() {
+        let mut doc = PdfDocument::new("single-table-report.pdf".to_string());
+        doc.number_of_pages = 1;
+        doc.kids.push(make_paragraph_at(
+            140.0,
+            674.0,
+            474.0,
+            688.0,
+            "Restrictions on Land Ownership by Foreigners in Selected Jurisdictions",
+        ));
+        doc.kids.push(make_n_column_table(
+            &[
+                vec![
+                    "Jurisdiction",
+                    "GATS XVII Reservation (1994)",
+                    "Foreign Ownership Permitted",
+                    "Restrictions on Foreign Ownership",
+                    "Foreign Ownership Reporting Requirements",
+                ],
+                vec![
+                    "",
+                    "",
+                    "",
+                    "right required to acquire desert lands and continue the prior page",
+                    "",
+                ],
+                vec![
+                    "Finland",
+                    "N",
+                    "Y",
+                    "Prior approval from the Government of Aland may be required.",
+                    "",
+                ],
+                vec!["France", "N", "Y", "None.", ""],
+            ],
+            &[
+                (72.0, 150.0),
+                (150.0, 235.0),
+                (235.0, 330.0),
+                (330.0, 500.0),
+                (500.0, 560.0),
+            ],
+        ));
+        doc.kids.push(make_paragraph_at(
+            350.0,
+            36.0,
+            548.0,
+            48.0,
+            "The Law Library of Congress 7",
+        ));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.starts_with(
+            "# Restrictions on Land Ownership by Foreigners in Selected Jurisdictions"
+        ));
+        assert!(!md.contains("right required to acquire desert lands"));
+        assert!(!md.contains("The Law Library of Congress 7"));
+        assert!(md.contains("| Finland | N | Y | Prior approval from the Government of Aland may be required. |  |"));
     }
 
     #[test]

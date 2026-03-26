@@ -158,6 +158,17 @@ METRIC_INFO = {
             "run-together words."
         ),
     },
+    "boundary_contamination_score": {
+        "name": "Boundary Contamination",
+        "short": "Boundary Spill",
+        "unit": "[0–1]",
+        "higher_better": True,
+        "description": (
+            "Measures whether extra text leaks into the start or end of the "
+            "prediction after sequence alignment. Penalizes page carry-over "
+            "rows and footer/header contamination."
+        ),
+    },
     "rouge1": {
         "name": "ROUGE-1 — Unigram F1",
         "short": "ROUGE-1",
@@ -231,8 +242,9 @@ METRIC_INFO = {
         "higher_better": True,
         "description": (
             "Text Quality Score: mean(ROUGE-1, ROUGE-L, BLEU-4, fragmentation, "
-            "boundary integrity, token-boundary F1). Composite of lexical "
-            "fidelity plus whitespace-boundary preservation. Higher is better."
+            "boundary integrity, token-boundary F1, boundary contamination). "
+            "Composite of lexical fidelity plus whitespace-boundary and edge "
+            "contamination preservation. Higher is better."
         ),
     },
 }

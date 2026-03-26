@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 
-CURRENT_EVALUATION_SCHEMA_VERSION = 5
+CURRENT_EVALUATION_SCHEMA_VERSION = 6
 
 REQUIRED_SCORE_KEYS = (
     "overall_mean",
@@ -25,6 +25,7 @@ REQUIRED_SCORE_KEYS = (
     "word_fragmentation_score_mean",
     "word_boundary_integrity_score_mean",
     "token_boundary_f1_mean",
+    "boundary_contamination_score_mean",
     "text_quality_score_mean",
 )
 
@@ -49,6 +50,7 @@ REQUIRED_DOCUMENT_SCORE_KEYS = (
     "word_fragmentation_score",
     "word_boundary_integrity_score",
     "token_boundary_f1",
+    "boundary_contamination_score",
     "text_quality_score",
 )
 
