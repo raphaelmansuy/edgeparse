@@ -14,24 +14,26 @@ description: "Reproduce EdgeParse benchmarks locally with the Python harness."
 ```bash
 cd benchmark
 uv sync          # install dependencies
-uv run python run.py --tool edgeparse
+uv run python run.py --engine edgeparse
 ```
 
 ## Running a Single Tool
 
 ```bash
-uv run python run.py --tool edgeparse
+uv run python run.py --engine edgeparse
 ```
 
-Available tools: `edgeparse`, `docling`, `marker`, `edgequake`, `opendataloader`, `pymupdf4llm`, `markitdown`.
+Available tools include `edgeparse`, `docling`, `marker`, `opendataloader`, `pymupdf4llm`, `markitdown`, and hybrid adapters such as `opendataloader_hybrid_docling_fast`.
 
-## Running All Tools
+## Running Grouped Comparisons
 
 ```bash
-uv run python compare_all.py
+uv run python compare_all.py --group non-ocr
+uv run python compare_all.py --group hybrid
+uv run python compare_all.py --group ocr --install
 ```
 
-This compares all tools against the ground-truth reference set and generates an HTML report in `reports/`.
+This keeps fast local parsers, hybrid backends, and OCR-heavy engines in separate reports. Use `uv run python compare_all.py --all` only when you want a single combined report.
 
 ## Custom PDFs
 
@@ -39,7 +41,7 @@ Place your PDF files in `benchmark/pdfs/` and matching ground-truth Markdown in 
 
 ```bash
 # Run with custom corpus
-uv run python run.py --tool edgeparse --pdf-dir ./my-pdfs
+uv run python run.py --engine edgeparse --input-dir ./my-pdfs
 ```
 
 ## Viewing Reports

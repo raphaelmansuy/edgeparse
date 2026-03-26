@@ -41,10 +41,14 @@ def to_markdown(document_paths: List[Path], _input_path, output_dir: Path):
         "--quiet",
     ]
 
+    env = dict(**__import__("os").environ)
+    env["EDGEPARSE_RASTER_TABLE_OCR"] = "off"
+
     result = subprocess.run(
         command,
         capture_output=True,
         text=True,
+        env=env,
     )
 
     if result.returncode != 0:

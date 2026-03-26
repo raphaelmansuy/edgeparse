@@ -235,7 +235,7 @@ fast on mismatches.
 
 - Builds the browser-targeted WASM package with `wasm-pack`
 - Syncs the npm package version from the tag
-- Publishes `edgeparse-wasm`
+- npm publication is currently disabled
 - Uploads the generated npm tarball to the GitHub Release
 
 ### `release-cli.yml`
@@ -278,7 +278,7 @@ and Homebrew. Docker publishing remains CI-driven through `release-docker.yml`.
 
 Crates.io versions are immutable. Bump the version and retag.
 
-### npm publish fails on platform packages or the WASM package
+### npm publish fails on platform packages
 
 Use a Classic Automation token for `NPM_TOKEN`. Granular tokens often miss one
 or more package names and produce `E403 Forbidden`.

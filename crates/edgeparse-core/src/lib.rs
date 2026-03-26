@@ -58,17 +58,19 @@ pub fn convert(
     for (&page_num, &page_id) in &pages_map {
         let page_chunks = extract_page_chunks(&raw_doc.document, page_num, page_id)?;
         let mut recovered_tables = Vec::new();
-        if let Some(page_info) = page_info_list
-            .iter()
-            .find(|info| info.page_number == page_num)
-        {
-            recovered_tables = recover_raster_table_borders(
-                input_path,
-                &page_info.crop_box,
-                page_num,
-                &page_chunks.text_chunks,
-                &page_chunks.image_chunks,
-            );
+        if config.raster_table_ocr {
+            if let Some(page_info) = page_info_list
+                .iter()
+                .find(|info| info.page_number == page_num)
+            {
+                recovered_tables = recover_raster_table_borders(
+                    input_path,
+                    &page_info.crop_box,
+                    page_num,
+                    &page_chunks.text_chunks,
+                    &page_chunks.image_chunks,
+                );
+            }
         }
         let mut elements: Vec<ContentElement> = page_chunks
             .text_chunks
@@ -124,14 +126,16 @@ pub fn convert(
     doc.creation_date = raw_doc.metadata.creation_date;
     doc.modification_date = raw_doc.metadata.modification_date;
 
-    for (page_idx, page) in pipeline_state.pages.iter_mut().enumerate() {
-        if let Some(page_info) = page_info_list.get(page_idx) {
-            recover_page_raster_table_cell_text(
-                input_path,
-                &page_info.crop_box,
-                page_info.page_number,
-                page,
-            );
+    if config.raster_table_ocr {
+        for (page_idx, page) in pipeline_state.pages.iter_mut().enumerate() {
+            if let Some(page_info) = page_info_list.get(page_idx) {
+                recover_page_raster_table_cell_text(
+                    input_path,
+                    &page_info.crop_box,
+                    page_info.page_number,
+                    page,
+                );
+            }
         }
     }
 

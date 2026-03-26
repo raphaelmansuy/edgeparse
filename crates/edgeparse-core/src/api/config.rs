@@ -114,6 +114,8 @@ pub struct ProcessingConfig {
     pub image_format: ImageFormat,
     /// Directory for extracted images
     pub image_dir: Option<String>,
+    /// Enable raster table OCR recovery on image-based tables
+    pub raster_table_ocr: bool,
     /// Pages to extract (e.g., "1,3,5-7")
     pub pages: Option<String>,
     /// Include headers/footers in output
@@ -150,6 +152,7 @@ impl Default for ProcessingConfig {
             image_output: ImageOutput::External,
             image_format: ImageFormat::Png,
             image_dir: None,
+            raster_table_ocr: true,
             pages: None,
             include_header_footer: false,
             hybrid: HybridBackend::Off,
@@ -175,6 +178,7 @@ mod tests {
         assert_eq!(config.table_method, TableMethod::Default);
         assert_eq!(config.image_output, ImageOutput::External);
         assert_eq!(config.image_format, ImageFormat::Png);
+        assert!(config.raster_table_ocr);
         assert_eq!(config.hybrid, HybridBackend::Off);
         assert_eq!(config.hybrid_timeout, 30000);
     }

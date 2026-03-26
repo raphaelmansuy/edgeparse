@@ -1,5 +1,11 @@
 ---
 // ComparisonSection — Head-to-head feature comparison vs leading PDF parsers
+import { benchmarkSnapshot, formatSpeed, getBenchmarkTool } from '../../data/benchmark';
+
+const edgeparse = getBenchmarkTool('EdgeParse');
+const opendataloader = getBenchmarkTool('OpenDataLoader');
+const docling = getBenchmarkTool('Docling (IBM)');
+const pymupdf4llm = getBenchmarkTool('PyMuPDF4LLM');
 ---
 
 <section class="comparison-section" aria-labelledby="comparison-heading">
@@ -19,9 +25,9 @@
     <div class="benchmark-grid">
       <div class="benchmark-card ep-card">
         <div class="bcard-label">EdgeParse</div>
-        <div class="bcard-score">0.787</div>
+        <div class="bcard-score">{edgeparse.overall.toFixed(3)}</div>
         <div class="bcard-sub">Overall benchmark score</div>
-        <div class="bcard-speed">0.064 s/doc · <strong>CPU only</strong></div>
+        <div class="bcard-speed">{formatSpeed(edgeparse.speedSeconds)} · <strong>CPU only</strong></div>
         <div class="bcard-badges">
           <span class="badge badge-green">No GPU</span>
           <span class="badge badge-green">No OCR</span>
@@ -33,9 +39,9 @@
 
       <div class="benchmark-card odl-card">
         <div class="bcard-label">OpenDataLoader</div>
-        <div class="bcard-score">0.733</div>
+        <div class="bcard-score">{opendataloader.overall.toFixed(3)}</div>
         <div class="bcard-sub">Fast heuristic pipeline</div>
-        <div class="bcard-speed">0.094 s/doc · <strong>1.5× slower</strong></div>
+        <div class="bcard-speed">{formatSpeed(opendataloader.speedSeconds)} · <strong>1.5× slower</strong></div>
         <div class="bcard-badges">
           <span class="badge badge-gray">Python only</span>
           <span class="badge badge-gray">No WASM</span>
@@ -44,9 +50,9 @@
 
       <div class="benchmark-card docling-card">
         <div class="bcard-label">IBM Docling</div>
-        <div class="bcard-score">0.745</div>
+        <div class="bcard-score">{docling.overall.toFixed(3)}</div>
         <div class="bcard-sub">Requires OCR / ML stack</div>
-        <div class="bcard-speed">0.768 s/doc · <strong>12× slower</strong></div>
+        <div class="bcard-speed">{formatSpeed(docling.speedSeconds)} · <strong>12× slower</strong></div>
         <div class="bcard-badges">
           <span class="badge badge-red">Needs OCR</span>
           <span class="badge badge-red">Heavy setup</span>
@@ -81,38 +87,38 @@
         <tbody>
           <tr>
             <td class="feature-col">Overall accuracy</td>
-            <td class="ep-col"><strong>0.787</strong> ✅</td>
-            <td>0.733</td>
-            <td>0.745</td>
-            <td>0.710</td>
+            <td class="ep-col"><strong>{edgeparse.overall.toFixed(3)}</strong> ✅</td>
+            <td>{opendataloader.overall.toFixed(3)}</td>
+            <td>{docling.overall.toFixed(3)}</td>
+            <td>{pymupdf4llm.overall.toFixed(3)}</td>
           </tr>
           <tr>
             <td class="feature-col">Speed (s/doc)</td>
-            <td class="ep-col"><strong>0.064</strong> ✅</td>
-            <td>0.094</td>
-            <td>0.768</td>
-            <td>0.439</td>
+            <td class="ep-col"><strong>{edgeparse.speedSeconds.toFixed(3)}</strong> ✅</td>
+            <td>{opendataloader.speedSeconds.toFixed(3)}</td>
+            <td>{docling.speedSeconds.toFixed(3)}</td>
+            <td>{pymupdf4llm.speedSeconds.toFixed(3)}</td>
           </tr>
           <tr>
             <td class="feature-col">Table extraction (TEDS)</td>
-            <td class="ep-col"><strong>0.596</strong> ✅</td>
-            <td>0.326</td>
-            <td>0.540</td>
-            <td>0.323</td>
+            <td class="ep-col"><strong>{edgeparse.teds.toFixed(3)}</strong> ✅</td>
+            <td>{opendataloader.teds.toFixed(3)}</td>
+            <td>{docling.teds.toFixed(3)}</td>
+            <td>{pymupdf4llm.teds.toFixed(3)}</td>
           </tr>
           <tr>
             <td class="feature-col">Reading order (NID)</td>
-            <td class="ep-col"><strong>0.889</strong> ✅</td>
-            <td>0.873</td>
-            <td>0.867</td>
-            <td>0.852</td>
+            <td class="ep-col"><strong>{edgeparse.nid.toFixed(3)}</strong> ✅</td>
+            <td>{opendataloader.nid.toFixed(3)}</td>
+            <td>{docling.nid.toFixed(3)}</td>
+            <td>{pymupdf4llm.nid.toFixed(3)}</td>
           </tr>
           <tr>
             <td class="feature-col">Heading detection (MHS)</td>
-            <td class="ep-col"><strong>0.553</strong> ✅</td>
-            <td>0.442</td>
-            <td>0.438</td>
-            <td>0.407</td>
+            <td class="ep-col"><strong>{edgeparse.mhs.toFixed(3)}</strong> ✅</td>
+            <td>{opendataloader.mhs.toFixed(3)}</td>
+            <td>{docling.mhs.toFixed(3)}</td>
+            <td>{pymupdf4llm.mhs.toFixed(3)}</td>
           </tr>
           <tr class="divider-row">
             <td class="feature-col feature-group">Dependencies</td>
@@ -224,9 +230,9 @@
     </div>
 
     <p class="comparison-footnote">
-      Benchmark: 200 real-world PDFs (academic papers, financial reports, multi-column layouts) on Apple M4 Max.
+      Benchmark: {benchmarkSnapshot.documentCount} real-world PDFs (academic papers, financial reports, multi-column layouts) on {benchmarkSnapshot.hardware}.
       Scores: NID = reading order, TEDS = table structure, MHS = heading hierarchy.
-      EdgeParse leads every reported metric in the current published snapshot, including paragraphs, text quality, table detection, speed, and overall score.
+      Snapshot updated {benchmarkSnapshot.lastUpdated}. EdgeParse leads every reported quality metric in the current published snapshot.
       <a href="/benchmark/" class="footnote-link">Full methodology →</a>
     </p>
   </div>

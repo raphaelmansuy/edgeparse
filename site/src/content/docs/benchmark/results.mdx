@@ -3,22 +3,41 @@ title: "Benchmark Results"
 description: "EdgeParse vs 6 PDF parsers on 200 documents. NID, TEDS, MHS, overall, and speed."
 ---
 
+import { benchmarkSnapshot, formatSpeed, getBenchmarkTool } from '../../../data/benchmark';
+
 ## Results Summary
 
-| Tool | NID | TEDS | MHS | Overall | Speed |
-|------|-----|------|-----|---------|-------|
-| **EdgeParse** | **0.889** | **0.596** | **0.553** | **0.787** | **0.064s** |
-| Docling | 0.867 | 0.540 | 0.438 | 0.745 | 0.768s |
-| OpenDataLoader | 0.873 | 0.326 | 0.442 | 0.733 | 0.094s |
-| PyMuPDF4LLM | 0.852 | 0.323 | 0.407 | 0.710 | 0.439s |
-| LiteParse | 0.815 | 0.000 | 0.001 | 0.564 | 0.196s |
-| MarkItDown | 0.808 | 0.193 | 0.001 | 0.564 | 0.149s |
+<table>
+  <thead>
+    <tr>
+      <th>Tool</th>
+      <th>NID</th>
+      <th>TEDS</th>
+      <th>MHS</th>
+      <th>Overall</th>
+      <th>Speed</th>
+    </tr>
+  </thead>
+  <tbody>
+    {benchmarkSnapshot.tools.map((tool) => (
+      <tr>
+        <td>{tool.isHighlight ? <strong>{tool.name}</strong> : tool.name}</td>
+        <td>{tool.isHighlight ? <strong>{tool.nid.toFixed(3)}</strong> : tool.nid.toFixed(3)}</td>
+        <td>{tool.isHighlight ? <strong>{tool.teds.toFixed(3)}</strong> : tool.teds.toFixed(3)}</td>
+        <td>{tool.isHighlight ? <strong>{tool.mhs.toFixed(3)}</strong> : tool.mhs.toFixed(3)}</td>
+        <td>{tool.isHighlight ? <strong>{tool.overall.toFixed(3)}</strong> : tool.overall.toFixed(3)}</td>
+        <td>{tool.isHighlight ? <strong>{formatSpeed(tool.speedSeconds)}</strong> : formatSpeed(tool.speedSeconds)}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
 
 ## Key Takeaways
 
-- **EdgeParse is the fastest** — 0.064s per document, 12× faster than Docling
-- **Highest overall score** — 0.787 across the current six-engine comparison
-- **Best structure metrics** — leading NID (0.889), TEDS (0.596), and MHS (0.553)
+- **Latest published snapshot:** updated {benchmarkSnapshot.lastUpdated} on {benchmarkSnapshot.hardware} across {benchmarkSnapshot.documentCount} documents
+- **EdgeParse is the fastest** — {formatSpeed(getBenchmarkTool('EdgeParse').speedSeconds)} per document, 12× faster than Docling
+- **Highest overall score** — {getBenchmarkTool('EdgeParse').overall.toFixed(3)} across the current six-engine comparison
+- **Best structure metrics** — leading NID ({getBenchmarkTool('EdgeParse').nid.toFixed(3)}), TEDS ({getBenchmarkTool('EdgeParse').teds.toFixed(3)}), and MHS ({getBenchmarkTool('EdgeParse').mhs.toFixed(3)})
 - **Best text metrics** — also leads paragraph boundaries, text quality, and table-detection F1 in the full benchmark report
 - **No ML stack required** — the top score comes from a pure Rust CPU pipeline
 
@@ -26,15 +45,15 @@ description: "EdgeParse vs 6 PDF parsers on 200 documents. NID, TEDS, MHS, overa
 
 | Comparison | Factor |
 |-----------|--------|
-| EdgeParse vs Docling | **12× faster** |
-| EdgeParse vs PyMuPDF4LLM | **6.9× faster** |
-| EdgeParse vs OpenDataLoader | **1.5× faster** |
-| EdgeParse vs MarkItDown | **2.3× faster** |
+| EdgeParse vs Docling | **{(getBenchmarkTool('Docling (IBM)').speedSeconds / getBenchmarkTool('EdgeParse').speedSeconds).toFixed(1)}× faster** |
+| EdgeParse vs PyMuPDF4LLM | **{(getBenchmarkTool('PyMuPDF4LLM').speedSeconds / getBenchmarkTool('EdgeParse').speedSeconds).toFixed(1)}× faster** |
+| EdgeParse vs OpenDataLoader | **{(getBenchmarkTool('OpenDataLoader').speedSeconds / getBenchmarkTool('EdgeParse').speedSeconds).toFixed(1)}× faster** |
+| EdgeParse vs MarkItDown | **{(getBenchmarkTool('MarkItDown').speedSeconds / getBenchmarkTool('EdgeParse').speedSeconds).toFixed(1)}× faster** |
 
 ## Test Environment
 
-- **Hardware:** Apple M4 Max
-- **Corpus:** 200 diverse PDF documents
+- **Hardware:** {benchmarkSnapshot.hardware}
+- **Corpus:** {benchmarkSnapshot.documentCount} diverse PDF documents
 - **Mode:** Single-threaded
 - **Categories:** Academic papers, financial reports, invoices, government forms, books, manuals
 
