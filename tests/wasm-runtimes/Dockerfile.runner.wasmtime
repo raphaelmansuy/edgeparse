@@ -10,9 +10,17 @@
 
 FROM edgeparse-wasi-base
 
-RUN curl -sSf https://wasmtime.dev/install.sh | bash
-ENV PATH="/root/.wasmtime/bin:${PATH}"
+ARG WASMTIME_VERSION=21.0.1
+ARG WASMTIME_ARCH=x86_64-linux
 
+RUN set -eux; \
+    curl -fsSLo /tmp/wasmtime.tar.xz "https://github.com/bytecodealliance/wasmtime/releases/download/v${WASMTIME_VERSION}/wasmtime-v${WASMTIME_VERSION}-${WASMTIME_ARCH}.tar.xz"; \
+    curl -fsSLo /tmp/wasmtime.tar.xz.sha256 "https://github.com/bytecodealliance/wasmtime/releases/download/v${WASMTIME_VERSION}/wasmtime-v${WASMTIME_VERSION}-${WASMTIME_ARCH}.tar.xz.sha256"; \
+    cd /tmp; \
+    sha256sum -c wasmtime.tar.xz.sha256; \
+    tar -xJf wasmtime.tar.xz; \
+    mv "wasmtime-v${WASMTIME_VERSION}-${WASMTIME_ARCH}/wasmtime" /usr/local/bin/; \
+    rm -rf /tmp/wasmtime*
 # Verify installation
 RUN wasmtime --version
 
