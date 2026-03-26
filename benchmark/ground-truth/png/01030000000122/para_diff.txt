@@ -1,0 +1,82 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000122) ===
+
+[001] !!!
+  GT  : # MOHAVE COMMUNITY COLLEGE
+  EP  : - 3. Mix reagents by pipetting gently up and down. - 4. Incubate all of the reaction tubes for 1 hour at 37 C.
+
+[002] !!!
+  GT  : **BIO181**
+  EP  : o
+
+[003] !!!
+  GT  : ## For use with CarolinaBLU™ stain:
+  EP  : NOTE: Your instructor will freeze your completed restriction digests at -20 oC until the next lab period.
+
+[004] !!!
+  GT  : | Tube | BamHI–HindIII restriction enzyme mixture | Restriction Buffer–RNase | Suspect 1 DNA | Suspect 2 DNA | Evidence 
+  EP  : # III. Electrophorese Digests
+
+[005] !!!
+  GT  : 3. Mix reagents by pipetting gently up and down.
+  EP  : Reagents:
+
+[006] !!!
+  GT  : 4. Incubate all of the reaction tubes for 1 hour at 37°C.
+  EP  : Restriction digests from Part II, on ice
+
+[007] !!!
+  GT  : **NOTE:** Your instructor will freeze your completed restriction digests at -20°C until the next lab period.
+  EP  : 10x loading dye, 10 ߤL
+
+[008] !!!
+  GT  : ---
+  EP  : - • - •
+
+[009] !!!
+  GT  : ## III. Electrophorese Digests
+  EP  : Supplies and Equipment
+
+[010] !!!
+  GT  : **Reagents:**
+  EP  : Gel electrophoresis chamber with agarose gel in gel tray, power supply
+
+[011] !!!
+  GT  : - Restriction digests from Part II, on ice - 10x loading dye, 10 μL
+  EP  : 1-20 ߤL Micropipette and pipet tips
+
+[012] !!!
+  GT  : **Supplies and Equipment:**
+  EP  : - • - •
+
+[013] !!!
+  GT  : - Gel electrophoresis chamber with agarose gel in gel tray, power supply - 1-20 μL Micropipette and pipet tips
+  EP  : # Load the Gel
+
+[014] !!!
+  GT  : ### Load the Gel
+  EP  : - 1. Use a micropipette to add 2 ߤL of 10× loading dye to a reaction tube. Use the pipet tip and gently pipet up - and d
+
+[015] !!!
+  GT  : 1. Use a micropipette to add 2 μL of 10× loading dye to a reaction tube. Use the pipet tip and gently pipet up and down 
+  EP  : - • steady the pipet over the well using two hands. You may wish to place one or both elbows on - the lab bench to stead
+
+[016] !!!
+  GT  : 2. Use a micropipette to load the contents of each reaction tube (20 μL total) into a separate well in the gel. Use a fr
+  EP  : (MISSING)
+
+[017] !!!
+  GT  : **NOTE:** Be careful not to punch the tip of the pipet through the bottom or side of the well.
+  EP  : (MISSING)
+
+[018] !!!
+  GT  : While loading,
+  EP  : (MISSING)
+
+[019] !!!
+  GT  : - steady the pipet over the well using two hands. You may wish to place one or both elbows on the lab bench to steady yo
+  EP  : (MISSING)
+
+[020] !!!
+  GT  : ---
+  EP  : (MISSING)
+

@@ -1,0 +1,18 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000065) ===
+
+[001] !!!
+  GT  : # 5. Natural dispersal
+  EP  : Figure 6. Mytella strigata biofouling green mussel farms in Bacoor City, Cavite, Manila Bay Photo from https://businessm
+
+[002] !!!
+  GT  : Dispersal by purely natural means is not included as a pathway of biological invasions (Gaston 1996). Examples include r
+  EP  : # 5. Natural dispersal
+
+[003] !!!
+  GT  : While a tsunami is a relatively rare event, a more common one is fouler dispersal by rafting on coastal currents of floa
+  EP  : Dispersal by purely natural means is not included as a pathway of biological invasions (Gaston 1996). Examples include r
+
+[004] !!!
+  GT  : (MISSING)
+  EP  : While a tsunami is a relatively rare event, a more common one is fouler dispersal by rafting on coastal currents of floa
+

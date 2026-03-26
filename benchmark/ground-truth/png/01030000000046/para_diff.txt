@@ -1,0 +1,42 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000046) ===
+
+[001] !!!
+  GT  : # Table: Provisional Results of Registration of Candidates on 8 March 2022 and Official Results of Registration of Candi
+  EP  : Political Parties, Candidates Registration and Election Campaign
+
+[002] !!!
+  GT  : | No. | Political party | Provisional registration result on 7 March | | | Official registration result on 29 April | | 
+  EP  : Table: Provisional Results of Registration of Candidates on 8 March 2022 22 of Registration of Candidates on 29 April 20
+
+[003] !!!
+  GT  : [21]: https://www.nec.gov.kh/khmer/content/5393 [22]: https://www.nec.gov.kh/khmer/content/5525
+  EP  : and Official Results
+
+[004] !!!
+  GT  : (MISSING)
+  EP  : # Number of
+
+[005] !!!
+  GT  : (MISSING)
+  EP  : commune/ sangkat
+
+[006] !!!
+  GT  : (MISSING)
+  EP  : | 1 | Cambodian People’s Party | 1,652 | 28,008 | 1,652 | 28,008 | 0 | | --- | --- | --- | --- | --- | --- | --- | | 2 |
+
+[007] !!!
+  GT  : (MISSING)
+  EP  : Number of candidates
+
+[008] !!!
+  GT  : (MISSING)
+  EP  : Number of commune/ sangkat
+
+[009] !!!
+  GT  : (MISSING)
+  EP  : Number of candidates
+
+[010] !!!
+  GT  : (MISSING)
+  EP  : 21 https://www.nec.gov.kh/khmer/content/5393 22 https://www.nec.gov.kh/khmer/content/5525
+

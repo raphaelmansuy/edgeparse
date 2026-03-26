@@ -1,0 +1,34 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000061) ===
+
+[001] !!!
+  GT  : iii. Looking at cost items, the cost of raw woods procurement will be highest share at 42%, followed by labour cost at 3
+  EP  : - iii. Looking at cost items, the cost of raw woods procurement will be highest share at 42%, followed by labour cost at
+
+[002] !!!
+  GT  : **Figure 5.1. Operating Cost Structure by the Three Departments of A Company**
+  EP  : v. Assumed selling price of wood pellet is $100 per tonne and appropriate.
+
+[003] !!!
+  GT  : ![Pie chart showing Operating Cost Structure by the Three Departments of A Company]
+  EP  : Figure 5.1. Operating Cost Structure by the Three Departments of A Company
+
+[004] !!!
+  GT  : Source: Author.
+  EP  : Cutting raw woods Fabrication Transportation
+
+[005] !!!
+  GT  : **Figure 5.2. Operating Cost Structure by the Cost Items of a Company**
+  EP  : Source: Author.
+
+[006] !!!
+  GT  : ![Pie chart showing Operating Cost Structure by the Cost Items of a Company]
+  EP  : Figure 5.2. Operating Cost Structure by the Cost Items of a Company
+
+[007] !!!
+  GT  : Source: Author.
+  EP  : Raw woods Electricity Diesel oil Labour Depreciation Interest payment
+
+[008] !!!
+  GT  : (MISSING)
+  EP  : Source: Author.
+

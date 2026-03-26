@@ -1,0 +1,26 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000056) ===
+
+[001] OK 
+  GT  : scheme helped the biomass power capacity to increase by more than double in 7 years. Under the FIT scheme, biomass fuels
+  EP  : scheme helped the biomass power capacity to increase by more than double in 7 years. Under the FIT scheme, biomass fuels
+
+[002] !!!
+  GT  : While inexpensive biomass sources such as wood waste from construction and waste materials, were the main fuels under th
+  EP  : - • - General wood: sawmill residues, import wood such as pellets and chips, palm kernel shell (PKS) and palm trunk Liqu
+
+[003] !!!
+  GT  : **Figure 4.1. Approved Capacity under the FIT Scheme**
+  EP  : | 400 |  | Construction |  | waste | | --- | --- | --- | --- | --- | | 300 |  |  | wood | (10MWs) | | 200 |  | General |
+
+[004] !!!
+  GT  : | Year | Waste materials | Biogas | Construction wood waste | General wood (10MW≤) | General wood (<10MW) | Unutilised w
+  EP  : FIT = feed-in-tariff.
+
+[005] !!!
+  GT  : *Note: Liquid biomass approved under the FIT scheme between FY2012 and FY2017 is included in general wood and no liquid 
+  EP  : Note: Liquid biomass approved under the FIT scheme between FY2012 and FY2017 is included in general wood and no liquid b
+
+[006] !!!
+  GT  : Source: METI (2021a).
+  EP  : (MISSING)
+

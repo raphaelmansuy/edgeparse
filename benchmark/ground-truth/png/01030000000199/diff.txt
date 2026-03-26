@@ -1,0 +1,134 @@
+=== GROUND TRUTH (01030000000199) ===
+
+# Base Model Performance Evaluation of Upstage OCR Pack
+
+## Overview of OCR Pack
+
+### Upstage universal OCR model E2E performance evaluation¹
+
+| Company | Scene (Photographed document image) | Document (Scanned document image) |
+|---------|-------------------------------------|----------------------------------|
+| Company A² | 70.23 | 80.41 |
+| Company B² | 75.66 | 82.07 |
+| upstage | 92.4 | 95.5 |
+
+### Upstage universal OCR model performance details: Document criteria
+
+| Metric | Company A | Company B | upstage |
+|---------|--------------|--------------|---------|
+| OCR-Recall³ | 73.2 | 94.2 | 94.1 |
+| OCR-Precision⁴ | 89.6 | 96.8 | 94.6 |
+| OCR-F¹⁵ | 80.4 | 92 | 95.5 |
+| Parsing-F¹ | 68.0 | 82.65 | 82.65 |
+
+---
+
+¹ Recall: Percentage of what the OCR model predicted to be True from those that were actually True
+² Precision: Percentage of what the OCR model classifies as True, which is actually True
+³ Recall of the OCR model
+⁴ Precision of the OCR model
+¹⁵ F1: Harmonic mean value of Recall and Precision
+⁶ Parsing-F1: Comparison of parsing model F1 of both companies for business registration document form. Company A is excluded from comparison due to the absence of the document parsing model.
+
+---
+
+¹ Performance based on universal model, additional performance improvement is possible by implementing specialized models according to business requirements
+² A: Universal model of global leading AI company / B: Universal model of leading AI company in Korea, 2022. 5 Test criteria
+
+
+=== EDGEPARSE OUTPUT (01030000000199) ===
+
+Overview of OCR Pack
+
+Base Model Performance Evaluation of Upstage OCR Pack
+
+Upstage universal OCR model E2E performance
+
+Upstage universal OCR model performance details: Document
+
+evaluation1 criteria
+
+73.2
+
+100
+
+OCR-Recall 7
+
+3
+
+94.2
+
+94.14
+
+95 11
+
+95.5
+
+5
+
+90 89.0
+
+92.4
+
+OCR-Precision
+
+4 90.69 85 96.8
+
+4
+
+82.07
+
+9
+
+80.41
+
+80
+
+80.4
+
+5
+
+75.66 1
+
+OCR-F1
+
+92.
+
+75
+
+4 95.5
+
+70.23
+
+Company A
+
+70
+
+Company B
+
+Parsing-F1 68.0
+
+65
+
+9 82.65
+
+Company Company
+
+# Company
+
+# Company
+
+A 2 2 2 2 B A B Scene (Photographed document image) Document (Scanned document image) 65 70 75 80 85 90 95 100
+
+# 3 Recall: Percentage of what the OCR model predicted to be True from those that were actually True
+
+1 Performance based on universal model, additional performance improvement is possible by implementing specialized 4 Precision: Percentage of what the OCR model classifies as True, which is actually True
+
+models according to business requirements 5 F1: Harmonic mean value of Recall and Precision
+
+2 A: Universal model of global leading AI company / B: Universal model of leading AI company in Korea, 2022. 5 Test criteria
+
+# 6. Parsing-F1: Comparison of parsing model F1 of both companies for business registration document
+
+form. Company A is excluded from comparison due to the absence of the document parsing model.
+

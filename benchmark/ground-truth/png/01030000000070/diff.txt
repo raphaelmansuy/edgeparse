@@ -1,0 +1,53 @@
+=== GROUND TRUTH (01030000000070) ===
+
+### Diagram 2
+**Participation of Institutions in the VNR Meeting of Indonesia 2021.**
+
+The distribution of participating institutions in VNR-related meetings are as follows:
+
+| Institution                        | Number | Percentage |
+|-----------------------------------|---------|------------|
+| Government                        | 57      | 24%        |
+| Other State Institutions          | 20      | 8%         |
+| Civil Society Organizations       | 90      | 37%        |
+| Philanthropic Foundation          | 19      | 8%         |
+| Educational Institution           | 31      | 13%        |
+| Private and State-Owned Companies | 16      | 7%         |
+| Other Institutions                | 7       | 3%         |
+
+### Diagram 3
+**Distribution of Participating Institutions within VNR Meeting of Indonesia 2021.**
+
+*Data is processed based on: Kementerian PPN / Bappenas, “Annexes Indonesia’s VNR 2021” (n. 68), 332-345.*
+
+
+=== EDGEPARSE OUTPUT (01030000000070) ===
+
+two meetings are related to the initial meeting of VNR and as particular human rights
+
+Diagram 2
+Participation of Institutions in the VNR Meeting of
+
+Indonesia 2021.
+
+74 The distribution of participating institutions in VNR-related meetings are as follows:
+
+16 (7%) 7 (3%)
+
+31 (13%)
+
+19 (8%)
+
+57 (24%)
+
+20 (8%) 90 (37%) Government Other State Institutions Civil Society Organizations Philanthropic Foundation Educational Institution Private and State-Owned Companies Other Institutions
+
+Diagram 3
+Distribution of Participating Institutions within VNR
+
+Meeting of Indonesia 2021.75
+
+74 Data is processed based on: ibid., 332-345. 75 Data is processed based on: Kementerian PPN / Bappenas, “Annexes Indonesia’s VNR 2021” (n.
+
+68), 332-345.
+

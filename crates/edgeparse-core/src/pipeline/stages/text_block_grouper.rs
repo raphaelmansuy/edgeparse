@@ -312,11 +312,13 @@ fn find_matching_block(
         // merging at paragraph boundaries.
         //
         // Guards:
-        //   - block.len() >= 4: need enough lines to establish a margin pattern
+        //   - block.len() >= 3: need enough lines to establish a margin pattern
+        //     (OODA-5: lowered from 4 to 3 to include shorter blocks)
         //   - near_margin >= 60%: confirms justified/flush text
-        //   - gap > 2× font_size: short enough to catch most paragraph breaks
+        //   - gap > 1.8× font_size: short enough to catch most paragraph breaks
+        //     (OODA-6: lowered from 2.0 to 1.8 for earlier detection)
         //   - not hyphenated: lines ending with '-' are word-wrap, not paragraphs
-        if block.len() >= 4 && !is_subsup {
+        if block.len() >= 3 && !is_subsup {
             let block_right = block
                 .iter()
                 .map(|l| l.bbox.right_x)
@@ -348,12 +350,40 @@ fn find_matching_block(
                 || last_trimmed.ends_with('\u{201D}');
             let is_real_sentence_end = last_chars >= 20 || ends_sentence;
             if near_margin * 5 >= block.len() * 3
-                && short_gap > reference_size * 2.0
+                && short_gap > reference_size * 1.8
                 && !last_ends_hyphen
                 && is_real_sentence_end
                 && !looks_like_lowercase_continuation(&line.value())
             {
                 continue;
+            }
+        }
+        // ── Geometric first-line indentation detection (OODA-7) ──────────────
+        // In LaTeX/Word documents with \parindent > 0, new paragraphs start with
+        // a first-line indent. Detect this using the block's median left_x:
+        //   - Compute the median left_x of all lines in the current block.
+        //   - If the incoming line's left_x is significantly higher (more indented)
+        //     than this median, AND the block's last line is not hyphenated,
+        //     treat the incoming line as a paragraph first line → new block.
+        // This is geometrically principled: in justified text the left margin
+        // is bimodal — body lines cluster at the column margin, first lines at
+        // margin + parindent. The median robustly represents the body margin.
+        if block.len() >= 2 && !is_subsup {
+            let mut lefts: Vec<f64> = block.iter().map(|l| l.bbox.left_x).collect();
+            lefts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let block_median_left = lefts[lefts.len() / 2];
+            let indent_threshold = reference_size * 0.8;
+            if line.bbox.left_x > block_median_left + indent_threshold {
+                // The incoming line is more indented than the block's body margin.
+                // Only treat as paragraph break if block ends non-hyphenated.
+                let last_text2 = last.value();
+                let trimmed2 = last_text2.trim_end();
+                let ends_hyphen2 = trimmed2.ends_with('-')
+                    || trimmed2.ends_with('\u{00AD}')
+                    || trimmed2.ends_with('\u{2010}');
+                if !ends_hyphen2 {
+                    continue; // Force new block: incoming line starts new paragraph
+                }
             }
         }
         // ── Leading probability ──────────────────────────────────────────────

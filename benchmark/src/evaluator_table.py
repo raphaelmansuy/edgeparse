@@ -7,7 +7,7 @@ A slight modification has been added to the code to improve the evaluation proce
 
 import re
 from collections import deque
-from typing import List, Optional, Tuple
+from typing import List, Optional, Set, Tuple
 
 from html import unescape
 from rapidfuzz.distance import Levenshtein
@@ -219,10 +219,49 @@ def wrap_tables_in_html(tables: list[str]) -> str:
     return f"<html><body>\n{body_content}\n</body></html>"
 
 
-def evaluate_table(gt: str, pred: str) -> Tuple[Optional[float], Optional[float]]:
+def _extract_table_grid(table_html: str) -> List[List[str]]:
+    soup = BeautifulSoup(table_html, "html.parser")
+    table = soup.find("table")
+    if table is None:
+        return []
+
+    grid: List[List[str]] = []
+    for row in table.find_all("tr"):
+        cells = row.find_all(["th", "td"])
+        if not cells:
+            continue
+        grid.append([_normalize(cell.get_text(" ", strip=True)) for cell in cells])
+    return grid
+
+
+def _occupied_positions(tables: List[str]) -> Set[Tuple[int, int, int]]:
+    occupied: Set[Tuple[int, int, int]] = set()
+    for table_idx, table_html in enumerate(tables):
+        for row_idx, row in enumerate(_extract_table_grid(table_html)):
+            for col_idx, cell_text in enumerate(row):
+                if cell_text:
+                    occupied.add((table_idx, row_idx, col_idx))
+    return occupied
+
+
+def _f1_from_sets(reference: Set[Tuple[int, int, int]], prediction: Set[Tuple[int, int, int]]) -> float:
+    if not reference and not prediction:
+        return 1.0
+    if not reference or not prediction:
+        return 0.0
+
+    overlap = len(reference & prediction)
+    precision = overlap / len(prediction)
+    recall = overlap / len(reference)
+    if precision + recall == 0.0:
+        return 0.0
+    return 2.0 * precision * recall / (precision + recall)
+
+
+def evaluate_table(gt: str, pred: str) -> Tuple[Optional[float], Optional[float], Optional[float]]:
     """Evaluate predicted table markup against ground truth using TEDS metrics.
 
-    Returns ``(None, None)`` when the ground truth does not contain a table.
+    Returns ``(None, None, None)`` when the ground truth does not contain a table.
     """
 
     gt_with_html = convert_to_markdown_with_html_tables(gt)
@@ -232,9 +271,9 @@ def evaluate_table(gt: str, pred: str) -> Tuple[Optional[float], Optional[float]
     pred_tables = extract_tables(pred_with_html)
 
     if not gt_tables:
-        return None, None
+        return None, None, None
     if not pred_tables:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0
 
     gt_data = wrap_tables_in_html(gt_tables)
     pred_data = wrap_tables_in_html(pred_tables)
@@ -245,4 +284,9 @@ def evaluate_table(gt: str, pred: str) -> Tuple[Optional[float], Optional[float]
     content_evaluator = TEDSEvaluator(structure_only=False)
     teds_score = calc_table_score(gt_data, pred_data, content_evaluator)
 
-    return teds_score, teds_s_score
+    table_cell_occupancy_f1 = _f1_from_sets(
+        _occupied_positions(gt_tables),
+        _occupied_positions(pred_tables),
+    )
+
+    return teds_score, teds_s_score, table_cell_occupancy_f1

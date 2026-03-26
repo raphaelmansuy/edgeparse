@@ -1,0 +1,614 @@
+{
+  "file name": "01030000000122.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "header",
+      "id": 1,
+      "page number": 1,
+      "bounding box": [
+        72.0,
+        737.88972,
+        531.48,
+        759.06204
+      ],
+      "kids": []
+    },
+    {
+      "type": "image",
+      "id": 2,
+      "page number": 1,
+      "bounding box": [
+        72.0,
+        595.8001326,
+        529.8621912,
+        720.000122
+      ],
+      "source": "01030000000122_images/imageFile1.png"
+    },
+    {
+      "type": "list",
+      "id": 5,
+      "level": "1",
+      "page number": 1,
+      "bounding box": [
+        72.0,
+        522.05856,
+        308.0712,
+        603.3253199999999
+      ],
+      "numbering style": "arabic numbers",
+      "number of list items": 2,
+      "next list id": 0,
+      "previous list id": 0,
+      "list items": [
+        {
+          "type": "list item",
+          "id": 3,
+          "page number": 1,
+          "bounding box": [
+            72.0,
+            547.73856,
+            283.59024,
+            603.3253199999999
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "3. Mix reagents by pipetting gently up and down.",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 4,
+          "page number": 1,
+          "bounding box": [
+            72.0,
+            522.05856,
+            308.0712,
+            577.6484399999999
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "4. Incubate all of the reaction tubes for 1 hour at 37 C.",
+          "kids": []
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": 6,
+      "page number": 1,
+      "bounding box": [
+        292.44,
+        533.15328,
+        295.88088,
+        569.31816
+      ],
+      "font": "Cambria",
+      "font size": 6.48,
+      "text color": "[0.0]",
+      "content": "o"
+    },
+    {
+      "type": "paragraph",
+      "id": 7,
+      "page number": 1,
+      "bounding box": [
+        71.99927999999997,
+        496.37855999999994,
+        512.91048,
+        551.9684400000001
+      ],
+      "font": "Cambria",
+      "font size": 9.96,
+      "text color": "[0.0]",
+      "content": "NOTE: Your instructor will freeze your completed restriction digests at -20 oC until the next lab period."
+    },
+    {
+      "type": "heading",
+      "id": 8,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        72.0,
+        489.61199999999997,
+        219.83999999999997,
+        505.764
+      ],
+      "heading level": 1,
+      "font": "Cambria-Bold",
+      "font size": 12.0,
+      "text color": "[0.0]",
+      "content": "III. Electrophorese Digests"
+    },
+    {
+      "type": "paragraph",
+      "id": 9,
+      "page number": 1,
+      "bounding box": [
+        72.0,
+        445.824,
+        113.46300000000001,
+        496.053
+      ],
+      "font": "Cambria",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "Reagents:"
+    },
+    {
+      "type": "paragraph",
+      "id": 10,
+      "page number": 1,
+      "bounding box": [
+        108.0,
+        420.867,
+        254.81699999999998,
+        471.096
+      ],
+      "font": "Cambria",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "Restriction digests from Part II, on ice"
+    },
+    {
+      "type": "paragraph",
+      "id": 11,
+      "page number": 1,
+      "bounding box": [
+        108.0,
+        409.824,
+        196.49699999999999,
+        460.053
+      ],
+      "font": "Cambria",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "10x loading dye, 10 ߤL"
+    },
+    {
+      "type": "list",
+      "id": 14,
+      "level": "1",
+      "page number": 1,
+      "bounding box": [
+        90.0,
+        429.075,
+        96.579,
+        452.403
+      ],
+      "numbering style": "bullets",
+      "number of list items": 2,
+      "next list id": 0,
+      "previous list id": 0,
+      "list items": [
+        {
+          "type": "list item",
+          "id": 12,
+          "page number": 1,
+          "bounding box": [
+            90.0,
+            440.118,
+            96.579,
+            452.403
+          ],
+          "font": "SymbolMT",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "•",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 13,
+          "page number": 1,
+          "bounding box": [
+            90.0,
+            429.075,
+            96.579,
+            441.36
+          ],
+          "font": "SymbolMT",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "•",
+          "kids": []
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": 15,
+      "page number": 1,
+      "bounding box": [
+        72.0,
+        385.22700000000003,
+        167.58,
+        435.456
+      ],
+      "font": "Cambria",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "Supplies and Equipment"
+    },
+    {
+      "type": "paragraph",
+      "id": 16,
+      "page number": 1,
+      "bounding box": [
+        108.00000000000001,
+        360.14400000000006,
+        381.663,
+        410.37300000000005
+      ],
+      "font": "Cambria",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "Gel electrophoresis chamber with agarose gel in gel tray, power supply"
+    },
+    {
+      "type": "paragraph",
+      "id": 17,
+      "page number": 1,
+      "bounding box": [
+        108.0,
+        349.10100000000006,
+        246.05999999999997,
+        399.33000000000004
+      ],
+      "font": "Cambria",
+      "font size": 9.0,
+      "text color": "[0.0]",
+      "content": "1-20 ߤL Micropipette and pipet tips"
+    },
+    {
+      "type": "list",
+      "id": 20,
+      "level": "1",
+      "page number": 1,
+      "bounding box": [
+        90.0,
+        368.35200000000003,
+        96.57900000000001,
+        391.68000000000006
+      ],
+      "numbering style": "bullets",
+      "number of list items": 2,
+      "next list id": 0,
+      "previous list id": 0,
+      "list items": [
+        {
+          "type": "list item",
+          "id": 18,
+          "page number": 1,
+          "bounding box": [
+            90.00000000000001,
+            379.39500000000004,
+            96.57900000000001,
+            391.68000000000006
+          ],
+          "font": "SymbolMT",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "•",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 19,
+          "page number": 1,
+          "bounding box": [
+            90.0,
+            368.35200000000003,
+            96.579,
+            380.63700000000006
+          ],
+          "font": "SymbolMT",
+          "font size": 9.0,
+          "text color": "[0.0]",
+          "content": "•",
+          "kids": []
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "id": 21,
+      "level": "Subtitle",
+      "page number": 1,
+      "bounding box": [
+        72.0,
+        341.57904,
+        136.82688,
+        356.43888
+      ],
+      "heading level": 2,
+      "font": "Cambria-Bold",
+      "font size": 11.04,
+      "text color": "[0.0]",
+      "content": "Load the Gel"
+    },
+    {
+      "type": "list",
+      "id": 31,
+      "level": "1",
+      "page number": 1,
+      "bounding box": [
+        71.99999999999994,
+        130.62635999999992,
+        537.8461319999999,
+        350.00532
+      ],
+      "numbering style": "arabic numbers",
+      "number of list items": 9,
+      "next list id": 0,
+      "previous list id": 0,
+      "list items": [
+        {
+          "type": "list item",
+          "id": 22,
+          "page number": 1,
+          "bounding box": [
+            72.0,
+            294.41855999999996,
+            530.7366840000005,
+            350.00532
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "1. Use a micropipette to add 2 ߤL of 10× loading dye to a reaction tube. Use the pipet tip and gently pipet up",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 23,
+          "page number": 1,
+          "bounding box": [
+            71.99999999999997,
+            282.65579999999994,
+            537.8461319999999,
+            338.24255999999997
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "and down a couple of times to mix the 10× loading dye with the digested DNA. Use a new pipet tip and repeat",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 24,
+          "page number": 1,
+          "bounding box": [
+            72.0,
+            270.8930399999999,
+            140.79372000000004,
+            326.47979999999995
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "for each digest.",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 25,
+          "page number": 1,
+          "bounding box": [
+            72.00000000000001,
+            245.21615999999997,
+            527.0345520000001,
+            300.80292
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "2. Use a micropipette to load the contents of each reaction tube (20 ߤL total) into a separate well in the gel.",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 26,
+          "page number": 1,
+          "bounding box": [
+            71.99999999999994,
+            233.45339999999996,
+            510.03083999999996,
+            289.04015999999996
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "Use a fresh pipet tip for each reaction tube and write down the order in which the samples are loaded.",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 27,
+          "page number": 1,
+          "bounding box": [
+            71.99999999999994,
+            207.77651999999995,
+            74.19119999999994,
+            263.3632799999999
+          ],
+          "font": "",
+          "font size": 9.96,
+          "text color": "",
+          "content": "",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 28,
+          "page number": 1,
+          "bounding box": [
+            71.99999999999994,
+            181.98011999999994,
+            449.91227999999995,
+            237.56687999999994
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "NOTE: Be careful not to punch the tip of the pipet through the bottom or side of the well.",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 29,
+          "page number": 1,
+          "bounding box": [
+            71.99999999999994,
+            156.30323999999993,
+            74.19119999999994,
+            211.88999999999993
+          ],
+          "font": "",
+          "font size": 9.96,
+          "text color": "",
+          "content": "",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 30,
+          "page number": 1,
+          "bounding box": [
+            71.99999999999994,
+            130.62635999999992,
+            137.54675999999995,
+            186.21311999999992
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "While loading,",
+          "kids": []
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "id": 38,
+      "level": "1",
+      "page number": 1,
+      "bounding box": [
+        71.99663999999999,
+        34.69392,
+        540.6927000000002,
+        159.8091599999999
+      ],
+      "numbering style": "arabic numbers",
+      "number of list items": 6,
+      "next list id": 0,
+      "previous list id": 0,
+      "list items": [
+        {
+          "type": "list item",
+          "id": 32,
+          "page number": 1,
+          "bounding box": [
+            125.99315999999993,
+            104.22239999999991,
+            540.6927000000002,
+            159.8091599999999
+          ],
+          "font": "SymbolMT",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "• steady the pipet over the well using two hands. You may wish to place one or both elbows on",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 33,
+          "page number": 1,
+          "bounding box": [
+            143.99087999999992,
+            92.57915999999989,
+            298.93859999999995,
+            148.16591999999991
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "the lab bench to steady your hands.",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 34,
+          "page number": 1,
+          "bounding box": [
+            125.98319999999995,
+            80.2187999999999,
+            536.7336000000001,
+            135.8055599999999
+          ],
+          "font": "SymbolMT",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "• be careful to expel any air in the pipet tip end before loading the gel. If an air bubble forms a",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 35,
+          "page number": 1,
+          "bounding box": [
+            143.98091999999994,
+            68.57555999999988,
+            499.31786399999976,
+            124.1623199999999
+          ],
+          "font": "Cambria",
+          "font size": 9.96,
+          "text color": "[0.0]",
+          "content": "cap over the well, the sample will flow into the buffer around the edges of the well.",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 36,
+          "page number": 1,
+          "bounding box": [
+            296.76,
+            47.412,
+            318.1776,
+            62.4816
+          ],
+          "font": "ArialMT",
+          "font size": 11.04,
+          "text color": "[0.0]",
+          "content": "133",
+          "kids": []
+        },
+        {
+          "type": "list item",
+          "id": 37,
+          "page number": 1,
+          "bounding box": [
+            71.99663999999999,
+            34.69392,
+            75.06575999999998,
+            49.76352
+          ],
+          "font": "",
+          "font size": 11.04,
+          "text color": "",
+          "content": "",
+          "kids": []
+        }
+      ]
+    }
+  ]
+}

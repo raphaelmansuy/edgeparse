@@ -1,0 +1,185 @@
+{
+  "file name": "01030000000172.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "heading",
+      "id": 1,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        771.4290000000001,
+        406.04030000000006,
+        782.2182
+      ],
+      "heading level": 1,
+      "font": "CormorantGaramond-Regular",
+      "font size": 10.8,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Part V. Chapter Five - Comparing Associations Between Multiple Variables"
+    },
+    {
+      "type": "paragraph",
+      "id": 2,
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        675.6219,
+        540.9497,
+        753.7419
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Section 5.1: The Linear Model 35 Section 5.2: Simple Regression Assumptions, Interpretation, and Write Up 36 Section 5.3: Multiple Regression Explanation, Assumptions, Interpretation, and Write Up 39 Section 5.4: Hierarchical Regression Explanation, Assumptions, Interpretation, and Write Up 43 Section 5.5: Chapter Five Self-Test 47"
+    },
+    {
+      "type": "heading",
+      "id": 3,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        644.4390000000001,
+        356.16350000000006,
+        655.2282
+      ],
+      "heading level": 1,
+      "font": "CormorantGaramond-Regular",
+      "font size": 10.8,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Part VI. Chapter Six - Comparing Three or More Group Means"
+    },
+    {
+      "type": "paragraph",
+      "id": 4,
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        565.2819,
+        540.9497,
+        626.7519
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Section 6.1: Between Versus Within Group Analyses 49 Section 6.2: One-Way ANOVA Assumptions, Interpretation, and Write Up 51 Section 6.3 Repeated Measures ANOVA Assumptions, Interpretation, and Write Up 54 Section 6.4: Chapter Six Self-Test 62"
+    },
+    {
+      "type": "heading",
+      "id": 5,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        534.099,
+        352.901,
+        544.8882
+      ],
+      "heading level": 1,
+      "font": "CormorantGaramond-Regular",
+      "font size": 10.8,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Part VII. Chapter Seven - Moderation and Mediation Analyses"
+    },
+    {
+      "type": "paragraph",
+      "id": 6,
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        454.9419,
+        540.9497,
+        516.4119
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Section 7.1: Mediation and Moderation Models 64 Section 7.2: Mediation Assumptions, The PROCESS Macro, Interpretation, and Write Up 66 Section 7.3: Moderation Models, Assumptions, Interpretation, and Write Up 69 Section 7.4: Chapter Seven Self-Test 73"
+    },
+    {
+      "type": "heading",
+      "id": 7,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        423.75899999999996,
+        354.9133,
+        434.5482
+      ],
+      "heading level": 1,
+      "font": "CormorantGaramond-Regular",
+      "font size": 10.8,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Part VIII. Chapter Eight - Factor Analysis and Scale Reliability"
+    },
+    {
+      "type": "paragraph",
+      "id": 8,
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        278.0019,
+        540.9497,
+        406.07189999999997
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Section 8.1: Factor Analysis Definitions 75 Section 8.2: EFA versus CFA 76 Section 8.3: EFA Steps with Factor Extraction 78 Section 8.4: EFA Determining the Number of Factors 80 Section 8.5: EFA Interpretation 84 Section 8.6: EFA Write Up 86 Section 8.7: Scale Reliability 87 Section 8.8: Chapter Eight Self-Test 89"
+    },
+    {
+      "type": "heading",
+      "id": 9,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        246.81900000000002,
+        297.4647,
+        257.6082
+      ],
+      "heading level": 1,
+      "font": "CormorantGaramond-Regular",
+      "font size": 10.8,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Part IX. Chapter Nine - Nonparametric Statistics"
+    },
+    {
+      "type": "paragraph",
+      "id": 10,
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        134.3619,
+        540.9497,
+        229.1319
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "Section 9.1: Nonparametric Definitions 91 Section 9.2: Choosing Appropriate Tests 93 Section 9.3: Comparing Two Independent Conditions: The Mann– Whitney U Test 94 Section 9.4: Comparing Two Dependent Conditions or Paired Samples – Wilcoxon Sign-Rank Test 96 Section 9.5: Differences Between Several Independent Groups: The Kruskal–Wallis Test 98 Section 9.6: Chapter Nine Self-Test 100"
+    },
+    {
+      "type": "paragraph",
+      "id": 11,
+      "page number": 1,
+      "bounding box": [
+        85.0394,
+        106.9119,
+        540.9497,
+        118.4319
+      ],
+      "font": "Lora-Regular",
+      "font size": 9.0,
+      "text color": "[0.0, 0.0, 1.0]",
+      "content": "References 101"
+    }
+  ]
+}

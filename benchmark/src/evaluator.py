@@ -22,10 +22,12 @@ from pathlib import Path
 from statistics import fmean
 from typing import Any, Dict, Iterable, List, Optional, Set
 
+from evaluation_schema import CURRENT_EVALUATION_SCHEMA_VERSION
 from evaluator_heading_level import evaluate_heading_level
 from evaluator_paragraph import evaluate_paragraph_structure
 from evaluator_reading_order import evaluate_reading_order
 from evaluator_table import evaluate_table
+from evaluator_text_quality import evaluate_text_quality
 
 
 DEFAULT_GT_DIR = "ground-truth/markdown"
@@ -43,6 +45,7 @@ class DocumentScores:
     nid_s: Optional[float]
     teds: Optional[float]
     teds_s: Optional[float]
+    table_cell_occupancy_f1: Optional[float]
     mhs: Optional[float]
     mhs_s: Optional[float]
     paragraph_boundary_f1: Optional[float]
@@ -53,6 +56,19 @@ class DocumentScores:
     prose_block_boundary_precision: Optional[float]
     prose_block_boundary_recall: Optional[float]
     prose_block_count_similarity: Optional[float]
+    # Text-content quality metrics
+    bleu4: Optional[float]
+    rouge1: Optional[float]
+    rouge2: Optional[float]
+    rougeL: Optional[float]
+    cer: Optional[float]
+    wer: Optional[float]
+    f1_token: Optional[float]
+    word_fragmentation_score: Optional[float]
+    word_boundary_integrity_score: Optional[float]
+    token_boundary_f1: Optional[float]
+    boundary_contamination_score: Optional[float]
+    text_quality_score: Optional[float]
     prediction_available: bool
 
     def to_json(self) -> Dict[str, Any]:
@@ -60,10 +76,12 @@ class DocumentScores:
             "document_id": self.document_id,
             "scores": {
                 "overall": self.overall,
+                # Structural metrics
                 "nid": self.nid,
                 "nid_s": self.nid_s,
                 "teds": self.teds,
                 "teds_s": self.teds_s,
+                "table_cell_occupancy_f1": self.table_cell_occupancy_f1,
                 "mhs": self.mhs,
                 "mhs_s": self.mhs_s,
                 "paragraph_boundary_f1": self.paragraph_boundary_f1,
@@ -74,6 +92,19 @@ class DocumentScores:
                 "prose_block_boundary_precision": self.prose_block_boundary_precision,
                 "prose_block_boundary_recall": self.prose_block_boundary_recall,
                 "prose_block_count_similarity": self.prose_block_count_similarity,
+                # Text-content quality metrics
+                "bleu4": self.bleu4,
+                "rouge1": self.rouge1,
+                "rouge2": self.rouge2,
+                "rougeL": self.rougeL,
+                "cer": self.cer,
+                "wer": self.wer,
+                "f1_token": self.f1_token,
+                "word_fragmentation_score": self.word_fragmentation_score,
+                "word_boundary_integrity_score": self.word_boundary_integrity_score,
+                "token_boundary_f1": self.token_boundary_f1,
+                "boundary_contamination_score": self.boundary_contamination_score,
+                "text_quality_score": self.text_quality_score,
             },
             "prediction_available": self.prediction_available,
         }
@@ -118,16 +149,18 @@ def _evaluate_single_document(
     prediction_available = pred_path.is_file()
 
     nid, nid_s = evaluate_reading_order(gt_markdown, pred_markdown)
-    teds, teds_s = evaluate_table(gt_markdown, pred_markdown)
+    teds, teds_s, table_cell_occupancy_f1 = evaluate_table(gt_markdown, pred_markdown)
     mhs, mhs_s = evaluate_heading_level(gt_markdown, pred_markdown)
     paragraph_metrics = evaluate_paragraph_structure(gt_markdown, pred_markdown)
+    text_metrics = evaluate_text_quality(gt_markdown, pred_markdown)
 
-    overall_components = [
-        nid,
-        teds,
-        mhs,
+    # Overall composite: structural quality (NID, TEDS, MHS) + text content
+    # quality (ROUGE-1, ROUGE-L, BLEU-4).  TEDS and MHS are only included
+    # when the document contains tables / headings respectively.
+    overall_values = [
+        v for v in (nid, teds, mhs, text_metrics["text_quality_score"])
+        if v is not None
     ]
-    overall_values = [value for value in overall_components if value is not None]
     overall_average = _safe_mean(overall_values)
 
     return DocumentScores(
@@ -137,6 +170,7 @@ def _evaluate_single_document(
         nid_s=nid_s,
         teds=teds,
         teds_s=teds_s,
+        table_cell_occupancy_f1=table_cell_occupancy_f1,
         mhs=mhs,
         mhs_s=mhs_s,
         paragraph_boundary_f1=paragraph_metrics["boundary_f1"],
@@ -147,6 +181,18 @@ def _evaluate_single_document(
         prose_block_boundary_precision=paragraph_metrics["prose_block_boundary_precision"],
         prose_block_boundary_recall=paragraph_metrics["prose_block_boundary_recall"],
         prose_block_count_similarity=paragraph_metrics["prose_block_count_similarity"],
+        bleu4=text_metrics["bleu4"],
+        rouge1=text_metrics["rouge1"],
+        rouge2=text_metrics["rouge2"],
+        rougeL=text_metrics["rougeL"],
+        cer=text_metrics["cer"],
+        wer=text_metrics["wer"],
+        f1_token=text_metrics["f1_token"],
+        word_fragmentation_score=text_metrics["word_fragmentation_score"],
+        word_boundary_integrity_score=text_metrics["word_boundary_integrity_score"],
+        token_boundary_f1=text_metrics["token_boundary_f1"],
+        boundary_contamination_score=text_metrics["boundary_contamination_score"],
+        text_quality_score=text_metrics["text_quality_score"],
         prediction_available=prediction_available,
     )
 
@@ -159,6 +205,11 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
     nid_s_values = [doc.nid_s for doc in documents if doc.nid_s is not None]
     teds_values = [doc.teds for doc in documents if doc.teds is not None]
     teds_s_values = [doc.teds_s for doc in documents if doc.teds_s is not None]
+    table_cell_occupancy_f1_values = [
+        doc.table_cell_occupancy_f1
+        for doc in documents
+        if doc.table_cell_occupancy_f1 is not None
+    ]
     mhs_values = [doc.mhs for doc in documents if doc.mhs is not None]
     mhs_s_values = [doc.mhs_s for doc in documents if doc.mhs_s is not None]
     paragraph_boundary_f1_values = [
@@ -201,6 +252,35 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
         for doc in documents
         if doc.prose_block_count_similarity is not None
     ]
+    # Text-content quality
+    bleu4_values         = [doc.bleu4              for doc in documents if doc.bleu4              is not None]
+    rouge1_values        = [doc.rouge1             for doc in documents if doc.rouge1             is not None]
+    rouge2_values        = [doc.rouge2             for doc in documents if doc.rouge2             is not None]
+    rougeL_values        = [doc.rougeL             for doc in documents if doc.rougeL             is not None]
+    cer_values           = [doc.cer                for doc in documents if doc.cer                is not None]
+    wer_values           = [doc.wer                for doc in documents if doc.wer                is not None]
+    f1_token_values      = [doc.f1_token           for doc in documents if doc.f1_token           is not None]
+    word_fragmentation_values = [
+        doc.word_fragmentation_score
+        for doc in documents
+        if doc.word_fragmentation_score is not None
+    ]
+    word_boundary_integrity_values = [
+        doc.word_boundary_integrity_score
+        for doc in documents
+        if doc.word_boundary_integrity_score is not None
+    ]
+    token_boundary_f1_values = [
+        doc.token_boundary_f1
+        for doc in documents
+        if doc.token_boundary_f1 is not None
+    ]
+    boundary_contamination_values = [
+        doc.boundary_contamination_score
+        for doc in documents
+        if doc.boundary_contamination_score is not None
+    ]
+    text_quality_values  = [doc.text_quality_score for doc in documents if doc.text_quality_score is not None]
 
     overall_mean = _safe_mean(overall_values)
     nid_mean = _safe_mean(nid_values)
@@ -223,10 +303,12 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
     return {
         "score": {
             "overall_mean": overall_mean,
+            # Structural metrics
             "nid_mean": nid_mean,
             "nid_s_mean": nid_s_mean,
             "teds_mean": teds_mean,
             "teds_s_mean": teds_s_mean,
+            "table_cell_occupancy_f1_mean": _safe_mean(table_cell_occupancy_f1_values),
             "mhs_mean": mhs_mean,
             "mhs_s_mean": mhs_s_mean,
             "paragraph_boundary_f1_mean": paragraph_boundary_f1_mean,
@@ -237,12 +319,26 @@ def _aggregate_document_scores(documents: List[DocumentScores]) -> Dict[str, Any
             "prose_block_boundary_precision_mean": prose_block_boundary_precision_mean,
             "prose_block_boundary_recall_mean": prose_block_boundary_recall_mean,
             "prose_block_count_similarity_mean": prose_block_count_similarity_mean,
+            # Text-content quality metrics
+            "bleu4_mean":              _safe_mean(bleu4_values),
+            "rouge1_mean":             _safe_mean(rouge1_values),
+            "rouge2_mean":             _safe_mean(rouge2_values),
+            "rougeL_mean":             _safe_mean(rougeL_values),
+            "cer_mean":                _safe_mean(cer_values),
+            "wer_mean":                _safe_mean(wer_values),
+            "f1_token_mean":           _safe_mean(f1_token_values),
+            "word_fragmentation_score_mean": _safe_mean(word_fragmentation_values),
+            "word_boundary_integrity_score_mean": _safe_mean(word_boundary_integrity_values),
+            "token_boundary_f1_mean": _safe_mean(token_boundary_f1_values),
+            "boundary_contamination_score_mean": _safe_mean(boundary_contamination_values),
+            "text_quality_score_mean": _safe_mean(text_quality_values),
         },
         "nid_count": len(nid_values),
         "teds_count": len(teds_values),
         "mhs_count": len(mhs_values),
         "paragraph_boundary_count": len(paragraph_boundary_f1_values),
         "prose_block_boundary_count": len(prose_block_boundary_f1_values),
+        "text_quality_count": len(text_quality_values),
         "missing_predictions": missing_predictions,
     }
 
@@ -257,6 +353,7 @@ def _logging_scores(
     nid_s = scores.nid_s
     teds = scores.teds
     teds_s = scores.teds_s
+    table_cell_occupancy_f1 = scores.table_cell_occupancy_f1
     mhs = scores.mhs
     mhs_s = scores.mhs_s
     paragraph_boundary_f1 = scores.paragraph_boundary_f1
@@ -264,49 +361,36 @@ def _logging_scores(
     prose_block_boundary_f1 = scores.prose_block_boundary_f1
     prose_block_count_similarity = scores.prose_block_count_similarity
 
-    overall = f"{overall:.3f}" if overall is not None else "none "
-    nid = f"{nid:.3f}" if nid is not None else "none "
-    nid_s = f"{nid_s:.3f}" if nid_s is not None else "none "
-    teds = f"{teds:.3f}" if teds is not None else "none "
-    teds_s = f"{teds_s:.3f}" if teds_s is not None else "none "
-    mhs = f"{mhs:.3f}" if mhs is not None else "none "
-    mhs_s = f"{mhs_s:.3f}" if mhs_s is not None else "none "
-    paragraph_boundary_f1 = (
-        f"{paragraph_boundary_f1:.3f}"
-        if paragraph_boundary_f1 is not None
-        else "none "
-    )
-    paragraph_count_similarity = (
-        f"{paragraph_count_similarity:.3f}"
-        if paragraph_count_similarity is not None
-        else "none "
-    )
-    prose_block_boundary_f1 = (
-        f"{prose_block_boundary_f1:.3f}"
-        if prose_block_boundary_f1 is not None
-        else "none "
-    )
-    prose_block_count_similarity = (
-        f"{prose_block_count_similarity:.3f}"
-        if prose_block_count_similarity is not None
-        else "none "
-    )
+    def _fmt(v: Optional[float]) -> str:
+        return f"{v:.3f}" if v is not None else "none "
 
     logging.info(
-        "engine=%s document=%s overall=%s nid=%s nid_s=%s teds=%s teds_s=%s mhs=%s mhs_s=%s paragraph_boundary_f1=%s paragraph_count_similarity=%s prose_block_boundary_f1=%s prose_block_count_similarity=%s",
+        "engine=%s document=%s overall=%s nid=%s nid_s=%s teds=%s teds_s=%s tocf1=%s "
+        "mhs=%s mhs_s=%s pbf1=%s prose_bf1=%s "
+        "bleu4=%s rouge1=%s rougeL=%s cer=%s wer=%s f1_tok=%s frag=%s wbis=%s tbf1=%s bcs=%s tqs=%s",
         engine_name,
         doc_id,
-        overall,
-        nid,
-        nid_s,
-        teds,
-        teds_s,
-        mhs,
-        mhs_s,
-        paragraph_boundary_f1,
-        paragraph_count_similarity,
-        prose_block_boundary_f1,
-        prose_block_count_similarity,
+        _fmt(overall),
+        _fmt(nid),
+        _fmt(nid_s),
+        _fmt(teds),
+        _fmt(teds_s),
+        _fmt(table_cell_occupancy_f1),
+        _fmt(mhs),
+        _fmt(mhs_s),
+        _fmt(paragraph_boundary_f1),
+        _fmt(prose_block_boundary_f1),
+        _fmt(scores.bleu4),
+        _fmt(scores.rouge1),
+        _fmt(scores.rougeL),
+        _fmt(scores.cer),
+        _fmt(scores.wer),
+        _fmt(scores.f1_token),
+        _fmt(scores.word_fragmentation_score),
+        _fmt(scores.word_boundary_integrity_score),
+        _fmt(scores.token_boundary_f1),
+        _fmt(scores.boundary_contamination_score),
+        _fmt(scores.text_quality_score),
     )
 
 
@@ -359,6 +443,7 @@ def _evaluate_engine_version(
 
     aggregated = _aggregate_document_scores(documents)
     payload = {
+        "schema_version": CURRENT_EVALUATION_SCHEMA_VERSION,
         "summary": summary_metadata,
         "metrics": aggregated,
         "documents": [doc.to_json() for doc in documents],
@@ -378,23 +463,51 @@ def _evaluate_engine_version(
         "nid_s",
         "teds",
         "teds_s",
+        "table_cell_occupancy_f1",
         "mhs",
         "mhs_s",
+        "bleu4",
+        "rouge1",
+        "rouge2",
+        "rougeL",
+        "cer",
+        "wer",
+        "f1_token",
+        "word_fragmentation_score",
+        "word_boundary_integrity_score",
+        "token_boundary_f1",
+        "boundary_contamination_score",
+        "text_quality_score",
     ]
     with csv_path.open("w", encoding="utf-8", newline="") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=csv_fieldnames)
         writer.writeheader()
         for index, doc in enumerate(documents):
+            def _v(val: Optional[float]) -> str | float:
+                return "" if val is None else val
             row = {
                 "index": index + 1,
                 "document_id": f"'{doc.document_id}",
-                "overall": "" if doc.overall is None else doc.overall,
-                "nid": "" if doc.nid is None else doc.nid,
-                "nid_s": "" if doc.nid_s is None else doc.nid_s,
-                "teds": "" if doc.teds is None else doc.teds,
-                "teds_s": "" if doc.teds_s is None else doc.teds_s,
-                "mhs": "" if doc.mhs is None else doc.mhs,
-                "mhs_s": "" if doc.mhs_s is None else doc.mhs_s,
+                "overall":            _v(doc.overall),
+                "nid":                _v(doc.nid),
+                "nid_s":              _v(doc.nid_s),
+                "teds":               _v(doc.teds),
+                "teds_s":             _v(doc.teds_s),
+                "table_cell_occupancy_f1": _v(doc.table_cell_occupancy_f1),
+                "mhs":                _v(doc.mhs),
+                "mhs_s":              _v(doc.mhs_s),
+                "bleu4":              _v(doc.bleu4),
+                "rouge1":             _v(doc.rouge1),
+                "rouge2":             _v(doc.rouge2),
+                "rougeL":             _v(doc.rougeL),
+                "cer":                _v(doc.cer),
+                "wer":                _v(doc.wer),
+                "f1_token":           _v(doc.f1_token),
+                "word_fragmentation_score": _v(doc.word_fragmentation_score),
+                "word_boundary_integrity_score": _v(doc.word_boundary_integrity_score),
+                "token_boundary_f1": _v(doc.token_boundary_f1),
+                "boundary_contamination_score": _v(doc.boundary_contamination_score),
+                "text_quality_score": _v(doc.text_quality_score),
             }
             writer.writerow(row)
     logging.info("Wrote evaluation CSV to %s", csv_path)

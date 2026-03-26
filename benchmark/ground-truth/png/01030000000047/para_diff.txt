@@ -1,0 +1,26 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000047) ===
+
+[001] !!!
+  GT  : # ANFREL Pre-Election Assessment Mission Report
+  EP  : ANFREL Pre-Election Assessment Mission Report
+
+[002] !!!
+  GT  : | No. | Political party | Provisional registration result on 7 March | | | Official registration result on 29 April | | 
+  EP  : # Number of
+
+[003] !!!
+  GT  : **Total** | | | | | | | | | | **84,208** | | | **86,092** | | | **+1,884**
+  EP  : commune/ sangkat
+
+[004] !!!
+  GT  : (MISSING)
+  EP  : | 11 | Khmer United Party | 35 | 498 | 30 | 457 | -41 | | --- | --- | --- | --- | --- | --- | --- | | 12 | Grassroots De
+
+[005] !!!
+  GT  : (MISSING)
+  EP  : Number of candidates
+
+[006] !!!
+  GT  : (MISSING)
+  EP  : Number of commune/ sangkat Number of candidates
+

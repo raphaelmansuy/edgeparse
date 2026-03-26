@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name to publish (e.g. v0.2.0) — used for version sync'
+        description: 'Tag name to publish (e.g. v0.2.1) — used for version sync'
         required: true
-        default: 'v0.2.0'
+        default: 'v0.2.1'
 
 permissions:
   contents: read
@@ -133,7 +133,14 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for dir in sdks/node/npm/*/; do
-            (cd "$dir" && npm publish --access public) || echo "::warning::Failed to publish $dir"
+            OUTPUT=$((cd "$dir" && npm publish --access public) 2>&1) && echo "$OUTPUT" || {
+              echo "$OUTPUT"
+              if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
+                echo "::warning::Package already published for $dir — skipping."
+              else
+                exit 1
+              fi
+            }
           done
 
       - name: Publish edgeparse (main package)
@@ -141,4 +148,11 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd sdks/node
-          npm publish --access public
+          OUTPUT=$(npm publish --access public 2>&1) && echo "$OUTPUT" || {
+            echo "$OUTPUT"
+            if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
+              echo "edgeparse already published at this version — skipping."
+            else
+              exit 1
+            fi
+          }

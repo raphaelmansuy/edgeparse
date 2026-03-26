@@ -1,0 +1,34 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000009) ===
+
+[001] !!!
+  GT  : # The Honey-Moon
+  EP  : Figure 4.3 The Honey-Moon [graphic]. Mezzotint, hand-colored. Printed for carington bowles, London, June 1777 this list,
+
+[002] !!!
+  GT  : *FIGURE 4.3* **The Honey-Moon** [graphic]. Mezzotint, hand-colored. PRINTED FOR CARINGTON BOWLES, LONDON, JUNE 1777
+  EP  : Book. Interspersed with Some Occasional Observations on Some of the Most Celebrated Modern Dispensatories, 35 and the Pr
+
+[003] !!!
+  GT  : ---
+  EP  : | 34 Richard Walker, Memoirs of Medicine; Including a | 34 Richard Walker, Memoirs of Medicine; Including a | Pharmacopo
+
+[004] !!!
+  GT  : this list, Richard Walker, apothecary to the Prince of Wales, adds Arabic henna, manna, and rhubarb.34 The influence of 
+  EP  : the Eighteenth Century (London: Printed for J. Johnson, its love-inducing and rejuvenating properties, as
+
+[005] !!!
+  GT  : *Book. Interspersed with Some Occasional Observations on Some of the Most Celebrated Modern Dispensatories, and the Pres
+  EP  : For the influence of the Arabian medicine on Western Europe, see volume 3 of John Astruc’s Treatise on the Diseases of W
+
+[006] !!!
+  GT  : Peninsula to Europe, where they were customarily used in tinctures, purges, and other more or less effective elixirs.35 
+  EP  : (MISSING)
+
+[007] !!!
+  GT  : ---
+  EP  : (MISSING)
+
+[008] !!!
+  GT  : 35 For the influence of the Arabian medicine on Western Europe, see volume 3 of John Astruc’s *Treatise on the Diseases 
+  EP  : (MISSING)
+

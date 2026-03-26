@@ -1,0 +1,22 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000176) ===
+
+[001] OK 
+  GT  : vapor and other gases, making it useless. Only in the vacuum of space can optical elements be cooled to hundreds of degr
+  EP  : vapor and other gases, making it useless. Only in the vacuum of space can optical elements be cooled to hundreds of degr
+
+[002] !!!
+  GT  : # Observations from the Spitzer Space Telescope (SST)
+  EP  : The first orbiting infrared observatory, launched in 1983, was the Infrared Astronomical Satellite (IRAS), built as a jo
+
+[003] !!!
+  GT  : | Image | Description | |:---|:---| | *Flame nebula* | Flame nebula | | *Cassiopeia A* | Cassiopeia A | | *Helix nebula*
+  EP  : # Observations from the Spitzer Space Telescope (SST).
+
+[004] !!!
+  GT  : **Figure 2.** These infrared images—a region of star formation, the remnant of an exploded star, and a region where an o
+  EP  : Figure 2. These infrared images—a region of star formation, the remnant of an exploded star, and a region where an old s
+
+[005] !!!
+  GT  : (MISSING)
+  EP  : 336 | Chapter 6 Section 6.5: Observations outside Earth's Atmosphere
+

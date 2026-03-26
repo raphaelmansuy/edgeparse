@@ -1,0 +1,54 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000070) ===
+
+[001] !!!
+  GT  : ### Diagram 2 **Participation of Institutions in the VNR Meeting of Indonesia 2021.**
+  EP  : two meetings are related to the initial meeting of VNR and as particular human rights
+
+[002] !!!
+  GT  : The distribution of participating institutions in VNR-related meetings are as follows:
+  EP  : Diagram 2 Participation of Institutions in the VNR Meeting of
+
+[003] !!!
+  GT  : | Institution                        | Number | Percentage | |-----------------------------------|---------|------------
+  EP  : Indonesia 2021.
+
+[004] !!!
+  GT  : ### Diagram 3 **Distribution of Participating Institutions within VNR Meeting of Indonesia 2021.**
+  EP  : 74 The distribution of participating institutions in VNR-related meetings are as follows:
+
+[005] !!!
+  GT  : *Data is processed based on: Kementerian PPN / Bappenas, “Annexes Indonesia’s VNR 2021” (n. 68), 332-345.*
+  EP  : 16 (7%) 7 (3%)
+
+[006] !!!
+  GT  : (MISSING)
+  EP  : 31 (13%)
+
+[007] !!!
+  GT  : (MISSING)
+  EP  : 19 (8%)
+
+[008] !!!
+  GT  : (MISSING)
+  EP  : 57 (24%)
+
+[009] !!!
+  GT  : (MISSING)
+  EP  : 20 (8%) 90 (37%) Government Other State Institutions Civil Society Organizations Philanthropic Foundation Educational In
+
+[010] !!!
+  GT  : (MISSING)
+  EP  : Diagram 3 Distribution of Participating Institutions within VNR
+
+[011] !!!
+  GT  : (MISSING)
+  EP  : Meeting of Indonesia 2021.75
+
+[012] !!!
+  GT  : (MISSING)
+  EP  : 74 Data is processed based on: ibid., 332-345. 75 Data is processed based on: Kementerian PPN / Bappenas, “Annexes Indon
+
+[013] !!!
+  GT  : (MISSING)
+  EP  : 68), 332-345.
+

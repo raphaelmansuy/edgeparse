@@ -1,0 +1,30 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000012) ===
+
+[001] !!!
+  GT  : # Figure 5.1 Mr. Bologna Jun-r as Kalim Azack in *Aladdin, or The Wonderful Lamp*.
+  EP  : Figure 5.1 Mr. Bologna Jun-r as Kalim Azack in Aladdin, or
+
+[002] !!!
+  GT  : # Figure 5.2 Mr. Grimaldi as Kazrac (the Chinese slave) in *Aladdin, or The Wonderful Lamp*.
+  EP  : The Wonderful Lamp.
+
+[003] !!!
+  GT  : theatrical prints, which are informed by interculturalation and illustrate the Orientalized look of the tale’s theatrica
+  EP  : Figure 5.2 Mr. Grimaldi as Kazrac (the Chinese slave) in
+
+[004] !!!
+  GT  : --- [41] “A Tartar. A Man from Crimea,” in Octavien Dalvimart, *The Costume of Turkey*, 1802 (London: Printed for Willia
+  EP  : Aladdin, or The Wonderful Lamp. theatrical prints, which are informed by intercultale’s theatrical life: one of John (“J
+
+[005] !!!
+  GT  : (MISSING)
+  EP  : “Chinese” costume resembles contemporary Qing
+
+[006] !!!
+  GT  : (MISSING)
+  EP  : Grimaldi sports a braided pigtail and long mous-
+
+[007] !!!
+  GT  : (MISSING)
+  EP  : The Costume of Turkey, 1802 (London: Printed for William Miller, 1804), n.p.
+

@@ -11,8 +11,8 @@
 Extract Markdown, JSON (with bounding boxes), and HTML from any born-digital PDF
 — deterministically, in milliseconds, on CPU.
 
-- **How accurate is it?** — **#1 among all non-OCR tools** (0.881 overall score) across reading order, table structure, and heading hierarchy. Within rounding distance of OCR-based Docling (0.881 vs 0.882) at **18× the speed**. [Benchmark details](#benchmark)
-- **How fast?** — **0.023 s/doc** on Apple M4. 13× faster than PyMuPDF4LLM, 2× faster than OpenDataLoader. Parallel per-page processing via Rayon.
+- **How accurate is it?** — **0.787 overall** on the latest `opendataloader.org` PDF-to-Markdown benchmark, with the best score in every reported metric: reading order, tables, headings, paragraphs, text quality, table detection, and speed. [Benchmark details](#benchmark)
+- **How fast?** — **0.064 s/doc** on the 200-document benchmark corpus on Apple M4 Max. Faster than OpenDataLoader, Docling, PyMuPDF4LLM, MarkItDown, and LiteParse.
 - **Does it need a GPU or Java?** — No. No JVM, no GPU, no OCR models, no Python runtime for the CLI. Single ~15 MB binary.
 - **RAG / LLM pipelines?** — Yes. Outputs structured Markdown for chunking, JSON with bounding boxes for citations, preserves reading order across multi-column layouts. [See integration examples](#rag--llm-integration)
 
@@ -24,6 +24,7 @@ Available as a **Rust library**, **CLI binary**, **Python package**, **Node.js p
 
 - [Get Started in 30 Seconds](#get-started-in-30-seconds)
 - [What Problems Does This Solve?](#what-problems-does-this-solve)
+- [Release Channels](#release-channels)
 - [Benchmark](#benchmark)
 - [Capability Matrix](#capability-matrix)
 - [Installation](#installation)
@@ -82,6 +83,24 @@ const md = convert('report.pdf', { format: 'markdown' });
 
 ---
 
+## Release Channels
+
+Tagged releases publish every supported distribution target through GitHub Actions:
+
+| Channel | Artifact | Install / Pull |
+|---------|----------|----------------|
+| Rust crates | `pdf-cos`, `edgeparse-core`, `edgeparse-cli` | `cargo install edgeparse-cli` |
+| Python SDK | `edgeparse` wheels + sdist | `pip install edgeparse` |
+| Node.js SDK | `edgeparse` + 5 platform addons | `npm install edgeparse` |
+| WebAssembly SDK | `@edgeparse/edgeparse-wasm` | `npm install @edgeparse/edgeparse-wasm` |
+| CLI binaries | GitHub Release archives for macOS, Linux, Windows | [GitHub Releases](https://github.com/raphaelmansuy/edgeparse/releases) |
+| Homebrew | `raphaelmansuy/edgeparse` tap | `brew tap raphaelmansuy/edgeparse && brew install edgeparse` |
+| Containers | GHCR + Docker Hub multi-arch images | `docker pull ghcr.io/raphaelmansuy/edgeparse:0.2.1` |
+
+Release automation and registry details: [docs/07-cicd-publishing.md](docs/07-cicd-publishing.md)
+
+---
+
 ## What Problems Does This Solve?
 
 | Problem | EdgeParse Solution | Status |
@@ -89,7 +108,7 @@ const md = convert('report.pdf', { format: 'markdown' });
 | PDF text loses reading order in multi-column layouts | XY-Cut++ algorithm preserves correct reading sequence across columns, sidebars, and mixed layouts | ✅ Shipped |
 | Table extraction is broken (merged cells, borderless tables) | Ruling-line table detection + borderless cluster method; `--table-method cluster` for complex cases | ✅ Shipped |
 | OCR/ML tools add 500 MB+ of dependencies to a simple PDF pipeline | Zero GPU, zero OCR models, zero JVM — single 15 MB binary, pure Rust | ✅ Shipped |
-| Heading hierarchy is lost (all text looks the same) | Font-metric + geometry-based heading classifier; MHS score 0.821 on 200-doc benchmark | ✅ Shipped |
+| Heading hierarchy is lost (all text looks the same) | Font-metric + geometry-based heading classifier; MHS score 0.553 on the current benchmark | ✅ Shipped |
 | PDFs can carry hidden prompt injection payloads | AI safety filters: hidden text, off-page content, tiny-text, invisible OCG layers detected and stripped | ✅ Shipped |
 | Need bounding boxes to cite sources in RAG answers | Every element (`paragraph`, `heading`, `table`, `image`) has `[left, bottom, right, top]` coordinates in PDF points | ✅ Shipped |
 | In-browser PDF parsing uploads data to a server | WebAssembly build — full Rust engine in the browser, PDF data never leaves the device | ✅ Shipped |
@@ -100,30 +119,19 @@ const md = convert('report.pdf', { format: 'markdown' });
 
 Evaluated on **200 real-world PDFs** — academic papers, financial reports, multi-column layouts, complex tables, mixed-language documents — running on Apple M4 Max.
 
-### Against non-OCR tools (direct comparison)
+### Current comparison set
 
-| Engine | NID ↑ | TEDS ↑ | MHS ↑ | Overall ↑ | Speed ↓ |
-|--------|-------:|-------:|------:|----------:|--------:|
-| **EdgeParse** | **0.911** | **0.783** | **0.821** | **0.881** | **0.023 s/doc** |
-| OpenDataLoader | 0.912 | 0.494 | 0.760 | 0.844 | 0.048 s/doc |
-| PyMuPDF4LLM | 0.888 | 0.540 | 0.774 | 0.833 | 0.310 s/doc |
-| Microsoft MarkItDown | 0.844 | 0.273 | 0.000 | 0.589 | 0.078 s/doc |
-| LiteParse (LlamaIndex) | 0.857 | 0.000 | 0.000 | 0.569 | 0.214 s/doc |
+| Engine | NID ↑ | TEDS ↑ | MHS ↑ | PBF ↑ | TQS ↑ | TD F1 ↑ | Speed ↓ | Overall ↑ |
+|--------|------:|-------:|------:|------:|------:|--------:|--------:|----------:|
+| **EdgeParse** | **0.889** | **0.596** | **0.553** | **0.559** | **0.920** | **0.901** | **0.064 s/doc** | **0.787** |
+| OpenDataLoader | 0.873 | 0.326 | 0.442 | 0.544 | 0.916 | 0.636 | 0.094 s/doc | 0.733 |
+| Docling | 0.867 | 0.540 | 0.438 | 0.530 | 0.908 | 0.891 | 0.768 s/doc | 0.745 |
+| PyMuPDF4LLM | 0.852 | 0.323 | 0.407 | 0.538 | 0.888 | 0.744 | 0.439 s/doc | 0.710 |
+| EdgeParse (pre-frontier baseline) | 0.859 | 0.493 | 0.500 | 0.482 | 0.891 | 0.849 | 0.232 s/doc | 0.751 |
+| MarkItDown | 0.808 | 0.193 | 0.001 | 0.362 | 0.861 | 0.558 | 0.149 s/doc | 0.564 |
+| LiteParse | 0.815 | 0.000 | 0.001 | 0.383 | 0.887 | N/A | 0.196 s/doc | 0.564 |
 
-EdgeParse wins **every metric** — including speed. It is **13× faster than PyMuPDF4LLM** and **2× faster than OpenDataLoader**. MarkItDown and LiteParse produce zero MHS and near-zero TEDS, meaning they extract raw text with no structural understanding.
-
-### Against ML/OCR-based tools (reference)
-
-Tools relying on deep-learning models, OCR engines, or GPU inference:
-
-| Engine | NID ↑ | TEDS ↑ | MHS ↑ | Overall ↑ | Speed ↓ | Requires |
-|--------|-------:|-------:|------:|----------:|--------:|---------|
-| **EdgeParse** | **0.911** | **0.783** | **0.821** | **0.881** | **0.023 s/doc** | Nothing |
-| MinerU | 0.953 | — | 0.858 | 0.906 | 20.8 s/doc | PaddleOCR + layout models |
-| IBM Docling | 0.899 | **0.887** | 0.824 | 0.882 | 0.424 s/doc | Layout + OCR models |
-| Marker | 0.866 | 0.825 | 0.794 | 0.846 | 30.3 s/doc | Surya OCR + GPU |
-
-EdgeParse is within rounding of Docling's Overall score (0.881 vs 0.882) while being **18× faster** and requiring zero model downloads. It outperforms Marker on all metrics at **1,300× the speed**. MinerU leads on NID/MHS at **900× the latency** and requires a full OCR stack.
+EdgeParse now leads the entire comparison set on every reported benchmark metric, including speed. Relative to the previous EdgeParse baseline, the current pipeline increases reading-order accuracy, table structure similarity, paragraph boundaries, text quality, table-detection F1, and overall score while cutting latency from `0.232` to `0.064 s/doc`.
 
 **When to choose what:**
 
@@ -140,7 +148,10 @@ EdgeParse is within rounding of Docling's Overall score (0.881 vs 0.882) while b
 | **NID** | Reading order accuracy — normalised index distance |
 | **TEDS** | Table structure accuracy — tree-edit distance vs. ground truth |
 | **MHS** | Heading hierarchy accuracy |
-| **Overall** | Geometric mean of NID, TEDS, MHS |
+| **PBF** | Paragraph boundary F1 |
+| **TQS** | Text quality score |
+| **TD F1** | Table detection F1 |
+| **Overall** | Normalized aggregate benchmark score |
 | **Speed** | Wall-clock seconds per document (full pipeline, 200 docs, parallel) |
 
 ### Running the benchmark
@@ -234,7 +245,7 @@ Requires [Rust 1.85+](https://rustup.rs/).
 
 ```toml
 [dependencies]
-edgeparse-core = "0.1"
+edgeparse-core = "0.2.1"
 ```
 
 Docs: [docs.rs/edgeparse-core](https://docs.rs/edgeparse-core) · [docs.rs/edgeparse-cli](https://docs.rs/edgeparse-cli)
@@ -258,7 +269,7 @@ cargo build --release
 
 ### System requirements
 
-- macOS 12+, Linux (glibc 2.31+), or Windows 10+
+- macOS 12+, Linux (glibc 2.17+), or Windows 10+
 - ~15 MB binary (stripped release build)
 - No Java, no Python (for the CLI), no GPU
 
@@ -712,7 +723,7 @@ Stages marked `par_map_pages` run in parallel via Rayon; cross-page stages run s
 
 ### What is the best PDF parser for RAG?
 
-For RAG pipelines, you need a parser that preserves document structure, maintains correct reading order, and provides element coordinates for citations. EdgeParse outputs structured JSON with bounding boxes for every element, handles multi-column layouts with XY-Cut++, and runs locally on CPU without a GPU or JVM. It is the fastest non-OCR tool in benchmarks (0.023 s/doc) with the highest overall accuracy (0.881) in its class. [See RAG integration examples](#rag--llm-integration).
+For RAG pipelines, you need a parser that preserves document structure, maintains correct reading order, and provides element coordinates for citations. EdgeParse outputs structured JSON with bounding boxes for every element, handles multi-column layouts with XY-Cut++, and runs locally on CPU without a GPU or JVM. On the current 200-document benchmark it leads the comparison set in both overall score (`0.787`) and latency (`0.064 s/doc`). [See RAG integration examples](#rag--llm-integration).
 
 ### How do I cite PDF sources in RAG answers?
 
@@ -720,7 +731,7 @@ Every element in JSON output includes a `bounding box` (`[left, bottom, right, t
 
 ### How do I extract tables from PDF?
 
-EdgeParse detects tables using border (ruling-line) analysis by default. For complex or borderless tables, add `--table-method cluster` (CLI) or `table_method="cluster"` (Python). This uses a text-clustering algorithm to detect table structure without visible borders. On the 200-doc benchmark, EdgeParse achieves a TEDS score of 0.783 — best among all non-OCR tools.
+EdgeParse detects tables using border (ruling-line) analysis by default. For complex or borderless tables, add `--table-method cluster` (CLI) or `table_method="cluster"` (Python). This uses a text-clustering algorithm to detect table structure without visible borders. On the current benchmark it reaches `0.596` TEDS and `0.901` table-detection F1, both best in the published comparison set.
 
 ### Does it work without sending data to the cloud?
 
@@ -732,16 +743,16 @@ Yes. XY-Cut++ reading order analysis correctly sequences text across multi-colum
 
 ### Does it need a GPU or Java?
 
-No. EdgeParse is a pure Rust implementation. It requires no JVM, no GPU, no OCR models, and no Python runtime for the CLI binary. The CLI binary is ~15 MB stripped. On Apple M4, it processes 200 real-world documents in under 5 seconds total.
+No. EdgeParse is a pure Rust implementation. It requires no JVM, no GPU, no OCR models, and no Python runtime for the CLI binary. The CLI binary is ~15 MB stripped. On Apple M4 Max, it processes the 200-document benchmark corpus in about `12.7` seconds total.
 
 ### How does it compare to Docling, MinerU, and Marker?
 
 | vs. | EdgeParse advantage | Tradeoff |
 |-----|---------------------|----------|
-| IBM Docling | **18× faster** (0.023 vs 0.424 s/doc), no model downloads, no GPU | Docling has higher TEDS on complex borderless tables (0.887 vs 0.783) |
-| MinerU | **900× faster** (0.023 vs 20.8 s/doc), no OCR stack | MinerU leads on NID (0.953 vs 0.911) |
-| Marker | **1,300× faster** (0.023 vs 30.3 s/doc), no GPU required | Marker supports scanned PDFs via Surya OCR |
-| PyMuPDF4LLM | **13× faster**, better TEDS (+45%), better MHS (+6%) | — |
+| OpenDataLoader | Faster (`0.064` vs `0.094 s/doc`) with stronger table structure and heading recovery | OpenDataLoader remains close on text quality and paragraph boundaries |
+| IBM Docling | Faster (`0.064` vs `0.768 s/doc`) with better TEDS and overall score in the current benchmark snapshot | Docling remains a viable OCR-heavy fallback for scanned documents |
+| Marker | Faster and materially better on every published metric in this benchmark family | Marker supports scanned PDFs via Surya OCR |
+| PyMuPDF4LLM | Faster (`0.064` vs `0.439 s/doc`) with stronger tables, headings, and reading order | PyMuPDF4LLM is simpler if you only need lightweight text extraction |
 
 ### Does it support scanned PDFs?
 

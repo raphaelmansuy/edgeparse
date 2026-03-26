@@ -1,0 +1,263 @@
+{
+  "file name": "01030000000150.pdf",
+  "number of pages": 1,
+  "author": null,
+  "title": null,
+  "creation date": null,
+  "modification date": null,
+  "kids": [
+    {
+      "type": "heading",
+      "id": 1,
+      "level": "Title",
+      "page number": 1,
+      "bounding box": [
+        85.104,
+        693.52,
+        418.738,
+        711.52
+      ],
+      "heading level": 1,
+      "font": "Calibri-Light",
+      "font size": 18.0,
+      "text color": "[0.0]",
+      "content": "6. ECO CIRCLE COMPETENCE FRAMEWORK"
+    },
+    {
+      "type": "table",
+      "id": 2,
+      "level": "7",
+      "page number": 1,
+      "bounding box": [
+        76.104,
+        262.25,
+        512.2570400000003,
+        648.91
+      ],
+      "number of rows": 4,
+      "number of columns": 2,
+      "next table id": 0,
+      "rows": [
+        {
+          "type": "table row",
+          "row number": 1,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                76.104,
+                557.815,
+                205.39100000000002,
+                648.91
+              ],
+              "row number": 1,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                205.39100000000002,
+                557.815,
+                512.2570400000003,
+                648.91
+              ],
+              "row number": 1,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 2,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                76.104,
+                404.97,
+                205.39100000000002,
+                557.815
+              ],
+              "row number": 2,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                205.39100000000002,
+                404.97,
+                512.2570400000003,
+                557.815
+              ],
+              "row number": 2,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 3,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                76.104,
+                328.22,
+                205.39100000000002,
+                404.97
+              ],
+              "row number": 3,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                205.39100000000002,
+                328.22,
+                512.2570400000003,
+                404.97
+              ],
+              "row number": 3,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        },
+        {
+          "type": "table row",
+          "row number": 4,
+          "cells": [
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                76.104,
+                262.25,
+                205.39100000000002,
+                328.22
+              ],
+              "row number": 4,
+              "column number": 1,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            },
+            {
+              "type": "table cell",
+              "page number": 1,
+              "bounding box": [
+                205.39100000000002,
+                262.25,
+                512.2570400000003,
+                328.22
+              ],
+              "row number": 4,
+              "column number": 2,
+              "row span": 1,
+              "column span": 1,
+              "kids": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "id": 3,
+      "page number": 1,
+      "bounding box": [
+        76.104,
+        567.91,
+        500.22824000000037,
+        606.5799999999999
+      ],
+      "font": "Calibri-Bold",
+      "font size": 11.520000000000001,
+      "text color": "[1.0]",
+      "content": "Competence Statement To know the basics of the 3 Rs and their importance and implementation into daily life in relation to green entrepreneurship and circular economy."
+    },
+    {
+      "type": "paragraph",
+      "id": 4,
+      "page number": 1,
+      "bounding box": [
+        76.104,
+        505.27,
+        175.172,
+        517.27
+      ],
+      "font": "Calibri-Bold",
+      "font size": 12.0,
+      "text color": "[0.0]",
+      "content": "Learning Outcomes"
+    },
+    {
+      "type": "paragraph",
+      "id": 5,
+      "page number": 1,
+      "bounding box": [
+        90.984,
+        71.934,
+        513.46912,
+        79.974
+      ],
+      "font": "Calibri",
+      "font size": 8.04,
+      "text color": "[0.0, 0.125, 0.37599998712539673]",
+      "content": "This project has been funded with the support of the European Commission. This publication reflects the views only of the author"
+    },
+    {
+      "type": "paragraph",
+      "id": 6,
+      "page number": 1,
+      "bounding box": [
+        109.1,
+        59.994,
+        496.71304000000003,
+        74.03399999999999
+      ],
+      "font": "Calibri",
+      "font size": 14.04,
+      "text color": "[0.0, 0.125, 0.37599998712539673]",
+      "content": "and the Commission cannot be held responsible for any use which may be made of the information contained therein."
+    },
+    {
+      "type": "paragraph",
+      "id": 7,
+      "page number": 1,
+      "bounding box": [
+        219.05,
+        42.120000000000005,
+        385.96504000000004,
+        53.160000000000004
+      ],
+      "font": "Calibri-Bold",
+      "font size": 11.04,
+      "text color": "[0.0, 0.125, 0.37599998712539673]",
+      "content": "Project No: : 2021-2-FR02-KA220-YOU-000048126"
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000183) ===
+
+[001] !!!
+  GT  : # Recommendation Pack: Track Record
+  EP  : Recommendation Pack: Track Record
+
+[002] !!!
+  GT  : Recommendation pack shows outstanding performance of 1.7~2.6 times that of competing models even when using commercial s
+  EP  : # Recommendation pack shows outstanding performance of
+
+[003] !!!
+  GT  : ## Comparison with Beauty Commerce Recommendation Models Recommendation model Hit Ratio comparison
+  EP  : # 1.7~2.6 times that of competing models even when using commercial service data
+
+[004] !!!
+  GT  : | Model                         | Hit Ratio  | |:------------------------------:|:----------:| | **Graph-RecSys**       
+  EP  : Comparison with Beauty Commerce Comparison with Beauty Commerce Comparison Case of Domestic Subscription Comparison Case
+
+[005] !!!
+  GT  : *Note:* - aws Personalize: 1.7X - Current Service Recommendation Algorithm: 2.6X
+  EP  : 0.03
+
+[006] !!!
+  GT  : ## Comparison Case of Domestic Subscription Platform Recommendation Model Comparison of quantitative evaluations among p
+  EP  : 0.06
+
+[007] !!!
+  GT  : | Method                         | Recall@10 | Accuracy | |:------------------------------:|:---------:|:--------:| | Cu
+  EP  : 0.09
+
+[008] !!!
+  GT  : - Blue bars indicate Recall@10 accuracy - Purple text indicates a 14.3% increase
+  EP  : CustomerBERT
+
+[009] !!!
+  GT  : ## Education Content Platform PoC Case Comparison of prediction rates of correct/incorrect answers based on personalized
+  EP  : 0.4048
+
+[010] !!!
+  GT  : | Model                         | Accuracy  | |:------------------------------:|:---------:| | **Upstage DKT Model**    
+  EP  : Graph-RecSys
+
+[011] !!!
+  GT  : *Note:* - Compared to regular model, 20% increase
+  EP  : Personalize
+
+[012] !!!
+  GT  : (MISSING)
+  EP  : AWS Ready
+
+[013] !!!
+  GT  : (MISSING)
+  EP  : AutoEncoder _RecVAE
+
+[014] !!!
+  GT  : (MISSING)
+  EP  : 0.3278
+
+[015] !!!
+  GT  : (MISSING)
+  EP  : Attn-RecSys
+
+[016] !!!
+  GT  : (MISSING)
+  EP  : AutoEncoder _CDAE
+
+[017] !!!
+  GT  : (MISSING)
+  EP  : Compared to regular model
+
+[018] !!!
+  GT  : (MISSING)
+  EP  : AutoEncoder _MultiVAE
+
+[019] !!!
+  GT  : (MISSING)
+  EP  : 0.23496
+
+[020] !!!
+  GT  : (MISSING)
+  EP  : GNN_LightGCN
+
+[021] !!!
+  GT  : (MISSING)
+  EP  : Personalize
+
+[022] !!!
+  GT  : (MISSING)
+  EP  : 1.7X↑
+
+[023] !!!
+  GT  : (MISSING)
+  EP  : # CF_BPR
+
+[024] !!!
+  GT  : (MISSING)
+  EP  : Traditional Statistical Model(IRT)
+
+[025] !!!
+  GT  : (MISSING)
+  EP  : Statistic_ MostPop
+
+[026] !!!
+  GT  : (MISSING)
+  EP  : DKT Model
+
+[027] !!!
+  GT  : (MISSING)
+  EP  : Current Service Recommendation
+
+[028] !!!
+  GT  : (MISSING)
+  EP  : 0.159
+
+[029] !!!
+  GT  : (MISSING)
+  EP  : 2.6X↑
+
+[030] !!!
+  GT  : (MISSING)
+  EP  : Statistic_ CotergoryPop
+
+[031] !!!
+  GT  : (MISSING)
+  EP  : Algorithm
+
+[032] !!!
+  GT  : (MISSING)
+  EP  : : Recall@10, accuracy : NDCG@10, Ranking
+
+[033] !!!
+  GT  : (MISSING)
+  EP  : 20
+

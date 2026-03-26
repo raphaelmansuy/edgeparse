@@ -1,0 +1,22 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000004) ===
+
+[001] !!!
+  GT  : # Conclusion
+  EP  : observer model with three parameters captures pss, sensory noise and an interval bias (i.e., a tendency to select one in
+
+[002] !!!
+  GT  : In this chapter, I have outlined the benefits of fitting formal observer models to judgements about simultaneity, and de
+  EP  : The 2xSJ task provides estimates that correlate fairly well with equivalent parameters estimated using tojs, sjs, and te
+
+[003] !!!
+  GT  : ---
+  EP  : # 12 Conclusion
+
+[004] !!!
+  GT  : <sup>23</sup> &lt;TwoAFCsimultaneity_3PEq_Multistart_rawdata&gt;.
+  EP  : In this chapter, I have outlined the benefits of fitting formal observer models to judgements about simultaneity, and de
+
+[005] !!!
+  GT  : (MISSING)
+  EP  : 23 <TwoAFCSimultaneity_3PEq_Multistart_rawdata>.
+

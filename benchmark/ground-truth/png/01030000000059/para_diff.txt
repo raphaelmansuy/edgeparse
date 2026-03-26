@@ -1,0 +1,38 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000059) ===
+
+[001] !!!
+  GT  : # Figure 4.6. Input Biomass Fuel for Each Type of Biomass Power Generation
+  EP  : Figure 4.6. Input Biomass Fuel for Each Type of Biomass Power Generation
+
+[002] !!!
+  GT  : | Biomass Type | Domestic logs and wood chips | Domestic wood pellets | Import pellets, chips | Construction wood waste 
+  EP  : PKS = palm kernel shell. Heat value used: Domestic logs and wood chips: 19.4 MJ/kg; Domestic wood pellets, Import pellet
+
+[003] !!!
+  GT  : *Note:* PKS = palm kernel shell. Heat value used: Domestic logs and wood chips: 19.4 MJ/kg; Domestic wood pellets, Impor
+  EP  : Source: Depicted by IEEJ based on Japan Woody Bioenergy Association, 2020.
+
+[004] !!!
+  GT  : ---
+  EP  : According to Japan’s trade statistics, its import of wood pellets has increased around 16 times from 2014 to 2019. Viet 
+
+[005] !!!
+  GT  : # According to Japan’s trade statistics, its import of wood pellets has increased around 16 times from 2014 to 2019. Vie
+  EP  : Figure 4.7. Wood Pellets Import
+
+[006] !!!
+  GT  : # Figure 4.7. Wood Pellets Import
+  EP  : Source: Trade Statistics of Japan.
+
+[007] !!!
+  GT  : | Year | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | |--------|-------|-------|-------|-------|-------|-------| | Import (
+  EP  : (MISSING)
+
+[008] !!!
+  GT  : | Country | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | |---------|-------|-------|-------|-------|-------|-------| | Chin
+  EP  : (MISSING)
+
+[009] !!!
+  GT  : *Source:* Trade Statistics of Japan.
+  EP  : (MISSING)
+

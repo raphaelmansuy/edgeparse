@@ -9,6 +9,9 @@ use super::content::ContentElement;
 pub struct PdfDocument {
     /// Original file name
     pub file_name: String,
+    /// Original source path when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
     /// Number of pages
     pub number_of_pages: u32,
     /// Document author
@@ -36,6 +39,7 @@ impl PdfDocument {
     pub fn new(file_name: String) -> Self {
         Self {
             file_name,
+            source_path: None,
             number_of_pages: 0,
             author: None,
             title: None,
@@ -89,6 +93,7 @@ mod tests {
     fn test_new_document() {
         let doc = PdfDocument::new("test.pdf".to_string());
         assert_eq!(doc.file_name, "test.pdf");
+        assert_eq!(doc.source_path, None);
         assert_eq!(doc.number_of_pages, 0);
         assert!(doc.kids.is_empty());
     }

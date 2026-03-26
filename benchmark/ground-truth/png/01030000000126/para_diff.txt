@@ -1,0 +1,34 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000126) ===
+
+[001] !!!
+  GT  : # Closure
+  EP  : Figure 4.3- Ontario area (in square feet) used to harvest mushroom s over the years.
+
+[002] !!!
+  GT  : Closure refers to our mind completing missing portions of a design. There must be enough parts available for the image t
+  EP  : # Closure
+
+[003] !!!
+  GT  : ---
+  EP  : Closure refers to our mind completing missing portions of a design. There must be enough parts available for the image t
+
+[004] !!!
+  GT  : **Figure 4.3** *Ontario area (in square feet) used to harvest mushrooms over the years.*
+  EP  : 4. Statistics Canada. Table 18-10-0002-01 Monthly average retail prices for food and other selected products. Data is re
+
+[005] !!!
+  GT  : | Year | Total Area Harvested (Square Feet) | |:-----|:-------------------------------------| | 2016 | 28,000,000       
+  EP  : Statistics Canada Open Licence: https://www.statcan.gc.ca/en/ reference/licence
+
+[006] !!!
+  GT  : ---
+  EP  : Gestalt’s Principles | 89
+
+[007] !!!
+  GT  : 4. Statistics Canada. Table 18-10-0002-01 Monthly average retail prices for food and other selected products. Data is re
+  EP  : (MISSING)
+
+[008] !!!
+  GT  : *Gestalt’s Principles | 89*
+  EP  : (MISSING)
+

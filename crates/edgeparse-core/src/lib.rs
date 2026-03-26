@@ -24,7 +24,9 @@ use crate::models::document::PdfDocument;
 use crate::pdf::chunk_parser::extract_page_chunks;
 use crate::pdf::page_info;
 #[cfg(not(target_arch = "wasm32"))]
-use crate::pdf::raster_table_ocr::recover_raster_table_borders;
+use crate::pdf::raster_table_ocr::{
+    recover_page_raster_table_cell_text, recover_raster_table_borders,
+};
 use crate::pipeline::orchestrator::{run_pipeline, PipelineState};
 use crate::tagged::struct_tree::build_mcid_map;
 
@@ -104,7 +106,7 @@ pub fn convert(
     // Run the processing pipeline
     let mcid_map = build_mcid_map(&raw_doc.document);
     let mut pipeline_state = PipelineState::with_mcid_map(page_contents, config.clone(), mcid_map)
-        .with_page_info(page_info_list);
+        .with_page_info(page_info_list.clone());
     run_pipeline(&mut pipeline_state)?;
 
     // Build the output document
@@ -115,11 +117,23 @@ pub fn convert(
         .to_string();
 
     let mut doc = PdfDocument::new(file_name);
+    doc.source_path = Some(input_path.display().to_string());
     doc.number_of_pages = pages_map.len() as u32;
     doc.author = raw_doc.metadata.author;
     doc.title = raw_doc.metadata.title;
     doc.creation_date = raw_doc.metadata.creation_date;
     doc.modification_date = raw_doc.metadata.modification_date;
+
+    for (page_idx, page) in pipeline_state.pages.iter_mut().enumerate() {
+        if let Some(page_info) = page_info_list.get(page_idx) {
+            recover_page_raster_table_cell_text(
+                input_path,
+                &page_info.crop_box,
+                page_info.page_number,
+                page,
+            );
+        }
+    }
 
     // Flatten pipeline output into document kids
     for page in pipeline_state.pages {

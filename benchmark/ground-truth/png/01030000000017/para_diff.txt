@@ -1,0 +1,14 @@
+=== PARAGRAPH STRUCTURE DIFF (01030000000017) ===
+
+[001] !!!
+  GT  : # Face Your World A girl at work with the Interactor during the Face Your World participation process (image courtesy of
+  EP  : 16 Face Your World A girl at work with the Interactor during the Face Your World participation process (image courtesy o
+
+[002] !!!
+  GT  : ticipating in *Face Your World* Slotervaart made a total of 1216 sketches in this phase of the planning project and Kasp
+  EP  : ’ part iv: serious geographies of play 115
+
+[003] !!!
+  GT  : PART IV: SERIOUS GEOGRAPHIES OF PLAY 115
+  EP  : (MISSING)
+

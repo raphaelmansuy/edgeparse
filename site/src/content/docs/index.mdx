@@ -1,12 +1,12 @@
 ---
-title: EdgeParse — Fastest PDF Parser. Zero ML. 88% Accuracy.
-description: EdgeParse extracts structured Markdown, JSON, and HTML from any born-digital PDF. #1 non-ML tool (0.881 overall), 18× faster than Docling, 2× faster than OpenDataLoader. Python, Node.js, Rust, CLI, WebAssembly. Zero GPU. Zero OCR.
+title: EdgeParse — Fast PDF Parser. Zero ML. Best Benchmark Score.
+description: EdgeParse extracts structured Markdown, JSON, and HTML from born-digital PDFs. 0.787 overall and 0.064 s/doc on the current 200-document benchmark. Python, Node.js, Rust, CLI, WebAssembly. Zero GPU. Zero OCR.
 template: splash
 hero:
   title: |
     PDF parsing for <span class="font-black text-transparent bg-clip-text bg-gradient-to-b from-accent-700 to-accent-400">AI Agents</span>
   tagline: |
-    The only PDF engine that matches ML-based tools without ML. 18× faster than Docling · 2× faster than OpenDataLoader · 88% accuracy across reading order, tables, and heading hierarchy. Python · Node.js · WebAssembly · Rust · CLI.
+    The PDF-to-Markdown engine that leads the current benchmark without ML. 12× faster than Docling · 1.5× faster than OpenDataLoader · best reported scores across reading order, tables, headings, paragraphs, text quality, and speed. Python · Node.js · WebAssembly · Rust · CLI.
   actions:
     - text: Get Started Free
       link: /getting-started/quick-start-python/
@@ -138,10 +138,10 @@ const html = convert_to_string(bytes, 'html');
   title="Everything Your AI Stack Needs From a PDF"
   subtitle="EdgeParse is the only PDF parser with ML-level accuracy that runs without ML — in Python, Node.js, the browser, and Rust."
   features={[
-    { icon: 'zap', title: '18× Faster Than Docling', description: '0.023 s/doc on Apple M4. 13× faster than PyMuPDF4LLM, 2× faster than OpenDataLoader. Parallel per-page processing via Rayon — CPU only.' },
-    { icon: 'table', title: 'Best-in-Class Table Extraction', description: 'TEDS score of 0.783 — 58% better than OpenDataLoader heuristic (0.494). Ruling-line + borderless cluster detection with merged cell support.' },
-    { icon: 'target', title: 'Multi-Column Reading Order', description: 'XY-Cut++ algorithm reads multi-column layouts, sidebars, and mixed content in the correct logical order. NID score of 0.911, #1 among non-OCR tools.' },
-    { icon: 'layers', title: 'Full Document Hierarchy', description: 'Headings, paragraphs, lists, figures — all classified with nesting. MHS score of 0.821. Agents see the complete semantic structure, not a flat blob of text.' },
+    { icon: 'zap', title: '12× Faster Than Docling', description: '0.064 s/doc on Apple M4 Max. 6.9× faster than PyMuPDF4LLM and 1.5× faster than OpenDataLoader. Parallel per-page processing via Rayon — CPU only.' },
+    { icon: 'table', title: 'Best-in-Class Table Extraction', description: 'TEDS score of 0.596 — best in the current published comparison and 83% better than OpenDataLoader heuristic mode (0.326). Ruling-line + borderless cluster detection with merged cell support.' },
+    { icon: 'target', title: 'Multi-Column Reading Order', description: 'XY-Cut++ reads multi-column layouts, sidebars, and mixed content in the correct logical order. NID score of 0.889 — highest in the current benchmark snapshot.' },
+    { icon: 'layers', title: 'Full Document Hierarchy', description: 'Headings, paragraphs, lists, figures — all classified with nesting. MHS score of 0.553, best among the compared engines in the current release snapshot.' },
     { icon: 'globe', title: 'WebAssembly: Runs in the Browser', description: 'The only PDF parser with a WebAssembly build. Full Rust engine in the browser — PDF data never leaves the device. No server, no uploads, offline-capable.' },
     { icon: 'shield', title: 'AI Safety Built-In', description: 'Filters hidden text, off-page content, tiny-text, and invisible layers — blocks prompt injection payloads embedded in PDFs before they reach your LLM.' },
     { icon: 'cpu', title: 'Zero Dependencies', description: 'No GPU, no JVM, no OCR models, no Python runtime for the CLI. A single 15 MB binary. Deploy everywhere: Lambda, containers, edge functions, browsers.' },
@@ -152,16 +152,16 @@ const html = convert_to_string(bytes, 'html');
 
 <BenchmarkSection
   title="#1 Non-ML PDF Parser in Independent Benchmarks"
-  subtitle="Tested on 200 real-world PDFs — academic papers, financial reports, multi-column layouts, complex tables. Running on Apple M4 Max."
+  subtitle="Tested on 200 real-world PDFs — academic papers, financial reports, multi-column layouts, and complex tables. Running on Apple M4 Max."
   tools={[
-    { name: 'EdgeParse', nid: 0.911, teds: 0.783, mhs: 0.821, overall: 0.881, speed: '0.023 s/doc', isHighlight: true },
-    { name: 'Docling (IBM)', nid: 0.899, teds: 0.887, mhs: 0.824, overall: 0.882, speed: '0.424 s/doc', isHighlight: false },
-    { name: 'OpenDataLoader', nid: 0.912, teds: 0.494, mhs: 0.760, overall: 0.844, speed: '0.048 s/doc', isHighlight: false },
-    { name: 'Marker', nid: 0.866, teds: 0.825, mhs: 0.794, overall: 0.846, speed: '30.3 s/doc', isHighlight: false },
-    { name: 'PyMuPDF4LLM', nid: 0.888, teds: 0.540, mhs: 0.774, overall: 0.833, speed: '0.310 s/doc', isHighlight: false },
-    { name: 'MarkItDown', nid: 0.844, teds: 0.273, mhs: 0.000, overall: 0.589, speed: '0.078 s/doc', isHighlight: false },
+    { name: 'EdgeParse', nid: 0.889, teds: 0.596, mhs: 0.553, overall: 0.787, speed: '0.064 s/doc', isHighlight: true },
+    { name: 'Docling (IBM)', nid: 0.867, teds: 0.540, mhs: 0.438, overall: 0.745, speed: '0.768 s/doc', isHighlight: false },
+    { name: 'OpenDataLoader', nid: 0.873, teds: 0.326, mhs: 0.442, overall: 0.733, speed: '0.094 s/doc', isHighlight: false },
+    { name: 'PyMuPDF4LLM', nid: 0.852, teds: 0.323, mhs: 0.407, overall: 0.710, speed: '0.439 s/doc', isHighlight: false },
+    { name: 'LiteParse', nid: 0.815, teds: 0.000, mhs: 0.001, overall: 0.564, speed: '0.196 s/doc', isHighlight: false },
+    { name: 'MarkItDown', nid: 0.808, teds: 0.193, mhs: 0.001, overall: 0.564, speed: '0.149 s/doc', isHighlight: false },
   ]}
-  note="EdgeParse is within 0.001 of Docling's overall score while being 18× faster — without any OCR models or GPU. Marker requires Surya OCR + GPU. Docling requires layout + OCR models."
+  note="EdgeParse leads the current benchmark on every reported metric while remaining the fastest engine in the comparison set. No OCR models, no GPU, no JVM."
 />
 
 <ComparisonSection />
@@ -188,13 +188,13 @@ const html = convert_to_string(bytes, 'html');
     {
       icon: 'finance',
       title: 'Financial Reports',
-      description: 'Parse earnings reports, balance sheets, and SEC filings with accurate table extraction (TEDS 0.783) — columns, merged cells, and nested headers intact.',
+      description: 'Parse earnings reports, balance sheets, and SEC filings with accurate table extraction (TEDS 0.596) — columns, merged cells, and nested headers intact.',
       tags: ['SEC Filings', 'Earnings', 'Tables', 'JSON'],
     },
     {
       icon: 'academic',
       title: 'Research & Academic',
-      description: 'Extract papers with correct multi-column reading order (NID 0.911) — figures, citations, and section hierarchy preserved for downstream analysis.',
+      description: 'Extract papers with correct multi-column reading order (NID 0.889) — figures, citations, and section hierarchy preserved for downstream analysis.',
       tags: ['arXiv', 'Multi-column', 'Citations'],
     },
     {

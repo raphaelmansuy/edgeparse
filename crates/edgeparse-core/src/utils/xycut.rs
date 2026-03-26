@@ -31,7 +31,7 @@ pub fn xycut_sort(elements: &mut [ContentElement], page_bbox: &BoundingBox) {
     xycut_recursive(elements, page_bbox);
 }
 
-fn xycut_recursive(elements: &mut [ContentElement], _region: &BoundingBox) {
+fn xycut_recursive(elements: &mut [ContentElement], region: &BoundingBox) {
     if elements.len() <= 1 {
         return;
     }
@@ -39,6 +39,15 @@ fn xycut_recursive(elements: &mut [ContentElement], _region: &BoundingBox) {
     // Find both possible cuts
     let h_gap = find_horizontal_gap_size(elements);
     let v_gap = find_vertical_gap_size(elements);
+    let vertical_analysis = v_gap.and_then(|(split_x, v_size)| {
+        analyze_vertical_cut(
+            elements,
+            split_x,
+            h_gap.map(|(_, gap)| gap).unwrap_or(0.0),
+            v_size,
+        )
+        .map(|analysis| (split_x, analysis))
+    });
 
     if std::env::var("XYCUT_DEBUG").is_ok() {
         eprintln!(
@@ -61,21 +70,20 @@ fn xycut_recursive(elements: &mut [ContentElement], _region: &BoundingBox) {
     // interleaved figure-heavy two-column pages row-by-row, while still keeping
     // full-width spanning elements (titles, section headings, footers) outside
     // the column subtrees.
-    let prefer_vertical = match (h_gap, v_gap) {
-        (None, Some(_)) => true,
-        (Some((_, h_size)), Some((split_x, v_size))) => {
-            should_prefer_vertical_cut(elements, split_x, h_size, v_size)
-        }
-        _ => false,
-    };
+    let prefer_vertical = vertical_analysis.is_some();
 
     if prefer_vertical {
         // Try vertical cut first (column split)
+        if let Some((split_x, analysis)) = vertical_analysis.as_ref() {
+            if reorder_vertical_bands(elements, *split_x, analysis, region) {
+                return;
+            }
+        }
         if let Some((split_x, _)) = v_gap {
             let (left, right) = partition_by_x(elements, split_x);
             if !left.is_empty() && !right.is_empty() {
-                xycut_recursive(left, _region);
-                xycut_recursive(right, _region);
+                xycut_recursive(left, region);
+                xycut_recursive(right, region);
                 return;
             }
         }
@@ -83,8 +91,8 @@ fn xycut_recursive(elements: &mut [ContentElement], _region: &BoundingBox) {
         if let Some((split_y, _)) = h_gap {
             let (top, bottom) = partition_by_y(elements, split_y);
             if !top.is_empty() && !bottom.is_empty() {
-                xycut_recursive(top, _region);
-                xycut_recursive(bottom, _region);
+                xycut_recursive(top, region);
+                xycut_recursive(bottom, region);
                 return;
             }
         }
@@ -93,8 +101,8 @@ fn xycut_recursive(elements: &mut [ContentElement], _region: &BoundingBox) {
         if let Some((split_y, _)) = h_gap {
             let (top, bottom) = partition_by_y(elements, split_y);
             if !top.is_empty() && !bottom.is_empty() {
-                xycut_recursive(top, _region);
-                xycut_recursive(bottom, _region);
+                xycut_recursive(top, region);
+                xycut_recursive(bottom, region);
                 return;
             }
         }
@@ -102,8 +110,8 @@ fn xycut_recursive(elements: &mut [ContentElement], _region: &BoundingBox) {
         if let Some((split_x, _)) = v_gap {
             let (left, right) = partition_by_x(elements, split_x);
             if !left.is_empty() && !right.is_empty() {
-                xycut_recursive(left, _region);
-                xycut_recursive(right, _region);
+                xycut_recursive(left, region);
+                xycut_recursive(right, region);
                 return;
             }
         }
@@ -131,14 +139,20 @@ fn xycut_recursive(elements: &mut [ContentElement], _region: &BoundingBox) {
     });
 }
 
-fn should_prefer_vertical_cut(
+#[derive(Debug, Clone, Copy)]
+struct VerticalCutAnalysis {
+    shared_top: f64,
+    shared_bottom: f64,
+}
+
+fn analyze_vertical_cut(
     elements: &[ContentElement],
     split_x: f64,
     horizontal_gap: f64,
     vertical_gap: f64,
-) -> bool {
+) -> Option<VerticalCutAnalysis> {
     if elements.len() < 4 {
-        return false;
+        return None;
     }
 
     let min_x = elements
@@ -152,6 +166,7 @@ fn should_prefer_vertical_cut(
     let content_width = (max_x - min_x).max(1.0);
     let spanning_width = content_width * 0.55;
     let split_margin = 6.0;
+    let band_tolerance = 8.0;
 
     let mut left_count = 0usize;
     let mut right_count = 0usize;
@@ -159,7 +174,7 @@ fn should_prefer_vertical_cut(
     let mut left_bottom = f64::INFINITY;
     let mut right_top = f64::NEG_INFINITY;
     let mut right_bottom = f64::INFINITY;
-    let mut wide_crossing = 0usize;
+    let mut crossing_bands: Vec<(f64, f64)> = Vec::new();
 
     for elem in elements {
         let bbox = elem.bbox();
@@ -168,7 +183,7 @@ fn should_prefer_vertical_cut(
             bbox.left_x < split_x - split_margin && bbox.right_x > split_x + split_margin;
 
         if crosses_split && width >= spanning_width {
-            wide_crossing += 1;
+            crossing_bands.push((bbox.top_y, bbox.bottom_y));
             continue;
         }
 
@@ -184,22 +199,109 @@ fn should_prefer_vertical_cut(
     }
 
     if left_count < 2 || right_count < 2 {
-        return false;
-    }
-    if wide_crossing > 0 {
-        return false;
+        return None;
     }
 
     let left_height = (left_top - left_bottom).max(0.0);
     let right_height = (right_top - right_bottom).max(0.0);
     if left_height <= 0.0 || right_height <= 0.0 {
-        return false;
+        return None;
     }
 
     let overlap = (left_top.min(right_top) - left_bottom.max(right_bottom)).max(0.0);
     let overlap_ratio = overlap / left_height.min(right_height);
+    if overlap_ratio < 0.35 || vertical_gap < horizontal_gap * 0.5 {
+        return None;
+    }
 
-    overlap_ratio >= 0.35 && vertical_gap >= horizontal_gap * 0.5
+    let shared_top = left_top.min(right_top);
+    let shared_bottom = left_bottom.max(right_bottom);
+    if shared_top <= shared_bottom {
+        return None;
+    }
+
+    let ambiguous_crossing = crossing_bands
+        .iter()
+        .filter(|(top_y, bottom_y)| {
+            *bottom_y < shared_top - band_tolerance && *top_y > shared_bottom + band_tolerance
+        })
+        .count();
+    if ambiguous_crossing > 0 {
+        return None;
+    }
+
+    Some(VerticalCutAnalysis {
+        shared_top,
+        shared_bottom,
+    })
+}
+
+fn reorder_vertical_bands(
+    elements: &mut [ContentElement],
+    split_x: f64,
+    analysis: &VerticalCutAnalysis,
+    region: &BoundingBox,
+) -> bool {
+    const SPLIT_MARGIN: f64 = 6.0;
+    const BAND_TOLERANCE: f64 = 8.0;
+
+    let mut top_spanning = Vec::new();
+    let mut left = Vec::new();
+    let mut right = Vec::new();
+    let mut bottom_spanning = Vec::new();
+
+    for element in elements.iter() {
+        let bbox = element.bbox();
+        let crosses_split =
+            bbox.left_x < split_x - SPLIT_MARGIN && bbox.right_x > split_x + SPLIT_MARGIN;
+
+        if crosses_split {
+            if bbox.bottom_y >= analysis.shared_top - BAND_TOLERANCE {
+                top_spanning.push(element.clone());
+                continue;
+            }
+            if bbox.top_y <= analysis.shared_bottom + BAND_TOLERANCE {
+                bottom_spanning.push(element.clone());
+                continue;
+            }
+            return false;
+        }
+
+        if bbox.center_x() < split_x {
+            left.push(element.clone());
+        } else {
+            right.push(element.clone());
+        }
+    }
+
+    if left.is_empty() || right.is_empty() {
+        return false;
+    }
+
+    if top_spanning.len() > 1 {
+        xycut_recursive(top_spanning.as_mut_slice(), region);
+    }
+    xycut_recursive(left.as_mut_slice(), region);
+    xycut_recursive(right.as_mut_slice(), region);
+    if bottom_spanning.len() > 1 {
+        xycut_recursive(bottom_spanning.as_mut_slice(), region);
+    }
+
+    let mut ordered = Vec::with_capacity(elements.len());
+    ordered.extend(top_spanning);
+    ordered.extend(left);
+    ordered.extend(right);
+    ordered.extend(bottom_spanning);
+
+    if ordered.len() != elements.len() {
+        return false;
+    }
+
+    for (dst, src) in elements.iter_mut().zip(ordered.into_iter()) {
+        *dst = src;
+    }
+
+    true
 }
 
 /// Minimum gap size (points) required to consider a cut.
@@ -612,5 +714,48 @@ mod tests {
         assert!(elements[1].bbox().left_x < 260.0);
         assert!(elements[2].bbox().left_x > 260.0);
         assert!(elements[3].bbox().left_x > 260.0);
+    }
+
+    #[test]
+    fn test_xycut_keeps_spanning_header_and_footer_outside_columns() {
+        let mut elements = vec![
+            make_element(40.0, 760.0, 540.0, 810.0),  // spanning header
+            make_element(50.0, 640.0, 250.0, 700.0),  // left col, top
+            make_element(50.0, 520.0, 250.0, 620.0),  // left col, bottom
+            make_element(320.0, 640.0, 520.0, 700.0), // right col, top
+            make_element(320.0, 520.0, 520.0, 620.0), // right col, bottom
+            make_element(40.0, 430.0, 540.0, 480.0),  // spanning footer/source
+        ];
+        let page = BoundingBox::new(Some(1), 0.0, 0.0, 595.0, 842.0);
+        xycut_sort(&mut elements, &page);
+
+        assert!(
+            elements[0].bbox().top_y >= 800.0,
+            "header should stay first"
+        );
+        assert!(elements[1].bbox().left_x < 260.0);
+        assert!(elements[2].bbox().left_x < 260.0);
+        assert!(elements[3].bbox().left_x > 260.0);
+        assert!(elements[4].bbox().left_x > 260.0);
+        assert!(elements[5].bbox().top_y <= 480.0, "footer should stay last");
+    }
+
+    #[test]
+    fn test_xycut_rejects_vertical_cut_when_spanning_band_sits_between_columns() {
+        let mut elements = vec![
+            make_element(50.0, 700.0, 250.0, 760.0),  // left col, top
+            make_element(320.0, 700.0, 520.0, 760.0), // right col, top
+            make_element(40.0, 610.0, 540.0, 680.0),  // spanning mid-band graphic
+            make_element(50.0, 500.0, 250.0, 580.0),  // left col, bottom
+            make_element(320.0, 500.0, 520.0, 580.0), // right col, bottom
+        ];
+        let page = BoundingBox::new(Some(1), 0.0, 0.0, 595.0, 842.0);
+        xycut_sort(&mut elements, &page);
+
+        assert!(elements[0].bbox().top_y >= 760.0);
+        assert!(elements[1].bbox().top_y >= 760.0);
+        assert!(elements[2].bbox().top_y >= 680.0 && elements[2].bbox().bottom_y <= 610.0);
+        assert!(elements[3].bbox().top_y <= 580.0);
+        assert!(elements[4].bbox().top_y <= 580.0);
     }
 }

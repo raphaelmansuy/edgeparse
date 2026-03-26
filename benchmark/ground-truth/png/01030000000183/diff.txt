@@ -1,0 +1,119 @@
+=== GROUND TRUTH (01030000000183) ===
+
+# Recommendation Pack: Track Record
+
+Recommendation pack shows outstanding performance of 1.7~2.6 times that of competing models even when using commercial service data
+
+## Comparison with Beauty Commerce Recommendation Models
+Recommendation model Hit Ratio comparison
+
+| Model                         | Hit Ratio  |
+|:------------------------------:|:----------:|
+| **Graph-RecSys**               | **0.4048** |
+| **Attn-RecSys**                | **0.3278** |
+| Personalize (AWS)               | 0.23496    |
+| Current Service Recommendation Algorithm | 0.159 |
+
+*Note:*
+- aws Personalize: 1.7X
+- Current Service Recommendation Algorithm: 2.6X
+
+## Comparison Case of Domestic Subscription Platform Recommendation Model
+Comparison of quantitative evaluations among personalized content recommendations
+
+| Method                         | Recall@10 | Accuracy |
+|:------------------------------:|:---------:|:--------:|
+| CustomerBERT                   | 0.03      | 0.06     | 0.09
+| Personalize (AWS)              |             |             |
+| --- | --- | --- |
+| AutoEncoder _RecVAE            |             |             |
+| AutoEncoder_CDAE               |             |             |
+| AutoEncoder_MultiVAE           |             |             |
+| GNN_LightGCN                   |             |             |
+| CF_BPR                        |             |             |
+| Statistic_MostPop             |             |             |
+| Statistic_CotergyPop           |             |             |
+
+- Blue bars indicate Recall@10 accuracy
+- Purple text indicates a 14.3% increase
+
+## Education Content Platform PoC Case
+Comparison of prediction rates of correct/incorrect answers based on personalized questions
+
+| Model                         | Accuracy  |
+|:------------------------------:|:---------:|
+| **Upstage DKT Model**          | **0.882** |
+| Traditional Statistical Model (IRT) | 0.735 |
+
+*Note:*
+- Compared to regular model, 20% increase
+
+
+=== EDGEPARSE OUTPUT (01030000000183) ===
+
+Recommendation Pack: Track Record
+
+# Recommendation pack shows outstanding performance of
+
+# 1.7~2.6 times that of competing models even when using commercial service data
+
+Comparison with Beauty Commerce Comparison with Beauty Commerce Comparison Case of Domestic Subscription Comparison Case of Domestic Subscription Education Content Platform PoC Case Education Content Platform PoC Case Recommendation Models Recommendation Models Platform Recommendation Model Platform Recommendation Model Comparison of prediction rates of correct/incorrect Comparison of prediction rates of correct/incorrect answers based on personalized questions answers based on personalized questions Recommendation model Hit Ratio comparison Recommendation model Hit Ratio comparison Comparison of quantitative evaluations among Comparison of quantitative evaluations among
+
+0.03
+
+0.06
+
+0.09
+
+CustomerBERT
+
+0.4048
+
+Graph-RecSys
+
+Personalize
+
+AWS Ready
+
+AutoEncoder _RecVAE
+
+0.3278
+
+Attn-RecSys
+
+AutoEncoder _CDAE
+
+Compared to regular model
+
+AutoEncoder _MultiVAE
+
+0.23496
+
+GNN_LightGCN
+
+Personalize
+
+1.7X↑
+
+# CF_BPR
+
+Traditional Statistical Model(IRT)
+
+Statistic_ MostPop
+
+DKT Model
+
+Current Service Recommendation
+
+0.159
+
+2.6X↑
+
+Statistic_ CotergoryPop
+
+Algorithm
+
+: Recall@10, accuracy : NDCG@10, Ranking
+
+20
+

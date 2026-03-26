@@ -11,10 +11,23 @@ jobs:
     name: Rust — build & test
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-14, windows-latest]
     steps:
       - uses: actions/checkout@v4
+      - name: Install Poppler (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+      - name: Install Poppler (macOS)
+        if: runner.os == 'macOS'
+        run: brew install poppler
+      - name: Install Poppler (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install poppler -y
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build
@@ -55,9 +68,27 @@ jobs:
           # Install the platform binary into the local package directory
           cp ../../target/release/libedgeparse_node.so npm/linux-x64-gnu/edgeparse-node.linux-x64-gnu.node
           # Install the local platform package so require('edgeparse-linux-x64-gnu') resolves
-          npm install --save-dev file:./npm/linux-x64-gnu
+          npm install --no-save file:./npm/linux-x64-gnu
           npm run build:ts
           npm test
+
+  wasm:
+    name: WASM SDK — build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p edgeparse-wasm --target wasm32-unknown-unknown
+
+  docker:
+    name: Docker — smoke build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f docker/Dockerfile .
 
   security:
     name: Security audit

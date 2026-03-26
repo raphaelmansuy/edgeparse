@@ -7,6 +7,25 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.1] — 2026-03-26
+
+### Added
+- Dedicated `release-wasm.yml` workflow to publish `@edgeparse/edgeparse-wasm` on tagged releases and attach the npm tarball to the GitHub Release
+- CI coverage for the WASM target and Docker image smoke builds so every shipped artifact is validated before release
+- Release-channel documentation in the README covering crates, SDKs, CLI archives, Homebrew, and container images
+
+### Changed
+- Bumped the workspace and published SDK manifests to `0.2.1`
+- Local release helpers now publish `pdf-cos` before `edgeparse-core`, matching the crates.io CI workflow
+- `make publish-all` now includes the WASM SDK release path
+- README benchmark results updated to the latest 200-document `opendataloader.org` comparison, where EdgeParse leads the published field on every reported metric
+
+### Fixed
+- Removed stale release documentation that still described five workflows and partial manual workarounds for older releases
+- Updated install guidance to reflect Linux `glibc >= 2.17` compatibility for release binaries
+
+---
+
 ## [0.2.0] — 2026-03-24
 
 ### Added
