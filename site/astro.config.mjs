@@ -220,7 +220,7 @@ export default defineConfig({
 						author: { '@type': 'Person', name: 'Raphael Mansuy', url: 'https://github.com/raphaelmansuy' },
 						url: fullUrl,
 						downloadUrl: 'https://pypi.org/project/edgeparse/',
-						softwareVersion: '0.2.1',
+						softwareVersion: '0.2.2',
 						license: 'https://opensource.org/licenses/Apache-2.0',
 						programmingLanguage: ['Rust', 'Python', 'TypeScript'],
 						image: ogImageUrl,

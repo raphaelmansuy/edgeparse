@@ -7,6 +7,23 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.2] — 2026-03-26
+
+### Added
+- Separate benchmark groups for `non-ocr` and `hybrid` runs so published comparisons can be reported more cleanly
+- Shared benchmark snapshot data for the site so landing and docs stay aligned from one source
+
+### Changed
+- Bumped the workspace and published SDK manifests to `0.2.2`
+- Rebuilt the checked-in WASM package used by the demo and site so browser deployments use the latest parser bundle
+- Updated the site/demo release path to ship the refreshed WASM bundle and current benchmark documentation
+
+### Fixed
+- Disabled WASM npm publication while keeping the release tarball attached to GitHub Releases
+- Corrected benchmark runner/docs grouping so hybrid engines no longer appear under the non-OCR bucket
+
+---
+
 ## [0.2.1] — 2026-03-26
 
 ### Added

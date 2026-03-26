@@ -12,8 +12,8 @@ Publishing is driven by six GitHub Actions workflows, all triggered by pushing a
 semantic version tag:
 
 ```bash
-git tag v0.2.1
-git push origin v0.2.1
+git tag v0.2.2
+git push origin v0.2.2
 ```
 
 ```text
@@ -21,7 +21,7 @@ vX.Y.Z tag
   ├─ release-rust.yml    -> crates.io         (pdf-cos, edgeparse-core, edgeparse-cli)
   ├─ release-python.yml  -> PyPI              (edgeparse wheels + sdist)
   ├─ release-node.yml    -> npm               (edgeparse + 5 platform packages)
-  ├─ release-wasm.yml    -> npm               (edgeparse-wasm)
+  ├─ release-wasm.yml    -> GitHub Releases   (edgeparse-wasm tarball)
   ├─ release-cli.yml     -> GitHub Releases   (5 CLI archives) + Homebrew tap
   └─ release-docker.yml  -> GHCR + Docker Hub (linux/amd64, linux/arm64)
 ```
@@ -51,7 +51,6 @@ Shared verification happens in `ci.yml` on pushes and pull requests:
 | npm | `edgeparse-linux-arm64-gnu` | https://www.npmjs.com/package/edgeparse-linux-arm64-gnu |
 | npm | `edgeparse-linux-x64-gnu` | https://www.npmjs.com/package/edgeparse-linux-x64-gnu |
 | npm | `edgeparse-win32-x64-msvc` | https://www.npmjs.com/package/edgeparse-win32-x64-msvc |
-| npm | `edgeparse-wasm` | https://www.npmjs.com/package/edgeparse-wasm |
 | GitHub Releases | CLI archives + WASM npm tarball | https://github.com/raphaelmansuy/edgeparse/releases |
 | Homebrew | `raphaelmansuy/edgeparse` tap | https://github.com/raphaelmansuy/homebrew-edgeparse |
 | GHCR | `ghcr.io/raphaelmansuy/edgeparse` | https://github.com/raphaelmansuy/edgeparse/pkgs/container/edgeparse |
@@ -89,7 +88,7 @@ Each GitHub Release includes:
 | Secret | Used by | Purpose |
 |--------|---------|---------|
 | `CARGO_REGISTRY_TOKEN` | `release-rust.yml` | Publish crates to crates.io |
-| `NPM_TOKEN` | `release-node.yml`, `release-wasm.yml` | Publish Node.js and WASM packages to npm |
+| `NPM_TOKEN` | `release-node.yml` | Publish Node.js packages to npm |
 | `DOCKERHUB_TOKEN` | `release-docker.yml` | Push Docker images to Docker Hub |
 | `HOMEBREW_TAP_TOKEN` | `release-cli.yml` | Push `edgeparse.rb` to the Homebrew tap |
 
@@ -97,14 +96,14 @@ Each GitHub Release includes:
 
 | Environment | Used by | Notes |
 |-------------|---------|-------|
-| `npm` | `release-node.yml`, `release-wasm.yml` | Optional protection rules for npm publish jobs |
+| `npm` | `release-node.yml`, `release-wasm.yml` | Optional protection rules for npm release jobs |
 | `pypi` | `release-python.yml` | Required for PyPI Trusted Publishing |
 
 ### External setup
 
 - crates.io: create a token with `publish-new` and `publish-update`
-- npm: use a Classic Automation token so the main package, platform packages,
-  and `edgeparse-wasm` can all publish from CI
+- npm: use a Classic Automation token so the main package and platform packages
+  can publish from CI
 - PyPI: configure Trusted Publishing for `release-python.yml` in environment
   `pypi`
 - Docker Hub: create a read/write access token for account `rmansuy`
@@ -178,7 +177,7 @@ make publish-brew-dry
 ```bash
 # 1. Commit and push the release-prep branch
 git add -A
-git commit -m "chore: prepare 0.2.1 release"
+git commit -m "chore: prepare 0.2.2 release"
 git push origin <branch>
 
 # 2. Open and merge the PR
@@ -188,8 +187,8 @@ gh pr merge <pr-number> --merge --delete-branch=false
 # 3. Tag the merge commit on main
 git checkout main
 git pull --ff-only origin main
-git tag v0.2.1
-git push origin v0.2.1
+git tag v0.2.2
+git push origin v0.2.2
 ```
 
 The tag must match `v[0-9]+.[0-9]+.[0-9]+`. The Rust and WASM release

@@ -90,7 +90,7 @@ Returns the EdgeParse version string.
 
 ```typescript
 import { version } from 'edgeparse-wasm';
-console.log(version()); // "0.2.1"
+console.log(version()); // "0.2.2"
 ```
 
 ### Parameters

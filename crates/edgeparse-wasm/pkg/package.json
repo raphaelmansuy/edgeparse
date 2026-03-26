@@ -2,7 +2,7 @@
   "name": "edgeparse-wasm",
   "type": "module",
   "description": "EdgeParse PDF parser — WebAssembly build for browsers",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "license": "Apache-2.0",
   "homepage": "https://edgeparse.io/docs/api/wasm/",
   "repository": {
