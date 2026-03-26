@@ -11,7 +11,7 @@ on:
         default: 'v0.2.2'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-native:
@@ -128,6 +128,35 @@ jobs:
           npm ci
           npm run build:ts
 
+      - name: Ensure GitHub Release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          TAG_NAME="${INPUT_TAG_NAME:-$GITHUB_REF_NAME}"
+          gh release view "$TAG_NAME" --repo "${{ github.repository }}" \
+          || gh release create "$TAG_NAME" \
+               --repo "${{ github.repository }}" \
+               --title "$TAG_NAME" \
+               --generate-notes
+
+      - name: Pack npm tarballs
+        run: |
+          mkdir -p release-assets/node
+          for dir in sdks/node/npm/*/; do
+            (cd "$dir" && npm pack --pack-destination "$GITHUB_WORKSPACE/release-assets/node")
+          done
+          (cd sdks/node && npm pack --pack-destination "$GITHUB_WORKSPACE/release-assets/node")
+
+      - name: Upload npm tarballs to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          TAG_NAME="${INPUT_TAG_NAME:-$GITHUB_REF_NAME}"
+          gh release upload "$TAG_NAME" release-assets/node/*.tgz \
+            --repo "${{ github.repository }}" --clobber
+
       - name: Publish platform packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -137,6 +166,8 @@ jobs:
               echo "$OUTPUT"
               if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
                 echo "::warning::Package already published for $dir — skipping."
+              elif echo "$OUTPUT" | grep -Eq "E403|403 Forbidden|You may not perform that action with these credentials"; then
+                echo "::warning::npm publish is unavailable for $dir with the current credentials — keeping the tarball on the GitHub Release instead."
               else
                 exit 1
               fi
@@ -152,6 +183,8 @@ jobs:
             echo "$OUTPUT"
             if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
               echo "edgeparse already published at this version — skipping."
+            elif echo "$OUTPUT" | grep -Eq "E403|403 Forbidden|You may not perform that action with these credentials"; then
+              echo "::warning::npm publish is unavailable for the main package with the current credentials — keeping the tarball on the GitHub Release instead."
             else
               exit 1
             fi
