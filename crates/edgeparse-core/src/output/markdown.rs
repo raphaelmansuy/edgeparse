@@ -17,41 +17,100 @@ use crate::models::semantic::SemanticTextNode;
 use crate::models::table::TableTokenRow;
 use crate::EdgePdfError;
 
+#[cfg(not(target_arch = "wasm32"))]
+struct CachedBBoxLayout {
+    page_width: f64,
+    lines: Vec<BBoxLayoutLine>,
+    blocks: Vec<BBoxLayoutBlock>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Default)]
+struct LayoutSourceCache {
+    bbox_layout: Option<Option<CachedBBoxLayout>>,
+    layout_lines: Option<Option<Vec<String>>>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl LayoutSourceCache {
+    fn bbox_layout(&mut self, doc: &PdfDocument) -> Option<&CachedBBoxLayout> {
+        if self.bbox_layout.is_none() {
+            let loaded = doc.source_path.as_deref().and_then(|source_path| {
+                let (page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
+                let blocks = collect_bbox_layout_blocks(&lines);
+                Some(CachedBBoxLayout {
+                    page_width,
+                    lines,
+                    blocks,
+                })
+            });
+            self.bbox_layout = Some(loaded);
+        }
+        self.bbox_layout.as_ref().and_then(Option::as_ref)
+    }
+
+    fn layout_lines(&mut self, doc: &PdfDocument) -> Option<&[String]> {
+        if self.layout_lines.is_none() {
+            let loaded = doc
+                .source_path
+                .as_deref()
+                .and_then(|source_path| read_pdftotext_layout_lines(Path::new(source_path)));
+            self.layout_lines = Some(loaded);
+        }
+        self.layout_lines
+            .as_ref()
+            .and_then(Option::as_ref)
+            .map(Vec::as_slice)
+    }
+}
+
 /// Generate Markdown representation of a PdfDocument.
 ///
 /// # Errors
 /// Returns `EdgePdfError::OutputError` on write failures.
 pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_open_plate_document(doc) {
+    let mut layout_cache = LayoutSourceCache::default();
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_open_plate_document_cached(doc, &mut layout_cache) {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_single_caption_chart_document(doc) {
+    if let Some(rendered) =
+        render_layout_single_caption_chart_document_cached(doc, &mut layout_cache)
+    {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_captioned_media_document(doc) {
+    if let Some(rendered) = render_layout_captioned_media_document_cached(doc, &mut layout_cache) {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_recommendation_infographic_document(doc) {
+    if let Some(rendered) =
+        render_layout_recommendation_infographic_document_cached(doc, &mut layout_cache)
+    {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_stacked_bar_report_document(doc) {
+    if let Some(rendered) =
+        render_layout_stacked_bar_report_document_cached(doc, &mut layout_cache)
+    {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_multi_figure_chart_document(doc) {
+    if let Some(rendered) =
+        render_layout_multi_figure_chart_document_cached(doc, &mut layout_cache)
+    {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_ocr_benchmark_dashboard_document(doc) {
+    if let Some(rendered) =
+        render_layout_ocr_benchmark_dashboard_document_cached(doc, &mut layout_cache)
+    {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_toc_document(doc) {
+    if let Some(rendered) = render_layout_toc_document_cached(doc, &mut layout_cache) {
         return Ok(rendered);
     }
     if looks_like_contents_document(doc) {
@@ -61,11 +120,15 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
         return Ok(render_compact_toc_document(doc));
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_projection_sheet_document(doc) {
+    if let Some(rendered) =
+        render_layout_projection_sheet_document_cached(doc, &mut layout_cache)
+    {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_appendix_tables_document(doc) {
+    if let Some(rendered) =
+        render_layout_appendix_tables_document_cached(doc, &mut layout_cache)
+    {
         return Ok(rendered);
     }
     if let Some(rendered) = render_top_table_plate_document(doc) {
@@ -78,11 +141,11 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_matrix_document(doc) {
+    if let Some(rendered) = render_layout_matrix_document_cached(doc, &mut layout_cache) {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(rendered) = render_layout_panel_stub_document(doc) {
+    if let Some(rendered) = render_layout_panel_stub_document_cached(doc, &mut layout_cache) {
         return Ok(rendered);
     }
 
@@ -923,6 +986,15 @@ struct LayoutCaptionedMediaProfile {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_captioned_media_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_captioned_media_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_captioned_media_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
@@ -960,7 +1032,7 @@ fn render_layout_captioned_media_document(doc: &PdfDocument) -> Option<String> {
         return None;
     }
 
-    let profile = build_layout_captioned_media_profile(doc)?;
+    let profile = build_layout_captioned_media_profile(doc, layout_cache)?;
     if profile.sections.is_empty() || (profile.sections.len() == 1 && profile.footnote.is_none()) {
         return None;
     }
@@ -1020,12 +1092,13 @@ fn render_layout_captioned_media_document(doc: &PdfDocument) -> Option<String> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn build_layout_captioned_media_profile(doc: &PdfDocument) -> Option<LayoutCaptionedMediaProfile> {
-    let source_path = doc.source_path.as_deref()?;
-    let (_, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
-    let blocks = collect_bbox_layout_blocks(&lines);
-    let sections = detect_layout_caption_sections(&blocks);
-    let footnote = detect_layout_bottom_footnote(&lines);
+fn build_layout_captioned_media_profile(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<LayoutCaptionedMediaProfile> {
+    let layout = layout_cache.bbox_layout(doc)?;
+    let sections = detect_layout_caption_sections(&layout.blocks);
+    let footnote = detect_layout_bottom_footnote(&layout.lines);
 
     let mut prose = doc
         .kids
@@ -1314,6 +1387,15 @@ fn normalize_layout_caption_title_text(title: &str) -> String {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_single_caption_chart_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_single_caption_chart_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_single_caption_chart_document_cached(
+    doc: &PdfDocument,
+    _layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
@@ -1476,13 +1558,21 @@ fn looks_like_chart_followup_paragraph(_element: &ContentElement, text: &str) ->
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_recommendation_infographic_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_recommendation_infographic_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_recommendation_infographic_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let (page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
-    let infographic = detect_layout_recommendation_infographic(page_width, &lines)?;
+    let layout = layout_cache.bbox_layout(doc)?;
+    let infographic = detect_layout_recommendation_infographic(layout.page_width, &layout.lines)?;
 
     let mut output = String::new();
     if let Some(eyebrow) = infographic.eyebrow.as_deref() {
@@ -1521,29 +1611,36 @@ fn render_layout_recommendation_infographic_document(doc: &PdfDocument) -> Optio
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_stacked_bar_report_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_stacked_bar_report_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_stacked_bar_report_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let (page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
-    let blocks = collect_bbox_layout_blocks(&lines);
-    let figure_captions = collect_layout_figure_captions(&blocks);
+    let layout = layout_cache.bbox_layout(doc)?;
+    let figure_captions = collect_layout_figure_captions(&layout.blocks);
     if figure_captions.len() != 2 {
         return None;
     }
-    let narrative = detect_layout_stacked_bar_narrative(&blocks)?;
+    let narrative = detect_layout_stacked_bar_narrative(&layout.blocks)?;
     let figure_one = detect_layout_three_month_stacked_figure(
-        &blocks,
-        &lines,
-        page_width,
+        &layout.blocks,
+        &layout.lines,
+        layout.page_width,
         figure_captions[0].clone(),
         figure_captions[1].bbox.top_y,
     )?;
     let figure_two = detect_layout_sector_bar_figure(
-        &blocks,
-        &lines,
-        page_width,
+        &layout.blocks,
+        &layout.lines,
+        layout.page_width,
         figure_captions[1].clone(),
         narrative.top_y,
     )?;
@@ -1589,13 +1686,21 @@ fn render_layout_stacked_bar_report_document(doc: &PdfDocument) -> Option<String
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_multi_figure_chart_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_multi_figure_chart_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_multi_figure_chart_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let (_page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
-    let figures = detect_layout_multi_figure_chart_sections(&lines)?;
+    let layout = layout_cache.bbox_layout(doc)?;
+    let figures = detect_layout_multi_figure_chart_sections(&layout.lines)?;
     let rendered_table_count = figures
         .iter()
         .filter(|figure| figure.labels.len() >= 4 && figure.labels.len() == figure.values.len())
@@ -1948,13 +2053,21 @@ fn detect_layout_recommendation_infographic(
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_ocr_benchmark_dashboard_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_ocr_benchmark_dashboard_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_ocr_benchmark_dashboard_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let (page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
-    let dashboard = detect_layout_ocr_benchmark_dashboard(page_width, &lines)?;
+    let layout = layout_cache.bbox_layout(doc)?;
+    let dashboard = detect_layout_ocr_benchmark_dashboard(layout.page_width, &layout.lines)?;
 
     let mut output = String::new();
     if let Some(eyebrow) = dashboard.eyebrow.as_deref() {
@@ -3495,15 +3608,23 @@ fn looks_like_sentence_end(text: &str) -> bool {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_open_plate_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_open_plate_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_open_plate_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let (page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
-    let plate = detect_layout_open_plate(page_width, &lines)
-        .or_else(|| detect_layout_block_pair_plate(page_width, &lines))?;
-    let bridge = extract_layout_narrative_bridge(page_width, &lines, &plate);
+    let layout = layout_cache.bbox_layout(doc)?;
+    let plate = detect_layout_open_plate(layout.page_width, &layout.lines)
+        .or_else(|| detect_layout_block_pair_plate(layout.page_width, &layout.lines))?;
+    let bridge = extract_layout_narrative_bridge(layout.page_width, &layout.lines, &plate);
 
     let mut output = String::new();
     output.push_str("# ");
@@ -3730,13 +3851,21 @@ fn detect_layout_block_pair_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> 
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_toc_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_toc_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_toc_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let lines = read_pdftotext_layout_lines(Path::new(source_path))?;
-    let (title, entries) = extract_layout_toc_entries(&lines)?;
+    let lines = layout_cache.layout_lines(doc)?;
+    let (title, entries) = extract_layout_toc_entries(lines)?;
     if entries.len() < 5 {
         return None;
     }
@@ -4378,15 +4507,23 @@ fn decode_bbox_layout_text(text: &str) -> String {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_matrix_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_matrix_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_matrix_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let lines = read_pdftotext_layout_lines(Path::new(source_path))?;
-    let header = find_layout_header_candidate(&lines)?;
-    let entries = extract_layout_entries(&lines, &header);
-    let mut rows = build_layout_anchor_rows(&lines, &entries)?;
+    let lines = layout_cache.layout_lines(doc)?;
+    let header = find_layout_header_candidate(lines)?;
+    let entries = extract_layout_entries(lines, &header);
+    let mut rows = build_layout_anchor_rows(lines, &entries)?;
     if rows.len() < 6 || rows.len() > 14 {
         return None;
     }
@@ -4422,14 +4559,22 @@ fn render_layout_matrix_document(doc: &PdfDocument) -> Option<String> {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_panel_stub_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_panel_stub_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_panel_stub_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let lines = read_pdftotext_layout_lines(Path::new(source_path))?;
-    let header = find_layout_panel_header_candidate(&lines)?;
-    let rows = build_layout_panel_stub_rows(&lines, &header)?;
+    let lines = layout_cache.layout_lines(doc)?;
+    let header = find_layout_panel_header_candidate(lines)?;
+    let rows = build_layout_panel_stub_rows(lines, &header)?;
     if rows.len() < 2 || rows.len() > 6 {
         return None;
     }
@@ -4459,13 +4604,21 @@ fn render_layout_panel_stub_document(doc: &PdfDocument) -> Option<String> {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_projection_sheet_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_projection_sheet_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_projection_sheet_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let lines = read_pdftotext_layout_lines(Path::new(source_path))?;
-    let projection = detect_layout_projection_sheet(&lines)?;
+    let lines = layout_cache.layout_lines(doc)?;
+    let projection = detect_layout_projection_sheet(lines)?;
 
     let mut output = String::from("# Table and Figure from the Document\n\n");
     output.push_str(&render_pipe_rows(&projection.table_rows));
@@ -4617,13 +4770,21 @@ fn detect_layout_projection_sheet(lines: &[String]) -> Option<LayoutProjectionSh
 
 #[cfg(not(target_arch = "wasm32"))]
 fn render_layout_appendix_tables_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_appendix_tables_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_appendix_tables_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let lines = read_pdftotext_layout_lines(Path::new(source_path))?;
-    let appendix = detect_layout_appendix_tables_document(&lines)?;
+    let lines = layout_cache.layout_lines(doc)?;
+    let appendix = detect_layout_appendix_tables_document(lines)?;
 
     let mut output = String::new();
     output.push_str("# ");
