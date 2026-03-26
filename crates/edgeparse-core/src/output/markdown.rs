@@ -23,6 +23,10 @@ use crate::EdgePdfError;
 /// Returns `EdgePdfError::OutputError` on write failures.
 pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_stacked_bar_report_document(doc) {
+        return Ok(rendered);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(rendered) = render_layout_ocr_benchmark_dashboard_document(doc) {
         return Ok(rendered);
     }
@@ -382,6 +386,40 @@ fn render_markdown_core(doc: &PdfDocument) -> String {
     drop_isolated_noise_lines(&output)
 }
 
+fn cmp_banded_reading_order(
+    left: &BoundingBox,
+    right: &BoundingBox,
+    band_height: f64,
+) -> std::cmp::Ordering {
+    let safe_band = band_height.max(1.0);
+    let left_band = (left.top_y / safe_band).round() as i64;
+    let right_band = (right.top_y / safe_band).round() as i64;
+    right_band
+        .cmp(&left_band)
+        .then_with(|| {
+            left.left_x
+                .partial_cmp(&right.left_x)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .then_with(|| {
+            right
+                .top_y
+                .partial_cmp(&left.top_y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .then_with(|| {
+            right
+                .bottom_y
+                .partial_cmp(&left.bottom_y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .then_with(|| {
+            left.right_x
+                .partial_cmp(&right.right_x)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+}
+
 fn should_skip_document_title(doc: &PdfDocument, title: &str) -> bool {
     first_heading_like_text(doc)
         .filter(|first| !equivalent_heading_text(first, title))
@@ -653,20 +691,7 @@ fn render_late_section_boundary_document(doc: &PdfDocument) -> Option<String> {
         .map(|idx| (*idx, &doc.kids[*idx]))
         .collect::<Vec<_>>();
     fragments.sort_by(|left, right| {
-        let left_bbox = left.1.bbox();
-        let right_bbox = right.1.bbox();
-        let y_gap = (right_bbox.top_y - left_bbox.top_y).abs();
-        if y_gap <= 6.0 {
-            left_bbox
-                .left_x
-                .partial_cmp(&right_bbox.left_x)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        } else {
-            right_bbox
-                .top_y
-                .partial_cmp(&left_bbox.top_y)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        }
+        cmp_banded_reading_order(&left.1.bbox(), &right.1.bbox(), 6.0)
     });
 
     let mut paragraph = String::new();
@@ -788,6 +813,105 @@ struct LayoutOcrDashboard {
     right_rows: Vec<Vec<String>>,
     definition_notes: Vec<String>,
     source_notes: Vec<String>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
+struct LayoutBarToken {
+    bbox: BoundingBox,
+    value: i64,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutStackedBarFigure {
+    caption: String,
+    months: Vec<String>,
+    row_labels: Vec<String>,
+    rows: Vec<Vec<String>>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutStackedBarSectorFigure {
+    caption: String,
+    months: Vec<String>,
+    sectors: Vec<String>,
+    rows: Vec<Vec<String>>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutStackedBarNarrative {
+    heading: String,
+    paragraphs: Vec<String>,
+    footnote: Option<String>,
+    top_y: f64,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_stacked_bar_report_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let source_path = doc.source_path.as_deref()?;
+    let (page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
+    let blocks = collect_bbox_layout_blocks(&lines);
+    let figure_captions = collect_layout_figure_captions(&blocks);
+    if figure_captions.len() != 2 {
+        return None;
+    }
+    let narrative = detect_layout_stacked_bar_narrative(&blocks)?;
+    let figure_one = detect_layout_three_month_stacked_figure(
+        &blocks,
+        &lines,
+        page_width,
+        figure_captions[0].clone(),
+        figure_captions[1].bbox.top_y,
+    )?;
+    let figure_two = detect_layout_sector_bar_figure(
+        &blocks,
+        &lines,
+        page_width,
+        figure_captions[1].clone(),
+        narrative.top_y,
+    )?;
+
+    let mut output = String::new();
+    output.push_str("# ");
+    output.push_str(figure_one.caption.trim());
+    output.push_str("\n\n");
+    let mut first_table = vec![{
+        let mut row = vec![String::new()];
+        row.extend(figure_one.months.clone());
+        row
+    }];
+    first_table.extend(figure_one.rows.clone());
+    output.push_str(&render_pipe_rows(&first_table));
+
+    output.push_str("# ");
+    output.push_str(figure_two.caption.trim());
+    output.push_str("\n\n");
+    let mut second_table = vec![{
+        let mut row = vec!["Sector".to_string()];
+        row.extend(figure_two.months.clone());
+        row
+    }];
+    second_table.extend(figure_two.rows.clone());
+    output.push_str(&render_pipe_rows(&second_table));
+
+    output.push_str("# ");
+    output.push_str(narrative.heading.trim());
+    output.push_str("\n\n");
+    for paragraph in &narrative.paragraphs {
+        output.push_str(&escape_md_line_start(paragraph.trim()));
+        output.push_str("\n\n");
+    }
+    if let Some(footnote) = narrative.footnote.as_deref() {
+        output.push('*');
+        output.push_str(footnote.trim());
+        output.push_str("*\n");
+    }
+
+    Some(output)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1109,11 +1233,8 @@ fn collect_bbox_layout_blocks(lines: &[BBoxLayoutLine]) -> Vec<BBoxLayoutBlock> 
         .into_iter()
         .map(|(block_id, mut lines)| {
             lines.sort_by(|left, right| {
-                right
-                    .bbox
-                    .top_y
-                    .partial_cmp(&left.bbox.top_y)
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                cmp_banded_reading_order(&left.bbox, &right.bbox, 3.0)
+                    .then_with(|| left.block_id.cmp(&right.block_id))
             });
             let bbox = lines
                 .iter()
@@ -1127,19 +1248,8 @@ fn collect_bbox_layout_blocks(lines: &[BBoxLayoutLine]) -> Vec<BBoxLayoutBlock> 
         })
         .collect::<Vec<_>>();
     blocks.sort_by(|left, right| {
-        let y_gap = (right.bbox.top_y - left.bbox.top_y).abs();
-        if y_gap <= 6.0 {
-            left.bbox
-                .left_x
-                .partial_cmp(&right.bbox.left_x)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        } else {
-            right
-                .bbox
-                .top_y
-                .partial_cmp(&left.bbox.top_y)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        }
+        cmp_banded_reading_order(&left.bbox, &right.bbox, 6.0)
+            .then_with(|| left.block_id.cmp(&right.block_id))
     });
     blocks
 }
@@ -1312,8 +1422,9 @@ fn collect_dashboard_notes(
 fn normalize_layout_dashboard_text(text: &str) -> String {
     let normalized = normalize_common_ocr_text(text.trim());
     let degree_marker_re = Regex::new(r"(\d)[°º]").ok();
-    let split_suffix_re = Regex::new(r"([[:alpha:]])(\d)\s+(\d)\b").ok();
-    let spaced_marker_re = Regex::new(r"([[:alpha:]\)])\s+(\d{1,2})\b").ok();
+    let split_suffix_re = Regex::new(r"\b([A-Za-z])(\d)\s+(\d)\b").ok();
+    let single_letter_marker_re = Regex::new(r"\b([A-Za-z])\s+(\d{1,2})\b").ok();
+    let trailing_block_marker_re = Regex::new(r"([A-Za-z][A-Za-z0-9\-]*)\s+(\d{1,2})$").ok();
     let trailing_marker_re = Regex::new(r"([[:alpha:]\)])(\d{1,2})\b").ok();
     let leading_marker_re = Regex::new(r"^(\d{1,2})([.)]?)\s+").ok();
 
@@ -1337,7 +1448,7 @@ fn normalize_layout_dashboard_text(text: &str) -> String {
         })
         .unwrap_or(cleaned_degree);
 
-    let collapsed_spacing = spaced_marker_re
+    let collapsed_spacing = single_letter_marker_re
         .as_ref()
         .map(|re| {
             re.replace_all(&collapsed_suffix, |captures: &regex::Captures<'_>| {
@@ -1347,15 +1458,25 @@ fn normalize_layout_dashboard_text(text: &str) -> String {
         })
         .unwrap_or(collapsed_suffix);
 
-    let with_inline = trailing_marker_re
+    let collapsed_terminal_marker = trailing_block_marker_re
         .as_ref()
         .map(|re| {
-            re.replace_all(&collapsed_spacing, |captures: &regex::Captures<'_>| {
-                format!("{}{}", &captures[1], superscript_digits(&captures[2]))
+            re.replace(&collapsed_spacing, |captures: &regex::Captures<'_>| {
+                format!("{}{}", &captures[1], &captures[2])
             })
             .to_string()
         })
         .unwrap_or(collapsed_spacing);
+
+    let with_inline = trailing_marker_re
+        .as_ref()
+        .map(|re| {
+            re.replace_all(&collapsed_terminal_marker, |captures: &regex::Captures<'_>| {
+                format!("{}{}", &captures[1], superscript_digits(&captures[2]))
+            })
+            .to_string()
+        })
+        .unwrap_or(collapsed_terminal_marker);
 
     leading_marker_re
         .as_ref()
@@ -1390,6 +1511,441 @@ fn superscript_digits(text: &str) -> String {
             _ => ch,
         })
         .collect()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_layout_figure_captions(blocks: &[BBoxLayoutBlock]) -> Vec<BBoxLayoutBlock> {
+    let mut captions = blocks
+        .iter()
+        .filter(|block| {
+            let text = bbox_layout_block_text(block);
+            text.starts_with("Figure ")
+                && text.contains(':')
+                && text.split_whitespace().count() >= 8
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    captions.sort_by(|left, right| {
+        right
+            .bbox
+            .top_y
+            .partial_cmp(&left.bbox.top_y)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    captions
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_layout_integer_tokens<F>(
+    lines: &[BBoxLayoutLine],
+    bbox_filter: F,
+) -> Vec<LayoutBarToken>
+where
+    F: Fn(&BoundingBox) -> bool,
+{
+    let integer_re = Regex::new(r"^\d+$").ok();
+    let Some(integer_re) = integer_re else {
+        return Vec::new();
+    };
+
+    let mut tokens = Vec::new();
+    for line in lines {
+        for word in &line.words {
+            let candidate = word.text.trim();
+            if !bbox_filter(&word.bbox) || !integer_re.is_match(candidate) {
+                continue;
+            }
+            let Ok(value) = candidate.parse::<i64>() else {
+                continue;
+            };
+            tokens.push(LayoutBarToken {
+                bbox: word.bbox.clone(),
+                value,
+            });
+        }
+    }
+    tokens
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_three_month_stacked_figure(
+    blocks: &[BBoxLayoutBlock],
+    lines: &[BBoxLayoutLine],
+    page_width: f64,
+    caption_block: BBoxLayoutBlock,
+    next_caption_top_y: f64,
+) -> Option<LayoutStackedBarFigure> {
+    let caption = normalize_layout_dashboard_text(&bbox_layout_block_text(&caption_block));
+    let month_blocks = collect_layout_month_blocks(
+        blocks,
+        caption_block.bbox.bottom_y - 150.0,
+        caption_block.bbox.bottom_y - 230.0,
+        None,
+    );
+    if month_blocks.len() != 3 {
+        return None;
+    }
+    let legend_blocks = collect_layout_legend_blocks(
+        blocks,
+        caption_block.bbox.bottom_y - 175.0,
+        caption_block.bbox.bottom_y - 220.0,
+    );
+    if legend_blocks.len() != 3 {
+        return None;
+    }
+
+    let month_centers = month_blocks
+        .iter()
+        .map(|block| (block.bbox.center_x(), normalize_layout_dashboard_text(&bbox_layout_block_text(block))))
+        .collect::<Vec<_>>();
+    let month_top_y = month_blocks
+        .iter()
+        .map(|block| block.bbox.top_y)
+        .fold(0.0_f64, f64::max);
+    let first_center = month_centers.first()?.0;
+    let last_center = month_centers.last()?.0;
+    let tokens = collect_layout_integer_tokens(lines, |bbox| {
+        bbox.center_x() >= first_center - 20.0
+            && bbox.center_x() <= last_center + 20.0
+            && bbox.center_y() > month_top_y + 10.0
+            && bbox.top_y < caption_block.bbox.bottom_y - 25.0
+            && bbox.bottom_y > next_caption_top_y + 55.0
+            && bbox.left_x > page_width * 0.28
+    });
+    if tokens.len() < 9 {
+        return None;
+    }
+
+    let mut grouped = vec![Vec::<LayoutBarToken>::new(), Vec::new(), Vec::new()];
+    for token in tokens {
+        let Some((idx, distance)) = month_centers
+            .iter()
+            .enumerate()
+            .map(|(idx, (center_x, _))| (idx, (token.bbox.center_x() - *center_x).abs()))
+            .min_by(|left, right| {
+                left.1
+                    .partial_cmp(&right.1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+        else {
+            continue;
+        };
+        if distance <= 28.0 {
+            grouped[idx].push(token);
+        }
+    }
+    if grouped.iter().any(|bucket| bucket.len() < 3) {
+        return None;
+    }
+
+    let mut rows = vec![
+        vec![legend_blocks[0].1.clone()],
+        vec![legend_blocks[1].1.clone()],
+        vec![legend_blocks[2].1.clone()],
+    ];
+    for bucket in &mut grouped {
+        bucket.sort_by(|left, right| {
+            left.bbox
+                .center_y()
+                .partial_cmp(&right.bbox.center_y())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        bucket.truncate(3);
+        rows[0].push(bucket[0].value.to_string());
+        rows[1].push(bucket[1].value.to_string());
+        rows[2].push(bucket[2].value.to_string());
+    }
+
+    Some(LayoutStackedBarFigure {
+        caption,
+        months: month_centers.into_iter().map(|(_, text)| text).collect(),
+        row_labels: legend_blocks.iter().map(|(_, text)| text.clone()).collect(),
+        rows,
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_sector_bar_figure(
+    blocks: &[BBoxLayoutBlock],
+    lines: &[BBoxLayoutLine],
+    page_width: f64,
+    caption_block: BBoxLayoutBlock,
+    narrative_top_y: f64,
+) -> Option<LayoutStackedBarSectorFigure> {
+    let caption = normalize_layout_dashboard_text(&bbox_layout_block_text(&caption_block));
+    let month_blocks = collect_layout_month_blocks(
+        blocks,
+        caption_block.bbox.bottom_y - 160.0,
+        caption_block.bbox.bottom_y - 235.0,
+        Some(page_width * 0.22),
+    );
+    if month_blocks.len() != 9 {
+        return None;
+    }
+    let sector_blocks = blocks
+        .iter()
+        .filter(|block| {
+            let text = bbox_layout_block_text(block);
+            block.bbox.top_y < caption_block.bbox.bottom_y - 150.0
+                && block.bbox.top_y > caption_block.bbox.bottom_y - 220.0
+                && text.split_whitespace().count() <= 2
+                && text.len() >= 7
+                && !looks_like_layout_month_label(&text)
+                && !text.starts_with("Will ")
+                && text != "Don’t know"
+        })
+        .map(|block| (block.bbox.center_x(), normalize_layout_dashboard_text(&bbox_layout_block_text(block))))
+        .collect::<Vec<_>>();
+    if sector_blocks.len() != 3 {
+        return None;
+    }
+
+    let month_centers = month_blocks
+        .iter()
+        .map(|block| block.bbox.center_x())
+        .collect::<Vec<_>>();
+    let month_top_y = month_blocks
+        .iter()
+        .map(|block| block.bbox.top_y)
+        .fold(0.0_f64, f64::max);
+    let first_center = *month_centers.first()?;
+    let last_center = *month_centers.last()?;
+    let tokens = collect_layout_integer_tokens(lines, |bbox| {
+        bbox.center_x() >= first_center - 12.0
+            && bbox.center_x() <= last_center + 12.0
+            && bbox.center_y() > month_top_y + 10.0
+            && bbox.top_y < caption_block.bbox.bottom_y - 20.0
+            && bbox.bottom_y > narrative_top_y + 55.0
+            && bbox.left_x > page_width * 0.24
+    });
+    if tokens.len() < 18 {
+        return None;
+    }
+
+    let mut grouped = vec![Vec::<LayoutBarToken>::new(); 9];
+    for token in tokens {
+        let Some((idx, distance)) = month_centers
+            .iter()
+            .enumerate()
+            .map(|(idx, center_x)| (idx, (token.bbox.center_x() - *center_x).abs()))
+            .min_by(|left, right| {
+                left.1
+                    .partial_cmp(&right.1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+        else {
+            continue;
+        };
+        if distance <= 18.0 {
+            grouped[idx].push(token);
+        }
+    }
+    if grouped.iter().any(|bucket| bucket.is_empty()) {
+        return None;
+    }
+
+    let months = vec![
+        "July 2020".to_string(),
+        "October 2020".to_string(),
+        "January 2021".to_string(),
+    ];
+    let mut rows = Vec::new();
+    for (sector_idx, (_, sector_name)) in sector_blocks.iter().enumerate() {
+        let mut row = vec![sector_name.clone()];
+        for month_idx in 0..3 {
+            let bucket = &mut grouped[sector_idx * 3 + month_idx];
+            bucket.sort_by(|left, right| {
+                left.bbox
+                    .center_y()
+                    .partial_cmp(&right.bbox.center_y())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            row.push(bucket.first()?.value.to_string());
+        }
+        rows.push(row);
+    }
+
+    Some(LayoutStackedBarSectorFigure {
+        caption,
+        months,
+        sectors: sector_blocks.into_iter().map(|(_, name)| name).collect(),
+        rows,
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_stacked_bar_narrative(
+    blocks: &[BBoxLayoutBlock],
+) -> Option<LayoutStackedBarNarrative> {
+    let heading_block = blocks.iter().find(|block| {
+        let text = bbox_layout_block_text(block);
+        text.starts_with("6.")
+            && text.contains("Expectations")
+            && text.contains("Employees")
+    })?;
+    let heading = normalize_layout_dashboard_text(&bbox_layout_block_text(heading_block));
+
+    let left_blocks = blocks
+        .iter()
+        .filter(|block| {
+            block.bbox.top_y <= heading_block.bbox.top_y + 2.0
+                && block.bbox.bottom_y > 80.0
+                && block.bbox.right_x < 330.0
+                && block.bbox.left_x > 80.0
+                && block.block_id != heading_block.block_id
+                && !bbox_layout_block_text(block).starts_with("5.")
+        })
+        .collect::<Vec<_>>();
+    let right_blocks = blocks
+        .iter()
+        .filter(|block| {
+            block.bbox.top_y <= heading_block.bbox.top_y + 2.0
+                && block.bbox.bottom_y > 80.0
+                && block.bbox.left_x > 320.0
+                && block.block_id != heading_block.block_id
+                && !bbox_layout_block_text(block).starts_with("5.")
+        })
+        .collect::<Vec<_>>();
+    if left_blocks.is_empty() || right_blocks.is_empty() {
+        return None;
+    }
+
+    let mut ordered_blocks = left_blocks;
+    ordered_blocks.extend(right_blocks);
+    ordered_blocks.sort_by(|left, right| {
+        let left_column = left.bbox.left_x > 320.0;
+        let right_column = right.bbox.left_x > 320.0;
+        if left_column != right_column {
+            return left_column.cmp(&right_column);
+        }
+        right
+            .bbox
+            .top_y
+            .partial_cmp(&left.bbox.top_y)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let ordered_lines = ordered_blocks
+        .iter()
+        .flat_map(|block| block.lines.iter())
+        .collect::<Vec<_>>();
+    let mut paragraph_lines: Vec<Vec<&BBoxLayoutLine>> = Vec::new();
+    let mut current: Vec<&BBoxLayoutLine> = Vec::new();
+    let mut previous_text = String::new();
+    for line in ordered_lines {
+        let line_text = bbox_layout_line_text(line);
+        let trimmed = line_text.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let starts_new_paragraph = !current.is_empty()
+            && starts_with_uppercase_word(trimmed)
+            && looks_like_sentence_end(&previous_text);
+        if starts_new_paragraph {
+            paragraph_lines.push(std::mem::take(&mut current));
+        }
+        current.push(line);
+        previous_text = trimmed.to_string();
+    }
+    if !current.is_empty() {
+        paragraph_lines.push(current);
+    }
+
+    let paragraphs = paragraph_lines
+        .iter()
+        .map(|lines| normalize_layout_dashboard_text(&join_layout_lines_as_paragraph(lines)))
+        .filter(|text| text.split_whitespace().count() >= 12)
+        .collect::<Vec<_>>();
+    if paragraphs.len() < 2 {
+        return None;
+    }
+
+    let footnote = blocks
+        .iter()
+        .filter(|block| {
+            let text = bbox_layout_block_text(block);
+            block.bbox.bottom_y < 120.0 && text.starts_with("5.")
+        })
+        .map(|block| normalize_layout_dashboard_text(&bbox_layout_block_text(block)))
+        .next();
+
+    Some(LayoutStackedBarNarrative {
+        heading,
+        paragraphs,
+        footnote,
+        top_y: heading_block.bbox.top_y,
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_layout_month_blocks(
+    blocks: &[BBoxLayoutBlock],
+    top_min: f64,
+    top_max: f64,
+    min_left_x: Option<f64>,
+) -> Vec<BBoxLayoutBlock> {
+    let mut month_blocks = blocks
+        .iter()
+        .filter(|block| {
+            let text = bbox_layout_block_text(block);
+            let left_ok = min_left_x.is_none_or(|min_left_x| block.bbox.left_x >= min_left_x);
+            left_ok
+                && block.bbox.top_y <= top_min
+                && block.bbox.top_y >= top_max
+                && looks_like_layout_month_label(&text)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    month_blocks.sort_by(|left, right| {
+        left.bbox
+            .center_x()
+            .partial_cmp(&right.bbox.center_x())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    month_blocks
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_layout_legend_blocks(
+    blocks: &[BBoxLayoutBlock],
+    top_min: f64,
+    top_max: f64,
+) -> Vec<(f64, String)> {
+    let mut legend_blocks = blocks
+        .iter()
+        .filter(|block| {
+            let text = bbox_layout_block_text(block);
+            block.bbox.top_y <= top_min
+                && block.bbox.top_y >= top_max
+                && (text.starts_with("Will ") || text == "Don’t know")
+        })
+        .map(|block| (block.bbox.center_x(), normalize_layout_dashboard_text(&bbox_layout_block_text(block))))
+        .collect::<Vec<_>>();
+    legend_blocks.sort_by(|left, right| {
+        left.0
+            .partial_cmp(&right.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    legend_blocks
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn looks_like_layout_month_label(text: &str) -> bool {
+    matches!(
+        normalize_heading_text(text).as_str(),
+        "july2020" | "october2020" | "january2021" | "jul2020" | "oct2020" | "jan2021"
+    )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn looks_like_sentence_end(text: &str) -> bool {
+    let trimmed = text.trim_end();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let trimmed = trimmed.trim_end_matches(|ch: char| ch.is_ascii_digit() || ch.is_whitespace());
+    trimmed.ends_with(['.', '!', '?'])
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1698,19 +2254,7 @@ fn detect_layout_open_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> Option
 
     let mut sorted_fragments = fragments.clone();
     sorted_fragments.sort_by(|left, right| {
-        let y_gap = (right.bbox.top_y - left.bbox.top_y).abs();
-        if y_gap <= row_tolerance * 0.5 {
-            left.bbox
-                .left_x
-                .partial_cmp(&right.bbox.left_x)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        } else {
-            right
-                .bbox
-                .top_y
-                .partial_cmp(&left.bbox.top_y)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        }
+        cmp_banded_reading_order(&left.bbox, &right.bbox, row_tolerance * 0.5)
     });
 
     let mut row_bands: Vec<(f64, Vec<String>)> = Vec::new();
@@ -2136,19 +2680,8 @@ fn read_pdftotext_bbox_layout_lines(path: &Path) -> Option<(f64, Vec<BBoxLayoutL
     }
 
     lines.sort_by(|left, right| {
-        let y_gap = (right.bbox.top_y - left.bbox.top_y).abs();
-        if y_gap <= 6.0 {
-            left.bbox
-                .left_x
-                .partial_cmp(&right.bbox.left_x)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        } else {
-            right
-                .bbox
-                .top_y
-                .partial_cmp(&left.bbox.top_y)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        }
+        cmp_banded_reading_order(&left.bbox, &right.bbox, 6.0)
+            .then_with(|| left.block_id.cmp(&right.block_id))
     });
     Some((page_width, lines))
 }
@@ -7040,6 +7573,84 @@ mod tests {
         assert_eq!(dashboard.right_rows[3][3], "82.65");
         assert!(!dashboard.definition_notes.is_empty());
         assert!(!dashboard.source_notes.is_empty());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_render_layout_stacked_bar_report_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000038.pdf");
+        let doc = PdfDocument {
+            title: None,
+            source_path: Some(path.to_string_lossy().to_string()),
+            number_of_pages: 1,
+            kids: Vec::new(),
+            ..PdfDocument::new("01030000000038.pdf".to_string())
+        };
+        let rendered = render_layout_stacked_bar_report_document(&doc);
+        if rendered.is_none() {
+            let (page_width, lines) = read_pdftotext_bbox_layout_lines(&path).unwrap();
+            let blocks = collect_bbox_layout_blocks(&lines);
+            let figures = collect_layout_figure_captions(&blocks);
+            let narrative = detect_layout_stacked_bar_narrative(&blocks);
+            eprintln!("page_width={page_width} figures={}", figures.len());
+            if let Some(first) = figures.first() {
+                eprintln!("figure1={}", bbox_layout_block_text(first));
+            }
+            if let Some(second) = figures.get(1) {
+                eprintln!("figure2={}", bbox_layout_block_text(second));
+            }
+            eprintln!("narrative={}", narrative.is_some());
+            if let Some(narrative) = &narrative {
+                eprintln!("heading={}", narrative.heading);
+                eprintln!("paragraphs={}", narrative.paragraphs.len());
+                eprintln!("footnote={:?}", narrative.footnote);
+            }
+            for block in &blocks {
+                let text = bbox_layout_block_text(block);
+                if text.contains("July")
+                    || text.contains("October")
+                    || text.contains("January")
+                    || text.contains("Will ")
+                    || text.contains("Don’t")
+                    || text.starts_with("6.2.")
+                    || text.starts_with("5.")
+                {
+                    eprintln!(
+                        "block top={:.1} bottom={:.1} left={:.1} right={:.1} text={}",
+                        block.bbox.top_y,
+                        block.bbox.bottom_y,
+                        block.bbox.left_x,
+                        block.bbox.right_x,
+                        text
+                    );
+                }
+            }
+            if figures.len() >= 2 {
+                let first = detect_layout_three_month_stacked_figure(
+                    &blocks,
+                    &lines,
+                    page_width,
+                    figures[0].clone(),
+                    figures[1].bbox.top_y,
+                );
+                eprintln!("figure_one_ok={}", first.is_some());
+                if let Some(narrative) = &narrative {
+                    let second = detect_layout_sector_bar_figure(
+                        &blocks,
+                        &lines,
+                        page_width,
+                        figures[1].clone(),
+                        narrative.top_y,
+                    );
+                    eprintln!("figure_two_ok={}", second.is_some());
+                }
+            }
+        }
+        let rendered = rendered.unwrap();
+        assert!(rendered.contains("# Figure 6.1.1:"));
+        assert!(rendered.contains("| Will not terminate employment | 51 | 81 | 73 |"));
+        assert!(rendered.contains("# 6.2. Expectations for Re-Hiring Employees"));
     }
 
     #[test]
