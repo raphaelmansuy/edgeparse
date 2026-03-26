@@ -1,0 +1,108 @@
+name: Release — WASM SDK (npm)
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name to publish (e.g. v0.2.1) — used for version sync'
+        required: true
+        default: 'v0.2.1'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-wasm:
+    name: Publish WASM package
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@wasm-pack
+
+      - name: Verify version consistency
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          TAG_NAME="${INPUT_TAG_NAME:-$GITHUB_REF_NAME}"
+          TAG_VERSION="${TAG_NAME#v}"
+          CARGO_VERSION=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name=="edgeparse-wasm") | .version')
+          if [[ "$TAG_VERSION" != "$CARGO_VERSION" ]]; then
+            echo "ERROR: tag $TAG_VERSION ≠ Cargo.toml $CARGO_VERSION"
+            exit 1
+          fi
+
+      - name: Build WASM package
+        run: |
+          cd crates/edgeparse-wasm
+          wasm-pack build --target web --release
+
+      - name: Sync npm metadata
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          node -e "
+          const fs = require('fs');
+          const refName = process.env.INPUT_TAG_NAME || process.env.GITHUB_REF_NAME;
+          const version = refName.replace(/^v/, '');
+          const path = 'crates/edgeparse-wasm/pkg/package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.name = '@edgeparse/edgeparse-wasm';
+          pkg.version = version;
+          pkg.description = 'EdgeParse PDF parser — WebAssembly build for browsers';
+          pkg.repository = {
+            type: 'git',
+            url: 'https://github.com/raphaelmansuy/edgeparse'
+          };
+          pkg.files = [
+            'edgeparse_wasm_bg.wasm',
+            'edgeparse_wasm.js',
+            'edgeparse_wasm.d.ts'
+          ];
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          console.log('Version synced to: ' + version);
+          "
+
+      - name: Pack npm tarball
+        run: |
+          cd crates/edgeparse-wasm/pkg
+          npm pack
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-package
+          path: crates/edgeparse-wasm/pkg/*.tgz
+
+      - name: Publish WASM package to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd crates/edgeparse-wasm/pkg
+          OUTPUT=$(npm publish --access public 2>&1) && echo "$OUTPUT" || {
+            echo "$OUTPUT"
+            if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
+              echo "@edgeparse/edgeparse-wasm already published at this version — skipping."
+            else
+              exit 1
+            fi
+          }
+
+      - name: Upload npm tarball to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          TAG_NAME="${INPUT_TAG_NAME:-$GITHUB_REF_NAME}"
+          gh release upload "$TAG_NAME" crates/edgeparse-wasm/pkg/*.tgz \
+            --repo "${{ github.repository }}" --clobber

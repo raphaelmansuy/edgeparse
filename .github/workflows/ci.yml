@@ -55,9 +55,27 @@ jobs:
           # Install the platform binary into the local package directory
           cp ../../target/release/libedgeparse_node.so npm/linux-x64-gnu/edgeparse-node.linux-x64-gnu.node
           # Install the local platform package so require('edgeparse-linux-x64-gnu') resolves
-          npm install --save-dev file:./npm/linux-x64-gnu
+          npm install --no-save file:./npm/linux-x64-gnu
           npm run build:ts
           npm test
+
+  wasm:
+    name: WASM SDK — build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p edgeparse-wasm --target wasm32-unknown-unknown
+
+  docker:
+    name: Docker — smoke build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f docker/Dockerfile .
 
   security:
     name: Security audit

@@ -19,9 +19,10 @@
         bench-engines bench-non-ocr bench-ocr bench-compare-all bench-report \
         run demo \
         publish-rust publish-rust-dry publish-python publish-python-dry \
-        publish-node publish-node-dry \
+        publish-node publish-node-dry publish-wasm publish-wasm-dry \
         publish-cli publish-cli-dry \
         publish-brew publish-brew-dry \
+        wasm-build wasm-check wasm-size wasm-clean \
         publish-all \
         clean clean-bench clean-all
 
@@ -221,14 +222,28 @@ bench-report: bench-setup ## Regenerate HTML report from existing results  (no r
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Rust / crates.io ──────────────────────────────────────────────────────────
-publish-rust-dry: ## Dry-run: verify edgeparse-core + edgeparse-cli can be published
+publish-rust-dry: ## Dry-run: verify pdf-cos + edgeparse-core publish cleanly and edgeparse-cli packages cleanly
+	$(call log,cargo publish --dry-run  [pdf-cos])
+	@cargo publish -p pdf-cos --dry-run --allow-dirty
 	$(call log,cargo publish --dry-run  [edgeparse-core])
-	@cargo publish -p edgeparse-core --dry-run
-	$(call log,cargo publish --dry-run  [edgeparse-cli])
-	@cargo publish -p edgeparse-cli --dry-run
+	@cargo publish -p edgeparse-core --dry-run --allow-dirty
+	$(call log,cargo package --allow-dirty  [edgeparse-cli])
+	@OUTPUT=$$(cargo package -p edgeparse-cli --allow-dirty 2>&1) && echo "$$OUTPUT" || { \
+	  echo "$$OUTPUT"; \
+	  if echo "$$OUTPUT" | grep -q 'location searched: crates.io index' \
+	    && echo "$$OUTPUT" | grep -q 'required by package `edgeparse-cli'; then \
+	    printf "$(BOLD)$(YELLOW) ⚠$(RESET) $(YELLOW)edgeparse-cli package dry-run requires edgeparse-core $(VERSION) to already exist on crates.io; the tagged CI release handles that publish order.$(RESET)\n"; \
+	  else \
+	    exit 1; \
+	  fi; \
+	}
 	$(call ok,Rust dry-run passed — ready for crates.io)
 
-publish-rust: ## Publish edgeparse-core then edgeparse-cli to crates.io
+publish-rust: ## Publish pdf-cos, edgeparse-core, then edgeparse-cli to crates.io
+	$(call log,Publishing pdf-cos to crates.io ...)
+	@cargo publish -p pdf-cos
+	$(call log,Waiting 30 s for crates.io index to propagate ...)
+	@sleep 30
 	$(call log,Publishing edgeparse-core to crates.io ...)
 	@cargo publish -p edgeparse-core
 	$(call log,Waiting 30 s for crates.io index to propagate ...)
@@ -502,9 +517,36 @@ publish-brew: ## Generate Homebrew formula and push to $(BREW_TAP_REPO)
 	 rm -rf "$$TAPDIR"
 	$(call ok,Homebrew formula v$(VERSION) pushed to $(BREW_TAP_REPO))
 
+# ── WASM / npm ────────────────────────────────────────────────────────────────
+publish-wasm-dry: ## Dry-run: build the WASM package and preview the npm tarball
+	$(call log,Building WebAssembly package [dry-run] ...)
+	@command -v wasm-pack >/dev/null 2>&1 || { \
+	  $(call err,wasm-pack not found — install: cargo install wasm-pack); \
+	  exit 1; }
+	@cd crates/edgeparse-wasm && wasm-pack build --target web --release
+	@node -e "const fs=require('fs');const p='crates/edgeparse-wasm/pkg/package.json';const pkg=JSON.parse(fs.readFileSync(p,'utf8'));pkg.name='@edgeparse/edgeparse-wasm';pkg.version='$(VERSION)';fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n');"
+	@cd crates/edgeparse-wasm/pkg && npm pack --dry-run
+	$(call ok,WASM dry-run passed — ready for npm)
+
+publish-wasm: ## Build and publish the WASM npm package (@edgeparse/edgeparse-wasm)
+ifndef NPM_TOKEN
+	$(call err,NPM_TOKEN is required.  Usage:  NPM_TOKEN=<token> make publish-wasm)
+	@exit 1
+endif
+	$(call log,Publishing @edgeparse/edgeparse-wasm to npm ...)
+	@command -v wasm-pack >/dev/null 2>&1 || { \
+	  $(call err,wasm-pack not found — install: cargo install wasm-pack); \
+	  exit 1; }
+	@printf "//registry.npmjs.org/:_authToken=%s\n" "$(NPM_TOKEN)" > ~/.npmrc
+	@cd crates/edgeparse-wasm && wasm-pack build --target web --release
+	@node -e "const fs=require('fs');const p='crates/edgeparse-wasm/pkg/package.json';const pkg=JSON.parse(fs.readFileSync(p,'utf8'));pkg.name='@edgeparse/edgeparse-wasm';pkg.version='$(VERSION)';fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n');"
+	@cd crates/edgeparse-wasm/pkg && npm publish --access public
+	@rm -f ~/.npmrc
+	$(call ok,WASM package published to npm)
+
 # ── Combined ──────────────────────────────────────────────────────────────────
-publish-all: publish-rust publish-python publish-node publish-cli publish-brew ## Publish everything: Rust crates + Python wheels + Node.js packages + CLI binaries + Homebrew formula
-	$(call ok,All SDKs + CLI + Homebrew tap published)
+publish-all: publish-rust publish-python publish-node publish-wasm publish-cli publish-brew ## Publish everything: crates + Python + Node + WASM + CLI + Homebrew
+	$(call ok,All publish targets completed)
 
 # ══════════════════════════════════════════════════════════════════════════════
 ## WASM
@@ -513,12 +555,12 @@ publish-all: publish-rust publish-python publish-node publish-cli publish-brew #
 WASM_CRATE := crates/edgeparse-wasm
 
 wasm-build: ## Build WASM package (release, --target web)
-	$(call info,Building WASM package...)
+	$(call log,Building WASM package...)
 	@cd $(WASM_CRATE) && wasm-pack build --target web --release --scope edgeparse
 	$(call ok,WASM package built → $(WASM_CRATE)/pkg/)
 
 wasm-check: ## Check WASM compilation (fast, no codegen)
-	$(call info,Checking WASM compilation...)
+	$(call log,Checking WASM compilation...)
 	@cargo check --target wasm32-unknown-unknown -p edgeparse-wasm
 	$(call ok,WASM check passed)
 

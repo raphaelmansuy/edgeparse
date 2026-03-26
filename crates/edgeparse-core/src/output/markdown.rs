@@ -3606,7 +3606,6 @@ fn collect_layout_legend_blocks(
     legend_blocks
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn looks_like_layout_month_label(text: &str) -> bool {
     matches!(
         normalize_heading_text(text).as_str(),
@@ -3614,7 +3613,6 @@ fn looks_like_layout_month_label(text: &str) -> bool {
     )
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn looks_like_sentence_end(text: &str) -> bool {
     let trimmed = text.trim_end();
     if trimmed.is_empty() {
