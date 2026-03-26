@@ -799,9 +799,7 @@ fn render_late_section_boundary_document(doc: &PdfDocument) -> Option<String> {
         .iter()
         .map(|idx| (*idx, &doc.kids[*idx]))
         .collect::<Vec<_>>();
-    fragments.sort_by(|left, right| {
-        cmp_banded_reading_order(&left.1.bbox(), &right.1.bbox(), 6.0)
-    });
+    fragments.sort_by(|left, right| cmp_banded_reading_order(left.1.bbox(), right.1.bbox(), 6.0));
 
     let mut paragraph = String::new();
     for (_, element) in fragments {
@@ -949,6 +947,7 @@ struct LayoutBarToken {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 struct LayoutStackedBarFigure {
     caption: String,
     months: Vec<String>,
@@ -957,6 +956,7 @@ struct LayoutStackedBarFigure {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 struct LayoutStackedBarSectorFigure {
     caption: String,
     months: Vec<String>,
@@ -1003,6 +1003,7 @@ struct LayoutCaptionedMediaProfile {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_captioned_media_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_captioned_media_document_cached(doc, &mut layout_cache)
@@ -1335,7 +1336,7 @@ fn render_layout_caption_section(section: &LayoutCaptionSection) -> String {
     if section.label.starts_with("Diagram ") {
         output.push_str("## ");
         output.push_str(section.label.trim());
-        output.push_str("\n");
+        output.push('\n');
         if !section.title.trim().is_empty() {
             let title = normalize_layout_caption_title_text(section.title.trim());
             output.push_str("**");
@@ -1347,7 +1348,7 @@ fn render_layout_caption_section(section: &LayoutCaptionSection) -> String {
         return output;
     }
 
-    if section.label.starts_with("Figure ") && !section.footnote_number.is_some() {
+    if section.label.starts_with("Figure ") && section.footnote_number.is_none() {
         output.push('*');
         output.push_str(section.label.trim());
         output.push_str("*\n\n");
@@ -1404,6 +1405,7 @@ fn normalize_layout_caption_title_text(title: &str) -> String {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_single_caption_chart_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_single_caption_chart_document_cached(doc, &mut layout_cache)
@@ -1575,6 +1577,7 @@ fn looks_like_chart_followup_paragraph(_element: &ContentElement, text: &str) ->
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_recommendation_infographic_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_recommendation_infographic_document_cached(doc, &mut layout_cache)
@@ -1628,6 +1631,7 @@ fn render_layout_recommendation_infographic_document_cached(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_stacked_bar_report_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_stacked_bar_report_document_cached(doc, &mut layout_cache)
@@ -1703,6 +1707,7 @@ fn render_layout_stacked_bar_report_document_cached(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_multi_figure_chart_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_multi_figure_chart_document_cached(doc, &mut layout_cache)
@@ -2070,6 +2075,7 @@ fn detect_layout_recommendation_infographic(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_ocr_benchmark_dashboard_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_ocr_benchmark_dashboard_document_cached(doc, &mut layout_cache)
@@ -2662,7 +2668,7 @@ fn collect_layout_panel_alpha_blocks(
                 && token_count >= 1
                 && !has_numeric_marker
                 && !text.starts_with(':')
-                && text.to_ascii_lowercase() != "comparison")
+                && !text.eq_ignore_ascii_case("comparison"))
                 .then_some(block.clone())
         })
         .collect::<Vec<_>>();
@@ -2841,7 +2847,7 @@ fn extract_layout_ranking_headers(
         };
         let metrics = first_segment
             .split(',')
-            .map(|part| title_case_metric_label(part))
+            .map(title_case_metric_label)
             .filter(|part| !part.trim().is_empty())
             .collect::<Vec<_>>();
         if metrics.len() >= 2 {
@@ -2931,12 +2937,7 @@ fn collect_bbox_layout_blocks(lines: &[BBoxLayoutLine]) -> Vec<BBoxLayoutBlock> 
 
 #[cfg(not(target_arch = "wasm32"))]
 fn bbox_layout_block_text(block: &BBoxLayoutBlock) -> String {
-    join_layout_lines_as_paragraph(
-        &block
-            .lines
-            .iter()
-            .collect::<Vec<_>>(),
-    )
+    join_layout_lines_as_paragraph(&block.lines.iter().collect::<Vec<_>>())
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -2951,7 +2952,7 @@ fn join_dashboard_title_blocks(blocks: &[BBoxLayoutBlock]) -> Option<String> {
     });
     let text = blocks
         .iter()
-        .map(|block| bbox_layout_block_text(block))
+        .map(bbox_layout_block_text)
         .filter(|text| !text.trim().is_empty())
         .collect::<Vec<_>>()
         .join(" ");
@@ -3623,6 +3624,7 @@ fn looks_like_sentence_end(text: &str) -> bool {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_open_plate_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_open_plate_document_cached(doc, &mut layout_cache)
@@ -3866,6 +3868,7 @@ fn detect_layout_block_pair_plate(page_width: f64, lines: &[BBoxLayoutLine]) -> 
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_toc_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_toc_document_cached(doc, &mut layout_cache)
@@ -4563,6 +4566,7 @@ fn decode_bbox_layout_text(text: &str) -> String {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_matrix_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_matrix_document_cached(doc, &mut layout_cache)
@@ -4615,6 +4619,7 @@ fn render_layout_matrix_document_cached(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_panel_stub_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_panel_stub_document_cached(doc, &mut layout_cache)
@@ -4660,6 +4665,7 @@ fn render_layout_panel_stub_document_cached(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_projection_sheet_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_projection_sheet_document_cached(doc, &mut layout_cache)
@@ -4855,6 +4861,7 @@ fn detect_layout_projection_sheet(lines: &[String]) -> Option<LayoutProjectionSh
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_appendix_tables_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_appendix_tables_document_cached(doc, &mut layout_cache)
@@ -4894,6 +4901,7 @@ fn render_layout_appendix_tables_document_cached(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_dual_table_article_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_dual_table_article_document_cached(doc, &mut layout_cache)
@@ -5155,6 +5163,7 @@ fn assign_layout_spans_to_columns(spans: &[(usize, String)], column_starts: &[us
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_titled_dual_table_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_titled_dual_table_document_cached(doc, &mut layout_cache)
@@ -5353,6 +5362,7 @@ fn looks_like_layout_value(text: &str) -> bool {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 fn render_layout_registration_report_document(doc: &PdfDocument) -> Option<String> {
     let mut layout_cache = LayoutSourceCache::default();
     render_layout_registration_report_document_cached(doc, &mut layout_cache)
@@ -5998,11 +6008,10 @@ fn build_layout_anchor_rows(
             let prev_stage_empty = rows[prev_pos].cells[0].trim().is_empty();
             let next_stage_empty = rows[next_pos].cells[0].trim().is_empty();
 
-            if previous_line_blank && anchor_indices[next_pos].saturating_sub(entry.line_idx) <= 1 {
-                next_pos
-            } else if filled_slots == [3]
+            if (previous_line_blank && anchor_indices[next_pos].saturating_sub(entry.line_idx) <= 1)
+                || (filled_slots == [3]
                 && anchor_indices[next_pos].saturating_sub(entry.line_idx) <= 1
-                && !rows[prev_pos].cells[3].trim().is_empty()
+                && !rows[prev_pos].cells[3].trim().is_empty())
             {
                 next_pos
             } else if prev_stage_empty && next_stage_empty {
@@ -7425,8 +7434,7 @@ fn normalize_common_ocr_text(text: &str) -> String {
         .replace("1- 20-μL", "1-20-μL")
         .replace("1- 20 μL", "1-20 μL")
         .replace("1- 2 0  μL", "1-20 μL")
-        .replace("1- 2 0 μL", "1-20 μL")
-        .replace("10x loading dye", "10x loading dye");
+        .replace("1- 2 0 μL", "1-20 μL");
 
     normalized = normalize_degree_spacing(&normalized);
     collapse_inline_whitespace(&normalized)
@@ -7570,7 +7578,7 @@ fn sanitize_numberish_token(token: &str) -> Option<String> {
 
     let candidate = trimmed.trim_end_matches('%').replace(',', "");
     if candidate.chars().all(|ch| ch.is_ascii_digit()) {
-        Some(trimmed.trim_end_matches(|c: char| matches!(c, ',' | ';' | ':')).to_string())
+        Some(trimmed.trim_end_matches([',', ';', ':']).to_string())
     } else {
         None
     }
@@ -8429,7 +8437,7 @@ fn should_merge_adjacent_semantic_paragraphs(prev: &str, next: &str) -> bool {
 }
 
 fn starts_with_enumerated_marker(text: &str) -> bool {
-    let first_token = match text.trim_start().split_whitespace().next() {
+    let first_token = match text.split_whitespace().next() {
         Some(token) => token.trim_start_matches(['(', '[']),
         None => return false,
     };
@@ -9215,7 +9223,7 @@ fn build_footnote_citation_region(
         {
             return None;
         }
-        if !same_column_region(&column_bbox, &next.bbox()) {
+        if !same_column_region(&column_bbox, next.bbox()) {
             return None;
         }
         lead_prefix = Some(prefix);
@@ -9241,11 +9249,11 @@ fn build_footnote_citation_region(
         if font_size > small_font_threshold {
             break;
         }
-        if !same_column_region(&column_bbox, &candidate.bbox()) {
+        if !same_column_region(&column_bbox, candidate.bbox()) {
             break;
         }
 
-        column_bbox = column_bbox.union(&candidate.bbox());
+        column_bbox = column_bbox.union(candidate.bbox());
         fragments.push(footnote_fragment_text(candidate));
         consecutive_small += 1;
         end_idx = idx;
@@ -9688,7 +9696,7 @@ fn collect_table_header_candidate_indices(
 
         let bbox = element.bbox();
         let vertical_gap = bbox.bottom_y - table_top;
-        if vertical_gap < -6.0 || vertical_gap > 260.0 {
+        if !(-6.0..=260.0).contains(&vertical_gap) {
             break;
         }
 
@@ -9726,7 +9734,7 @@ fn collect_table_footer_candidate_indices(
 
         let bbox = element.bbox();
         let gap = table_bottom - bbox.top_y;
-        if gap < -6.0 || gap > 28.0 {
+        if !(-6.0..=28.0).contains(&gap) {
             break;
         }
         indices.push(idx);

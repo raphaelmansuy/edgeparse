@@ -305,6 +305,7 @@ struct ClusterTable {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 struct PanelLine {
     bbox: BoundingBox,
     baseline: f64,
@@ -313,6 +314,7 @@ struct PanelLine {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 struct PanelFragment {
     slot_idx: usize,
     bbox: BoundingBox,
@@ -2413,8 +2415,7 @@ fn collect_panel_band_indices(elements: &[ContentElement], table: &ClusterTable)
     indices.reverse();
     indices.extend(table.consumed_block_indices.iter().copied());
 
-    for next_idx in end_idx + 1..elements.len() {
-        let elem = &elements[next_idx];
+    for (next_idx, elem) in elements.iter().enumerate().skip(end_idx + 1) {
         if !is_panel_text_candidate(elem) || elem.bbox().page_number != page_number {
             break;
         }

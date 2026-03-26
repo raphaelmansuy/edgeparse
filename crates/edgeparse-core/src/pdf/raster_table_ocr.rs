@@ -523,8 +523,7 @@ fn normalize_page_raster_cell_text(cell_bbox: &BoundingBox, text: String) -> Str
     let normalized = text
         .replace('|', " ")
         .replace('—', "-")
-        .replace('“', "\"")
-        .replace('”', "\"")
+        .replace(['“', '”'], "\"")
         .replace('’', "'")
         .split_whitespace()
         .collect::<Vec<_>>()
