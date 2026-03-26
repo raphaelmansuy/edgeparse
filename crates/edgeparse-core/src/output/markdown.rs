@@ -31,6 +31,10 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_captioned_media_document(doc) {
+        return Ok(rendered);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(rendered) = render_layout_recommendation_infographic_document(doc) {
         return Ok(rendered);
     }
@@ -893,6 +897,354 @@ struct LayoutSeriesFigure {
     labels: Vec<String>,
     values: Vec<String>,
     source: Option<String>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutCaptionSection {
+    label: String,
+    title: String,
+    footnote_number: Option<String>,
+    top_y: f64,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+enum LayoutCaptionedMediaEvent {
+    Caption(LayoutCaptionSection),
+    Paragraph(String),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_captioned_media_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+    let paragraph_count = doc
+        .kids
+        .iter()
+        .filter(|element| matches!(element, ContentElement::Paragraph(_)))
+        .count();
+    let image_count = doc
+        .kids
+        .iter()
+        .filter(|element| {
+            matches!(
+                element,
+                ContentElement::Image(_)
+                    | ContentElement::Figure(_)
+                    | ContentElement::Picture(_)
+            )
+        })
+        .count();
+    if paragraph_count == 0 || image_count == 0 {
+        return None;
+    }
+    let has_explicit_structure = doc.kids.iter().any(|element| {
+        matches!(
+            element,
+            ContentElement::Caption(_)
+                | ContentElement::Heading(_)
+                | ContentElement::NumberHeading(_)
+                | ContentElement::Table(_)
+                | ContentElement::List(_)
+        )
+    });
+    if has_explicit_structure {
+        return None;
+    }
+
+    let source_path = doc.source_path.as_deref()?;
+    let (_, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
+    let blocks = collect_bbox_layout_blocks(&lines);
+    let sections = detect_layout_caption_sections(&blocks);
+    let footnote = detect_layout_bottom_footnote(&lines);
+
+    if sections.is_empty() || (sections.len() == 1 && footnote.is_none()) {
+        return None;
+    }
+    let has_non_figure_label = sections
+        .iter()
+        .any(|section| !section.label.starts_with("Figure "));
+    let has_anchored_footnote = footnote.is_some()
+        || sections
+            .iter()
+            .any(|section| section.footnote_number.is_some());
+    if !has_non_figure_label && !has_anchored_footnote {
+        return None;
+    }
+
+    let mut prose = doc
+        .kids
+        .iter()
+        .filter_map(|element| match element {
+            ContentElement::Paragraph(_)
+            | ContentElement::TextBlock(_)
+            | ContentElement::TextLine(_) => {
+                let text = clean_paragraph_text(&extract_element_text(element));
+                let trimmed = text.trim();
+                (!trimmed.is_empty()
+                    && trimmed.split_whitespace().count() >= 8
+                    && !starts_with_caption_prefix(trimmed)
+                    && !trimmed.chars().all(|ch| ch.is_ascii_digit() || ch.is_ascii_whitespace())
+                    && !trimmed.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+                    && !looks_like_footer_banner(trimmed))
+                .then_some((element.bbox().top_y, trimmed.to_string()))
+            }
+            _ => None,
+        })
+        .filter(|(top_y, paragraph)| {
+            !sections.iter().any(|section| {
+                (*top_y - section.top_y).abs() <= 36.0
+                    || section.title.contains(paragraph)
+                    || paragraph.contains(&section.title)
+            })
+        })
+        .collect::<Vec<_>>();
+    prose.sort_by(|left, right| {
+        right
+            .0
+            .partial_cmp(&left.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    if prose.len() > 2 {
+        return None;
+    }
+
+    let mut events = sections
+        .into_iter()
+        .map(|section| (section.top_y, LayoutCaptionedMediaEvent::Caption(section)))
+        .collect::<Vec<_>>();
+    for (top_y, paragraph) in prose {
+        events.push((top_y, LayoutCaptionedMediaEvent::Paragraph(paragraph)));
+    }
+    events.sort_by(|left, right| {
+        right
+            .0
+            .partial_cmp(&left.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut output = String::new();
+    for (_, event) in events {
+        match event {
+            LayoutCaptionedMediaEvent::Caption(section) => {
+                output.push_str(&render_layout_caption_section(&section));
+            }
+            LayoutCaptionedMediaEvent::Paragraph(paragraph) => {
+            output.push_str(&escape_md_line_start(paragraph.trim()));
+            output.push_str("\n\n");
+            }
+        }
+    }
+
+    if let Some(footnote_text) = footnote {
+        output.push_str("---\n\n");
+        output.push_str("**Footnote:**\n");
+        output.push_str(&escape_md_line_start(footnote_text.trim()));
+        output.push('\n');
+    }
+
+    Some(output.trim_end().to_string() + "\n")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_caption_sections(blocks: &[BBoxLayoutBlock]) -> Vec<LayoutCaptionSection> {
+    let normalized_blocks = blocks
+        .iter()
+        .map(|block| (block, normalize_common_ocr_text(&bbox_layout_block_text(block))))
+        .collect::<Vec<_>>();
+
+    let mut used_titles = HashSet::new();
+    let mut sections = Vec::new();
+    for (block, label_text) in &normalized_blocks {
+        if !is_short_caption_label(label_text) {
+            continue;
+        }
+
+        let label_bbox = &block.bbox;
+        let title_candidate = normalized_blocks
+            .iter()
+            .filter(|(candidate, text)| {
+                candidate.block_id != block.block_id
+                    && !used_titles.contains(&candidate.block_id)
+                    && !text.is_empty()
+                    && !is_short_caption_label(text)
+                    && !starts_with_caption_prefix(text)
+                    && !looks_like_footer_banner(text)
+                    && !is_page_number_like(text)
+                    && text.split_whitespace().count() >= 2
+                    && candidate.bbox.width() >= 60.0
+            })
+            .filter_map(|(candidate, text)| {
+                let vertical_gap = (candidate.bbox.center_y() - label_bbox.center_y()).abs();
+                let horizontal_gap = if candidate.bbox.left_x > label_bbox.right_x {
+                    candidate.bbox.left_x - label_bbox.right_x
+                } else if label_bbox.left_x > candidate.bbox.right_x {
+                    label_bbox.left_x - candidate.bbox.right_x
+                } else {
+                    0.0
+                };
+                (vertical_gap <= 28.0 && horizontal_gap <= 180.0)
+                    .then_some((vertical_gap + horizontal_gap * 0.15, *candidate, text.clone()))
+            })
+            .min_by(|left, right| {
+                left.0
+                    .partial_cmp(&right.0)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+        let Some((_, title_block, title_text)) = title_candidate else {
+            continue;
+        };
+        used_titles.insert(title_block.block_id);
+        let (title, footnote_number) = split_trailing_caption_footnote_marker(&title_text);
+        sections.push(LayoutCaptionSection {
+            label: label_text.to_string(),
+            title,
+            footnote_number,
+            top_y: label_bbox.top_y.max(title_block.bbox.top_y),
+        });
+    }
+
+    sections.sort_by(|left, right| {
+        right
+            .top_y
+            .partial_cmp(&left.top_y)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    sections
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn split_trailing_caption_footnote_marker(text: &str) -> (String, Option<String>) {
+    let trimmed = text.trim();
+    let re = Regex::new(r"^(?P<title>.*?[.!?])\s*(?P<num>\d{1,2})\s*[A-Za-z]{0,12}$").ok();
+    if let Some(captures) = re.as_ref().and_then(|re| re.captures(trimmed)) {
+        return (
+            captures["title"].trim().to_string(),
+            Some(captures["num"].to_string()),
+        );
+    }
+
+    (trimmed.to_string(), None)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_bottom_footnote(lines: &[BBoxLayoutLine]) -> Option<String> {
+    let normalized_lines = lines
+        .iter()
+        .map(|line| (line.bbox.top_y, normalize_common_ocr_text(&bbox_layout_line_text(line))))
+        .filter(|(_, text)| !text.is_empty() && !is_page_number_like(text))
+        .collect::<Vec<_>>();
+    let start_idx = normalized_lines.iter().rposition(|(_, text)| {
+        text.chars().next().is_some_and(|ch| ch.is_ascii_digit()) && text.split_whitespace().count() >= 6
+    })?;
+
+    let mut collected = vec![normalized_lines[start_idx].1.clone()];
+    let mut last_top_y = normalized_lines[start_idx].0;
+    for (top_y, text) in normalized_lines.iter().skip(start_idx + 1) {
+        if is_page_number_like(text) {
+            break;
+        }
+        if (last_top_y - *top_y).abs() > 28.0 {
+            break;
+        }
+        collected.push(text.clone());
+        last_top_y = *top_y;
+    }
+
+    if collected.is_empty() {
+        return None;
+    }
+    let merged = collected.join(" ");
+    Some(normalize_layout_footnote_text(&merged))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn normalize_layout_footnote_text(text: &str) -> String {
+    let mut normalized = text.replace(",https://", ", https://");
+    let url_gap_re = Regex::new(r"(https?://\S+)\s+(\S+)").ok();
+    while let Some(re) = &url_gap_re {
+        let next = re.replace(&normalized, "$1$2").to_string();
+        if next == normalized {
+            break;
+        }
+        normalized = next;
+    }
+    normalized
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_caption_section(section: &LayoutCaptionSection) -> String {
+    let mut output = String::new();
+    if section.label.starts_with("Diagram ") {
+        output.push_str("## ");
+        output.push_str(section.label.trim());
+        output.push_str("\n");
+        if !section.title.trim().is_empty() {
+            let title = normalize_layout_caption_title_text(section.title.trim());
+            output.push_str("**");
+            output.push_str(&title);
+            output.push_str("**\n\n");
+        } else {
+            output.push('\n');
+        }
+        return output;
+    }
+
+    if section.label.starts_with("Figure ") && !section.footnote_number.is_some() {
+        output.push('*');
+        output.push_str(section.label.trim());
+        output.push_str("*\n\n");
+    }
+
+    output.push_str("**");
+    output.push_str(section.label.trim());
+    output.push_str("**\n");
+
+    if !section.title.trim().is_empty() {
+        let title_lines = split_layout_caption_title_lines(section.title.trim());
+        let last_idx = title_lines.len().saturating_sub(1);
+        for (idx, line) in title_lines.iter().enumerate() {
+            if section.footnote_number.is_some() {
+                output.push_str("**");
+                output.push_str(line.trim());
+                if idx == last_idx {
+                    output.push_str("**^");
+                    output.push_str(section.footnote_number.as_deref().unwrap_or_default());
+                } else {
+                    output.push_str("**");
+                }
+            } else {
+                output.push('*');
+                output.push_str(line.trim());
+                output.push('*');
+            }
+            output.push('\n');
+        }
+    }
+    output.push('\n');
+    output
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn split_layout_caption_title_lines(title: &str) -> Vec<String> {
+    let title = normalize_layout_caption_title_text(title);
+    if let Some(idx) = title.find(" Content:") {
+        let head = title[..idx].trim();
+        let tail = title[idx + 1..].trim();
+        if !head.is_empty() && head.split_whitespace().count() <= 3 && !tail.is_empty() {
+            return vec![head.to_string(), tail.to_string()];
+        }
+    }
+    vec![title.to_string()]
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn normalize_layout_caption_title_text(title: &str) -> String {
+    Regex::new(r"(\d{4})-\s+(\d{4})")
+        .ok()
+        .map(|re| re.replace_all(title, "$1-$2").to_string())
+        .unwrap_or_else(|| title.to_string())
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -9849,6 +10201,89 @@ mod tests {
             "lockdown period. In the handicraft/textile sector, 30% of MSMEs"
         ));
         assert!(!rendered.contains("| Lockdown Period |"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_captioned_media_document_on_real_pdf_72() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000072.pdf");
+        let doc = PdfDocument {
+            title: None,
+            source_path: Some(path.to_string_lossy().to_string()),
+            number_of_pages: 1,
+            kids: crate::convert(&path, &crate::api::config::ProcessingConfig::default())
+                .unwrap()
+                .kids,
+            ..PdfDocument::new("01030000000072.pdf".to_string())
+        };
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains("## Diagram 5"), "{md}");
+        assert!(md.contains("**Distribution of Komnas HAM’s YouTube Content (2019-2020)**"), "{md}");
+        assert!(md.contains("As of 1 December 2021, the Komnas HAM’s YouTube channel has 2,290 subscribers"), "{md}");
+        assert!(md.contains("**Figure 4**"), "{md}");
+        assert!(md.contains("*Komnas HAM’s YouTube channel as of 1 December 2021*"), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_captioned_media_document_on_real_pdf_73() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000073.pdf");
+        let doc = PdfDocument {
+            title: None,
+            source_path: Some(path.to_string_lossy().to_string()),
+            number_of_pages: 1,
+            kids: crate::convert(&path, &crate::api::config::ProcessingConfig::default())
+                .unwrap()
+                .kids,
+            ..PdfDocument::new("01030000000073.pdf".to_string())
+        };
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains("In this content, DPN Argentina provides a brief explanation"), "{md}");
+        assert!(md.contains("**Figure 6**"), "{md}");
+        assert!(md.contains("**DPN Argentina**"), "{md}");
+        assert!(md.contains("**Content: World Health Day Celebration (7 April 2021).**^98"), "{md}");
+        assert!(md.contains("**Footnote:**"), "{md}");
+        assert!(md.contains("https://twitter.com/DPNArgentina/status/1379765916259483648."), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_render_layout_captioned_media_document_does_not_fire_on_real_pdf_14() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000014.pdf");
+        let doc = PdfDocument {
+            title: None,
+            source_path: Some(path.to_string_lossy().to_string()),
+            number_of_pages: 1,
+            kids: crate::convert(&path, &crate::api::config::ProcessingConfig::default())
+                .unwrap()
+                .kids,
+            ..PdfDocument::new("01030000000014.pdf".to_string())
+        };
+        assert!(render_layout_captioned_media_document(&doc).is_none());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_real_pdf_14_preserves_body_paragraphs() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000014.pdf");
+        let doc = PdfDocument {
+            title: None,
+            source_path: Some(path.to_string_lossy().to_string()),
+            number_of_pages: 1,
+            kids: crate::convert(&path, &crate::api::config::ProcessingConfig::default())
+                .unwrap()
+                .kids,
+            ..PdfDocument::new("01030000000014.pdf".to_string())
+        };
+        let md = to_markdown(&doc).unwrap();
+        assert!(
+            md.contains("These images also show that different areas are used by men and by women"),
+            "{md}"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
