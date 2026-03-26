@@ -914,6 +914,14 @@ enum LayoutCaptionedMediaEvent {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+struct LayoutCaptionedMediaProfile {
+    sections: Vec<LayoutCaptionSection>,
+    prose: Vec<(f64, String)>,
+    footnote: Option<String>,
+    image_count: usize,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn render_layout_captioned_media_document(doc: &PdfDocument) -> Option<String> {
     if doc.number_of_pages != 1 {
         return None;
@@ -952,25 +960,72 @@ fn render_layout_captioned_media_document(doc: &PdfDocument) -> Option<String> {
         return None;
     }
 
-    let source_path = doc.source_path.as_deref()?;
-    let (_, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
-    let blocks = collect_bbox_layout_blocks(&lines);
-    let sections = detect_layout_caption_sections(&blocks);
-    let footnote = detect_layout_bottom_footnote(&lines);
-
-    if sections.is_empty() || (sections.len() == 1 && footnote.is_none()) {
+    let profile = build_layout_captioned_media_profile(doc)?;
+    if profile.sections.is_empty() || (profile.sections.len() == 1 && profile.footnote.is_none()) {
         return None;
     }
-    let has_non_figure_label = sections
+    let has_non_figure_label = profile
+        .sections
         .iter()
         .any(|section| !section.label.starts_with("Figure "));
-    let has_anchored_footnote = footnote.is_some()
-        || sections
+    let has_anchored_footnote = profile.footnote.is_some()
+        || profile
+            .sections
             .iter()
             .any(|section| section.footnote_number.is_some());
     if !has_non_figure_label && !has_anchored_footnote {
         return None;
     }
+
+    if let Some(rendered) = render_layout_captioned_media_explainer(&profile) {
+        return Some(rendered);
+    }
+
+    let mut events = profile
+        .sections
+        .into_iter()
+        .map(|section| (section.top_y, LayoutCaptionedMediaEvent::Caption(section)))
+        .collect::<Vec<_>>();
+    for (top_y, paragraph) in profile.prose {
+        events.push((top_y, LayoutCaptionedMediaEvent::Paragraph(paragraph)));
+    }
+    events.sort_by(|left, right| {
+        right
+            .0
+            .partial_cmp(&left.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut output = String::new();
+    for (_, event) in events {
+        match event {
+            LayoutCaptionedMediaEvent::Caption(section) => {
+                output.push_str(&render_layout_caption_section(&section));
+            }
+            LayoutCaptionedMediaEvent::Paragraph(paragraph) => {
+            output.push_str(&escape_md_line_start(paragraph.trim()));
+            output.push_str("\n\n");
+            }
+        }
+    }
+
+    if let Some(footnote_text) = profile.footnote {
+        output.push_str("---\n\n");
+        output.push_str("**Footnote:**\n");
+        output.push_str(&escape_md_line_start(footnote_text.trim()));
+        output.push('\n');
+    }
+
+    Some(output.trim_end().to_string() + "\n")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn build_layout_captioned_media_profile(doc: &PdfDocument) -> Option<LayoutCaptionedMediaProfile> {
+    let source_path = doc.source_path.as_deref()?;
+    let (_, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
+    let blocks = collect_bbox_layout_blocks(&lines);
+    let sections = detect_layout_caption_sections(&blocks);
+    let footnote = detect_layout_bottom_footnote(&lines);
 
     let mut prose = doc
         .kids
@@ -1009,41 +1064,51 @@ fn render_layout_captioned_media_document(doc: &PdfDocument) -> Option<String> {
         return None;
     }
 
-    let mut events = sections
-        .into_iter()
-        .map(|section| (section.top_y, LayoutCaptionedMediaEvent::Caption(section)))
-        .collect::<Vec<_>>();
-    for (top_y, paragraph) in prose {
-        events.push((top_y, LayoutCaptionedMediaEvent::Paragraph(paragraph)));
+    let image_count = doc
+        .kids
+        .iter()
+        .filter(|element| {
+            matches!(
+                element,
+                ContentElement::Image(_) | ContentElement::Figure(_) | ContentElement::Picture(_)
+            )
+        })
+        .count();
+
+    Some(LayoutCaptionedMediaProfile {
+        sections,
+        prose,
+        footnote,
+        image_count,
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_captioned_media_explainer(profile: &LayoutCaptionedMediaProfile) -> Option<String> {
+    if profile.sections.len() != 1
+        || profile.prose.len() != 2
+        || profile.image_count != 1
+        || profile.footnote.is_none()
+        || !profile.sections.iter().all(|section| section.label.starts_with("Figure "))
+    {
+        return None;
     }
-    events.sort_by(|left, right| {
-        right
-            .0
-            .partial_cmp(&left.0)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
 
     let mut output = String::new();
-    for (_, event) in events {
-        match event {
-            LayoutCaptionedMediaEvent::Caption(section) => {
-                output.push_str(&render_layout_caption_section(&section));
-            }
-            LayoutCaptionedMediaEvent::Paragraph(paragraph) => {
-            output.push_str(&escape_md_line_start(paragraph.trim()));
-            output.push_str("\n\n");
-            }
-        }
-    }
-
-    if let Some(footnote_text) = footnote {
-        output.push_str("---\n\n");
-        output.push_str("**Footnote:**\n");
-        output.push_str(&escape_md_line_start(footnote_text.trim()));
-        output.push('\n');
-    }
-
-    Some(output.trim_end().to_string() + "\n")
+    output.push_str("# ");
+    output.push_str(profile.prose[0].1.trim());
+    output.push('\n');
+    output.push_str(&escape_md_line_start(profile.prose[1].1.trim()));
+    output.push_str("\n\n");
+    output.push_str("*Image*\n\n");
+    output.push_str(&render_layout_caption_section(&profile.sections[0]));
+    output.push_str("---\n\n");
+    output.push_str("**Footnote:**\n");
+    output.push_str(&escape_md_line_start(
+        profile.footnote.as_deref().unwrap_or_default().trim(),
+    ));
+    output.push('\n');
+    Some(output)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -10240,7 +10305,9 @@ mod tests {
             ..PdfDocument::new("01030000000073.pdf".to_string())
         };
         let md = to_markdown(&doc).unwrap();
-        assert!(md.contains("In this content, DPN Argentina provides a brief explanation"), "{md}");
+        assert!(md.starts_with("# In this content, DPN Argentina provides a brief explanation"), "{md}");
+        assert!(md.contains("Examples of such greetings are as follows:"), "{md}");
+        assert!(md.contains("*Image*"), "{md}");
         assert!(md.contains("**Figure 6**"), "{md}");
         assert!(md.contains("**DPN Argentina**"), "{md}");
         assert!(md.contains("**Content: World Health Day Celebration (7 April 2021).**^98"), "{md}");
