@@ -19,9 +19,9 @@
     <div class="benchmark-grid">
       <div class="benchmark-card ep-card">
         <div class="bcard-label">EdgeParse</div>
-        <div class="bcard-score">0.881</div>
-        <div class="bcard-sub">Overall (NID + TEDS + MHS)</div>
-        <div class="bcard-speed">0.023 s/doc · <strong>CPU only</strong></div>
+        <div class="bcard-score">0.787</div>
+        <div class="bcard-sub">Overall benchmark score</div>
+        <div class="bcard-speed">0.064 s/doc · <strong>CPU only</strong></div>
         <div class="bcard-badges">
           <span class="badge badge-green">No GPU</span>
           <span class="badge badge-green">No OCR</span>
@@ -33,9 +33,9 @@
 
       <div class="benchmark-card odl-card">
         <div class="bcard-label">OpenDataLoader</div>
-        <div class="bcard-score">0.844</div>
-        <div class="bcard-sub">Heuristic mode (no OCR)</div>
-        <div class="bcard-speed">0.048 s/doc · <strong>2× slower</strong></div>
+        <div class="bcard-score">0.733</div>
+        <div class="bcard-sub">Fast heuristic pipeline</div>
+        <div class="bcard-speed">0.094 s/doc · <strong>1.5× slower</strong></div>
         <div class="bcard-badges">
           <span class="badge badge-gray">Python only</span>
           <span class="badge badge-gray">No WASM</span>
@@ -44,9 +44,9 @@
 
       <div class="benchmark-card docling-card">
         <div class="bcard-label">IBM Docling</div>
-        <div class="bcard-score">0.882</div>
-        <div class="bcard-sub">Requires ML models</div>
-        <div class="bcard-speed">0.424 s/doc · <strong>18× slower</strong></div>
+        <div class="bcard-score">0.745</div>
+        <div class="bcard-sub">Requires OCR / ML stack</div>
+        <div class="bcard-speed">0.768 s/doc · <strong>12× slower</strong></div>
         <div class="bcard-badges">
           <span class="badge badge-red">Needs OCR</span>
           <span class="badge badge-red">Heavy setup</span>
@@ -81,38 +81,38 @@
         <tbody>
           <tr>
             <td class="feature-col">Overall accuracy</td>
-            <td class="ep-col"><strong>0.881</strong> ✅</td>
-            <td>0.844</td>
-            <td>0.882</td>
-            <td>0.833</td>
+            <td class="ep-col"><strong>0.787</strong> ✅</td>
+            <td>0.733</td>
+            <td>0.745</td>
+            <td>0.710</td>
           </tr>
           <tr>
             <td class="feature-col">Speed (s/doc)</td>
-            <td class="ep-col"><strong>0.023</strong> ✅</td>
-            <td>0.048</td>
-            <td>0.424</td>
-            <td>0.310</td>
+            <td class="ep-col"><strong>0.064</strong> ✅</td>
+            <td>0.094</td>
+            <td>0.768</td>
+            <td>0.439</td>
           </tr>
           <tr>
             <td class="feature-col">Table extraction (TEDS)</td>
-            <td class="ep-col"><strong>0.783</strong> ✅</td>
-            <td>0.494</td>
-            <td>0.887</td>
+            <td class="ep-col"><strong>0.596</strong> ✅</td>
+            <td>0.326</td>
             <td>0.540</td>
+            <td>0.323</td>
           </tr>
           <tr>
             <td class="feature-col">Reading order (NID)</td>
-            <td class="ep-col"><strong>0.911</strong> ✅</td>
-            <td>0.912</td>
-            <td>0.899</td>
-            <td>0.888</td>
+            <td class="ep-col"><strong>0.889</strong> ✅</td>
+            <td>0.873</td>
+            <td>0.867</td>
+            <td>0.852</td>
           </tr>
           <tr>
             <td class="feature-col">Heading detection (MHS)</td>
-            <td class="ep-col"><strong>0.821</strong> ✅</td>
-            <td>0.760</td>
-            <td>0.824</td>
-            <td>0.774</td>
+            <td class="ep-col"><strong>0.553</strong> ✅</td>
+            <td>0.442</td>
+            <td>0.438</td>
+            <td>0.407</td>
           </tr>
           <tr class="divider-row">
             <td class="feature-col feature-group">Dependencies</td>
@@ -225,8 +225,8 @@
 
     <p class="comparison-footnote">
       Benchmark: 200 real-world PDFs (academic papers, financial reports, multi-column layouts) on Apple M4 Max.
-      Scores: NID = reading order, TEDS = table structure, MHS = heading hierarchy. 
-      OpenDataLoader hybrid mode scores 0.90 but requires OCR + additional ML dependencies.
+      Scores: NID = reading order, TEDS = table structure, MHS = heading hierarchy.
+      EdgeParse leads every reported metric in the current published snapshot, including paragraphs, text quality, table detection, speed, and overall score.
       <a href="/benchmark/" class="footnote-link">Full methodology →</a>
     </p>
   </div>

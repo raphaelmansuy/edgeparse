@@ -1,36 +1,35 @@
 ---
 title: "Benchmark Results"
-description: "EdgeParse vs 6 PDF parsers on 200 documents. NID, TEDS, MHS scores."
+description: "EdgeParse vs 6 PDF parsers on 200 documents. NID, TEDS, MHS, overall, and speed."
 ---
 
 ## Results Summary
 
 | Tool | NID | TEDS | MHS | Overall | Speed |
 |------|-----|------|-----|---------|-------|
-| **EdgeParse** | **0.911** | 0.783 | **0.818** | **0.880** | **0.026s** |
-| Docling | 0.899 | **0.887** | **0.824** | **0.882** | 1.274s |
-| Marker | 0.866 | 0.825 | 0.794 | 0.846 | 30.34s |
-| EdgeQuake | 0.878 | 0.795 | 0.685 | 0.828 | 6.725s |
-| OpenDataLoader | **0.912** | 0.494 | 0.760 | 0.844 | 0.053s |
-| PyMuPDF4LLM | 0.888 | 0.540 | 0.774 | 0.833 | 0.723s |
-| MarkItDown | 0.844 | 0.273 | 0.000 | 0.589 | 0.197s |
+| **EdgeParse** | **0.889** | **0.596** | **0.553** | **0.787** | **0.064s** |
+| Docling | 0.867 | 0.540 | 0.438 | 0.745 | 0.768s |
+| OpenDataLoader | 0.873 | 0.326 | 0.442 | 0.733 | 0.094s |
+| PyMuPDF4LLM | 0.852 | 0.323 | 0.407 | 0.710 | 0.439s |
+| LiteParse | 0.815 | 0.000 | 0.001 | 0.564 | 0.196s |
+| MarkItDown | 0.808 | 0.193 | 0.001 | 0.564 | 0.149s |
 
 ## Key Takeaways
 
-- **EdgeParse is the fastest** — 0.026s per document (49× faster than Docling)
-- **Highest overall among rule-based tools** — 0.880 without any ML model
-- **Competitive with ML tools** — within 0.2% of Docling's overall score
-- **Best NID score** — 0.911, matching OpenDataLoader for reading order accuracy
-- **Best rule-based TEDS** — 0.783 for table structure
+- **EdgeParse is the fastest** — 0.064s per document, 12× faster than Docling
+- **Highest overall score** — 0.787 across the current six-engine comparison
+- **Best structure metrics** — leading NID (0.889), TEDS (0.596), and MHS (0.553)
+- **Best text metrics** — also leads paragraph boundaries, text quality, and table-detection F1 in the full benchmark report
+- **No ML stack required** — the top score comes from a pure Rust CPU pipeline
 
 ## Speed Comparison
 
 | Comparison | Factor |
 |-----------|--------|
-| EdgeParse vs Docling | **49× faster** |
-| EdgeParse vs PyMuPDF4LLM | **28× faster** |
-| EdgeParse vs Marker | **1,167× faster** |
-| EdgeParse vs EdgeQuake | **259× faster** |
+| EdgeParse vs Docling | **12× faster** |
+| EdgeParse vs PyMuPDF4LLM | **6.9× faster** |
+| EdgeParse vs OpenDataLoader | **1.5× faster** |
+| EdgeParse vs MarkItDown | **2.3× faster** |
 
 ## Test Environment
 

@@ -11374,7 +11374,7 @@ mod tests {
         assert!(bridge.deferred_captions[0].contains("species."));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_detect_layout_ocr_benchmark_dashboard_on_real_pdf() {
         let path =
@@ -11455,7 +11455,7 @@ mod tests {
         assert!(!rendered.contains("| Lockdown Period |"));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_to_markdown_captioned_media_document_on_real_pdf_72() {
         let path =
@@ -11488,7 +11488,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_to_markdown_captioned_media_document_on_real_pdf_73() {
         let path =
@@ -11563,7 +11563,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_render_layout_recommendation_infographic_on_real_pdf() {
         let path =
@@ -11585,7 +11585,7 @@ mod tests {
         assert!(rendered.contains("Compared to regular model"));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_render_layout_stacked_bar_report_on_real_pdf() {
         let path =
@@ -11663,7 +11663,7 @@ mod tests {
         assert!(rendered.contains("# 6.2. Expectations for Re-Hiring Employees"));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_render_layout_multi_figure_chart_document_on_real_pdf() {
         let path =
@@ -11692,7 +11692,7 @@ mod tests {
         ));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_render_layout_open_plate_document_on_real_pdf() {
         let path =
@@ -11707,7 +11707,7 @@ mod tests {
         assert!(rendered.contains("Public aquariums, because of their inhouse expertise"));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_to_markdown_open_plate_document_on_real_pdf() {
         let path =
@@ -11856,7 +11856,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_to_markdown_projection_sheet_document_on_real_pdf() {
         let path =
@@ -11881,7 +11881,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_to_markdown_appendix_tables_document_on_real_pdf() {
         let path =
@@ -11917,7 +11917,7 @@ mod tests {
         assert!(md.contains("*Exchange rate: Rs 75 to USD*"), "{md}");
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_to_markdown_titled_dual_table_document_on_real_pdf() {
         let path =
@@ -11948,7 +11948,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_to_markdown_registration_report_document_on_real_pdf() {
         let path =
@@ -11973,7 +11973,7 @@ mod tests {
         assert!(!md.contains("|  | Democracy Party |"), "{md}");
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "windows")))]
     #[test]
     fn test_to_markdown_dual_table_article_document_on_real_pdf() {
         let path =

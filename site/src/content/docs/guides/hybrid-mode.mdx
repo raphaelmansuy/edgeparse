@@ -27,7 +27,7 @@ result = edgeparse.convert("document.pdf",
 
 | Scenario | Recommendation |
 |----------|---------------|
-| Speed-critical production | Standard mode (0.026s/doc) |
+| Speed-critical production | Standard mode (0.064s/doc) |
 | Maximum table accuracy | Hybrid mode with docling-fast |
 | No GPU available | Standard mode |
 | Complex academic papers | Hybrid mode |
@@ -40,6 +40,6 @@ result = edgeparse.convert("document.pdf",
 
 ## Trade-offs
 
-- **Speed**: Hybrid mode is slower (~1s/doc vs 0.026s/doc)
+- **Speed**: Hybrid mode is slower (~1s/doc vs 0.064s/doc)
 - **Accuracy**: Higher TEDS score for complex tables
 - **Dependencies**: Requires the backend to be installed
