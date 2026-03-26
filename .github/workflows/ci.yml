@@ -11,10 +11,23 @@ jobs:
     name: Rust — build & test
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-14, windows-latest]
     steps:
       - uses: actions/checkout@v4
+      - name: Install Poppler (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+      - name: Install Poppler (macOS)
+        if: runner.os == 'macOS'
+        run: brew install poppler
+      - name: Install Poppler (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install poppler -y
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build
