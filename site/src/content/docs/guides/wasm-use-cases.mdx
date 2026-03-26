@@ -10,7 +10,7 @@ EdgeParse WASM runs the full Rust PDF extraction engine directly in the browser.
 Extract structured chunks from PDFs in the browser, then send only the text to your embedding API. The full PDF never leaves the user's device.
 
 ```typescript
-import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from 'edgeparse-wasm';
 
 await init();
 
@@ -47,7 +47,7 @@ async function extractChunksForRAG(file: File) {
 Build a web app where users drag-and-drop PDFs and instantly see structured output. No file uploads, no server queue, no processing delays.
 
 ```typescript
-import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from 'edgeparse-wasm';
 
 await init();
 
@@ -136,7 +136,7 @@ Build a Chrome or Firefox extension that adds "Extract as Markdown" or "Copy as 
 
 ```typescript
 // content-script.ts
-import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from 'edgeparse-wasm';
 
 chrome.runtime.onMessage.addListener(async (msg) => {
   if (msg.action !== 'extract-pdf') return;
@@ -158,7 +158,7 @@ chrome.runtime.onMessage.addListener(async (msg) => {
 Extract tables from PDFs and convert them to CSV or array data for spreadsheet applications or data analysis tools.
 
 ```typescript
-import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from 'edgeparse-wasm';
 
 await init();
 
@@ -184,7 +184,7 @@ Add PDF extraction as a feature in your web application without provisioning add
 
 ```typescript
 // In your React/Vue/Svelte component
-import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from 'edgeparse-wasm';
 
 let wasmReady = false;
 

@@ -5,14 +5,14 @@ description: "API reference for the EdgeParse WebAssembly SDK — convert(), con
 
 ## Package
 
-**npm:** `@edgeparse/edgeparse-wasm` · **Source:** [`crates/edgeparse-wasm/`](https://github.com/raphaelmansuy/edgeparse/tree/main/crates/edgeparse-wasm)
+**npm:** `edgeparse-wasm` · **Source:** [`crates/edgeparse-wasm/`](https://github.com/raphaelmansuy/edgeparse/tree/main/crates/edgeparse-wasm)
 
 ## Initialization
 
 Before calling any conversion function, initialize the WASM module:
 
 ```typescript
-import init from '@edgeparse/edgeparse-wasm';
+import init from 'edgeparse-wasm';
 
 // Async initialization — fetches and compiles the .wasm binary
 await init();
@@ -63,7 +63,7 @@ Each element in `kids` is an externally-tagged enum object like `{ "Paragraph": 
 ### Example
 
 ```typescript
-import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from 'edgeparse-wasm';
 
 await init();
 
@@ -112,7 +112,7 @@ A string in the requested format:
 ### Example
 
 ```typescript
-import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from 'edgeparse-wasm';
 
 await init();
 
@@ -135,8 +135,8 @@ function version(): string;
 ### Example
 
 ```typescript
-import { version } from '@edgeparse/edgeparse-wasm';
-console.log(version()); // "0.1.1"
+import { version } from 'edgeparse-wasm';
+console.log(version()); // "0.2.1"
 ```
 
 ## Error handling

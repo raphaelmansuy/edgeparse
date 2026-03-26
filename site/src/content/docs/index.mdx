@@ -113,7 +113,7 @@ edgeparse invoice.pdf --format json
 
 # Batch convert entire directory
 edgeparse docs/*.pdf --format markdown --output-dir results/` },
-    { label: 'WebAssembly', lang: 'typescript', code: `import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+    { label: 'WebAssembly', lang: 'typescript', code: `import init, { convert_to_string } from 'edgeparse-wasm';
 
 // Load WASM binary (once)
 await init();

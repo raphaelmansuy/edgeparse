@@ -49,7 +49,7 @@ The WASM package exports three functions:
 Parses PDF bytes and returns a structured JavaScript object (the full `PdfDocument` model with pages, elements, bounding boxes).
 
 ```typescript
-import init, { convert } from '@edgeparse/edgeparse-wasm';
+import init, { convert } from 'edgeparse-wasm';
 
 await init(); // Load WASM binary (once)
 
@@ -65,7 +65,7 @@ const doc = convert(bytes, 'json');
 Parses PDF bytes and returns a formatted string output.
 
 ```typescript
-import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from 'edgeparse-wasm';
 
 await init();
 
@@ -89,7 +89,7 @@ const json = convert_to_string(bytes, 'json');
 Returns the EdgeParse version string.
 
 ```typescript
-import { version } from '@edgeparse/edgeparse-wasm';
+import { version } from 'edgeparse-wasm';
 console.log(version()); // "0.2.1"
 ```
 
@@ -215,7 +215,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   optimizeDeps: {
-    exclude: ['@edgeparse/edgeparse-wasm'],
+    exclude: ['edgeparse-wasm'],
   },
   build: {
     target: 'esnext',

@@ -73,7 +73,7 @@ Returns the edgeparse engine version string.
 
 ```typescript
 import { version } from 'edgeparse';
-console.log(version()); // e.g. "0.1.1"
+console.log(version()); // e.g. "0.2.1"
 ```
 
 ## CLI

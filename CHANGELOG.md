@@ -10,7 +10,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.2.1] — 2026-03-26
 
 ### Added
-- Dedicated `release-wasm.yml` workflow to publish `@edgeparse/edgeparse-wasm` on tagged releases and attach the npm tarball to the GitHub Release
+- Dedicated `release-wasm.yml` workflow to publish `edgeparse-wasm` on tagged releases and attach the npm tarball to the GitHub Release
 - CI coverage for the WASM target and Docker image smoke builds so every shipped artifact is validated before release
 - Release-channel documentation in the README covering crates, SDKs, CLI archives, Homebrew, and container images
 

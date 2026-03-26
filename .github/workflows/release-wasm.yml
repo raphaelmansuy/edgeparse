@@ -58,21 +58,31 @@ jobs:
           const version = refName.replace(/^v/, '');
           const path = 'crates/edgeparse-wasm/pkg/package.json';
           const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-          pkg.name = '@edgeparse/edgeparse-wasm';
+          pkg.name = 'edgeparse-wasm';
           pkg.version = version;
           pkg.description = 'EdgeParse PDF parser — WebAssembly build for browsers';
+          pkg.homepage = 'https://edgeparse.io/docs/api/wasm/';
           pkg.repository = {
             type: 'git',
-            url: 'https://github.com/raphaelmansuy/edgeparse'
+            url: 'git+https://github.com/raphaelmansuy/edgeparse.git',
+            directory: 'crates/edgeparse-wasm'
           };
+          pkg.publishConfig = { access: 'public' };
           pkg.files = [
             'edgeparse_wasm_bg.wasm',
             'edgeparse_wasm.js',
-            'edgeparse_wasm.d.ts'
+            'edgeparse_wasm.d.ts',
+            'README.md',
+            'LICENSE'
           ];
           fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
           console.log('Version synced to: ' + version);
           "
+
+      - name: Stage package docs
+        run: |
+          cp README.md crates/edgeparse-wasm/pkg/README.md
+          cp LICENSE crates/edgeparse-wasm/pkg/LICENSE
 
       - name: Pack npm tarball
         run: |
@@ -92,7 +102,7 @@ jobs:
           OUTPUT=$(npm publish --access public 2>&1) && echo "$OUTPUT" || {
             echo "$OUTPUT"
             if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
-              echo "@edgeparse/edgeparse-wasm already published at this version — skipping."
+              echo "edgeparse-wasm already published at this version — skipping."
             else
               exit 1
             fi

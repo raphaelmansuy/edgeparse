@@ -21,7 +21,7 @@ vX.Y.Z tag
   ├─ release-rust.yml    -> crates.io         (pdf-cos, edgeparse-core, edgeparse-cli)
   ├─ release-python.yml  -> PyPI              (edgeparse wheels + sdist)
   ├─ release-node.yml    -> npm               (edgeparse + 5 platform packages)
-  ├─ release-wasm.yml    -> npm               (@edgeparse/edgeparse-wasm)
+  ├─ release-wasm.yml    -> npm               (edgeparse-wasm)
   ├─ release-cli.yml     -> GitHub Releases   (5 CLI archives) + Homebrew tap
   └─ release-docker.yml  -> GHCR + Docker Hub (linux/amd64, linux/arm64)
 ```
@@ -51,7 +51,7 @@ Shared verification happens in `ci.yml` on pushes and pull requests:
 | npm | `edgeparse-linux-arm64-gnu` | https://www.npmjs.com/package/edgeparse-linux-arm64-gnu |
 | npm | `edgeparse-linux-x64-gnu` | https://www.npmjs.com/package/edgeparse-linux-x64-gnu |
 | npm | `edgeparse-win32-x64-msvc` | https://www.npmjs.com/package/edgeparse-win32-x64-msvc |
-| npm | `@edgeparse/edgeparse-wasm` | https://www.npmjs.com/package/@edgeparse/edgeparse-wasm |
+| npm | `edgeparse-wasm` | https://www.npmjs.com/package/edgeparse-wasm |
 | GitHub Releases | CLI archives + WASM npm tarball | https://github.com/raphaelmansuy/edgeparse/releases |
 | Homebrew | `raphaelmansuy/edgeparse` tap | https://github.com/raphaelmansuy/homebrew-edgeparse |
 | GHCR | `ghcr.io/raphaelmansuy/edgeparse` | https://github.com/raphaelmansuy/edgeparse/pkgs/container/edgeparse |
@@ -104,7 +104,7 @@ Each GitHub Release includes:
 
 - crates.io: create a token with `publish-new` and `publish-update`
 - npm: use a Classic Automation token so the main package, platform packages,
-  and `@edgeparse/edgeparse-wasm` can all publish from CI
+  and `edgeparse-wasm` can all publish from CI
 - PyPI: configure Trusted Publishing for `release-python.yml` in environment
   `pypi`
 - Docker Hub: create a read/write access token for account `rmansuy`
@@ -235,7 +235,7 @@ fast on mismatches.
 
 - Builds the browser-targeted WASM package with `wasm-pack`
 - Syncs the npm package version from the tag
-- Publishes `@edgeparse/edgeparse-wasm`
+- Publishes `edgeparse-wasm`
 - Uploads the generated npm tarball to the GitHub Release
 
 ### `release-cli.yml`

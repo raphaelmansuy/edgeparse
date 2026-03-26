@@ -92,7 +92,7 @@ Tagged releases publish every supported distribution target through GitHub Actio
 | Rust crates | `pdf-cos`, `edgeparse-core`, `edgeparse-cli` | `cargo install edgeparse-cli` |
 | Python SDK | `edgeparse` wheels + sdist | `pip install edgeparse` |
 | Node.js SDK | `edgeparse` + 5 platform addons | `npm install edgeparse` |
-| WebAssembly SDK | `@edgeparse/edgeparse-wasm` | `npm install @edgeparse/edgeparse-wasm` |
+| WebAssembly SDK | `edgeparse-wasm` | `npm install edgeparse-wasm` |
 | CLI binaries | GitHub Release archives for macOS, Linux, Windows | [GitHub Releases](https://github.com/raphaelmansuy/edgeparse/releases) |
 | Homebrew | `raphaelmansuy/edgeparse` tap | `brew tap raphaelmansuy/edgeparse && brew install edgeparse` |
 | Containers | GHCR + Docker Hub multi-arch images | `docker pull ghcr.io/raphaelmansuy/edgeparse:0.2.1` |
@@ -399,7 +399,7 @@ EdgeParse compiles to WebAssembly — **client-side PDF extraction in any modern
 ### Quick start
 
 ```typescript
-import init, { convert_to_string } from '@edgeparse/edgeparse-wasm';
+import init, { convert_to_string } from 'edgeparse-wasm';
 
 await init();  // load WASM binary once
 
