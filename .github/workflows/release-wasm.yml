@@ -98,6 +98,18 @@ jobs:
         run: |
           echo "::warning::WASM npm publication is disabled. The package tarball will still be uploaded to the GitHub Release."
 
+      - name: Ensure GitHub Release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          TAG_NAME="${INPUT_TAG_NAME:-$GITHUB_REF_NAME}"
+          gh release view "$TAG_NAME" --repo "${{ github.repository }}" \
+          || gh release create "$TAG_NAME" \
+               --repo "${{ github.repository }}" \
+               --title "$TAG_NAME" \
+               --generate-notes
+
       - name: Upload npm tarball to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
