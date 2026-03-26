@@ -874,6 +874,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). In short:
 4. Open a PR
 
 ---
+## Star History
+
+<a href="https://www.star-history.com/?repos=raphaelmansuy%2Fedgeparse&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=raphaelmansuy/edgeparse&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=raphaelmansuy/edgeparse&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=raphaelmansuy/edgeparse&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## License
 
