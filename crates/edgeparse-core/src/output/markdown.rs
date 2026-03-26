@@ -60,6 +60,10 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     if let Some(rendered) = render_layout_projection_sheet_document(doc) {
         return Ok(rendered);
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_appendix_tables_document(doc) {
+        return Ok(rendered);
+    }
     if let Some(rendered) = render_top_table_plate_document(doc) {
         return Ok(rendered);
     }
@@ -297,6 +301,10 @@ fn render_markdown_core(doc: &PdfDocument) -> String {
                 };
                 let trimmed = text.trim();
                 if trimmed.is_empty() || looks_like_margin_page_number(doc, element, trimmed) {
+                    i += 1;
+                    continue;
+                }
+                if should_skip_leading_figure_carryover(doc, i, trimmed) {
                     i += 1;
                     continue;
                 }
@@ -4066,6 +4074,19 @@ struct LayoutProjectionSheet {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+struct LayoutAppendixTableSection {
+    heading: String,
+    rows: Vec<Vec<String>>,
+    notes: Vec<String>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutAppendixTablesDocument {
+    title: String,
+    sections: Vec<LayoutAppendixTableSection>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn detect_layout_projection_sheet(lines: &[String]) -> Option<LayoutProjectionSheet> {
     let header_idx = lines.iter().position(|line| {
         split_layout_line_spans(line)
@@ -4175,6 +4196,172 @@ fn detect_layout_projection_sheet(lines: &[String]) -> Option<LayoutProjectionSh
         body,
         footer: lines[footer_idx].trim().to_string(),
     })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_appendix_tables_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let source_path = doc.source_path.as_deref()?;
+    let lines = read_pdftotext_layout_lines(Path::new(source_path))?;
+    let appendix = detect_layout_appendix_tables_document(&lines)?;
+
+    let mut output = String::new();
+    output.push_str("# ");
+    output.push_str(appendix.title.trim());
+    output.push_str("\n\n");
+
+    for section in appendix.sections {
+        output.push_str("## ");
+        output.push_str(section.heading.trim());
+        output.push_str("\n\n");
+        output.push_str(&render_pipe_rows(&section.rows));
+        for note in section.notes {
+            output.push('*');
+            output.push_str(&escape_md_line_start(note.trim()));
+            output.push_str("*\n");
+        }
+        output.push('\n');
+    }
+
+    Some(output.trim_end().to_string() + "\n")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_appendix_tables_document(lines: &[String]) -> Option<LayoutAppendixTablesDocument> {
+    let title_idx = lines
+        .iter()
+        .position(|line| normalize_heading_text(line.trim()) == "appendices")?;
+    let title = lines[title_idx].trim().to_string();
+
+    let caption_indices = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, line)| line.trim_start().starts_with("TABLE ").then_some(idx))
+        .collect::<Vec<_>>();
+    if caption_indices.len() < 2 {
+        return None;
+    }
+
+    let mut sections = Vec::new();
+    for (pos, caption_idx) in caption_indices.iter().enumerate() {
+        let next_caption_idx = caption_indices
+            .get(pos + 1)
+            .copied()
+            .unwrap_or(lines.len());
+
+        let mut heading_lines = vec![lines[*caption_idx].trim().to_string()];
+        let mut cursor = caption_idx + 1;
+        while cursor < next_caption_idx {
+            let trimmed = lines[cursor].trim();
+            if trimmed.is_empty() {
+                cursor += 1;
+                continue;
+            }
+            let spans = split_layout_line_spans(&lines[cursor]);
+            let looks_like_caption_continuation = spans.len() == 1
+                && spans[0].0 <= 4
+                && !trimmed.starts_with("Source")
+                && !trimmed.starts_with("Sources")
+                && !trimmed.starts_with("Exchange rate")
+                && !trimmed.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+                && trimmed
+                    .chars()
+                    .all(|ch| !ch.is_alphabetic() || ch.is_uppercase());
+            if !looks_like_caption_continuation {
+                break;
+            }
+            heading_lines.push(trimmed.to_string());
+            cursor += 1;
+        }
+
+        let data_start = (*caption_idx + 1..next_caption_idx).find(|idx| {
+            let trimmed = lines[*idx].trim();
+            !trimmed.is_empty()
+                && !trimmed.starts_with("Source")
+                && !trimmed.starts_with("Sources")
+                && !trimmed.starts_with("Exchange rate")
+                && split_layout_line_spans(&lines[*idx]).len() == 4
+        })?;
+
+        let note_start = (data_start..next_caption_idx).find(|idx| {
+            let trimmed = lines[*idx].trim();
+            trimmed.starts_with("Source")
+                || trimmed.starts_with("Sources")
+                || trimmed.starts_with("Exchange rate")
+        });
+        let data_end = note_start.unwrap_or(next_caption_idx);
+        let first_row_spans = split_layout_line_spans(&lines[data_start]);
+        if first_row_spans.len() != 4 {
+            return None;
+        }
+        let column_starts = first_row_spans.iter().map(|(start, _)| *start).collect::<Vec<_>>();
+
+        let mut header_cells = vec![String::new(); column_starts.len()];
+        for line in lines.iter().take(data_start).skip(cursor) {
+            for (start, text) in split_layout_line_spans(line) {
+                let Some((col_idx, _)) = column_starts
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, col_start)| start.abs_diff(**col_start))
+                else {
+                    continue;
+                };
+                append_cell_text(&mut header_cells[col_idx], &text);
+            }
+        }
+        if header_cells.iter().any(|cell| cell.trim().is_empty()) {
+            continue;
+        }
+
+        let mut rows = vec![header_cells];
+        for line in lines.iter().take(data_end).skip(data_start) {
+            let spans = split_layout_line_spans(line);
+            if spans.len() != 4 {
+                continue;
+            }
+            let mut row = vec![String::new(); column_starts.len()];
+            for (start, text) in spans {
+                let Some((col_idx, _)) = column_starts
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, col_start)| start.abs_diff(**col_start))
+                else {
+                    continue;
+                };
+                append_cell_text(&mut row[col_idx], &text);
+            }
+            if row.iter().all(|cell| !cell.trim().is_empty()) {
+                rows.push(row);
+            }
+        }
+        if rows.len() < 3 {
+            continue;
+        }
+
+        let notes = lines
+            .iter()
+            .take(next_caption_idx)
+            .skip(note_start.unwrap_or(next_caption_idx))
+            .map(|line| line.trim())
+            .filter(|line| {
+                !line.is_empty()
+                    && !line.chars().all(|ch| ch.is_ascii_digit())
+                    && !is_standalone_page_number(line)
+            })
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+
+        sections.push(LayoutAppendixTableSection {
+            heading: heading_lines.join(" "),
+            rows,
+            notes,
+        });
+    }
+
+    (sections.len() >= 2).then_some(LayoutAppendixTablesDocument { title, sections })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -5113,7 +5300,7 @@ fn render_element(out: &mut String, element: &ContentElement) {
 
                 if is_list_section_heading(&combined) {
                     if let Some(pending) = pending_item.take() {
-                        out.push_str(&format!("- {}\n", pending.trim()));
+                        push_rendered_list_item(out, pending.trim());
                     }
                     out.push_str(&format!("# {}\n\n", combined.trim_end_matches(':').trim()));
                     i += 1;
@@ -5163,12 +5350,12 @@ fn render_element(out: &mut String, element: &ContentElement) {
                 }
 
                 if let Some(pending) = pending_item.replace(current_item) {
-                    out.push_str(&format!("- {}\n", pending.trim()));
+                    push_rendered_list_item(out, pending.trim());
                 }
                 i += 1;
             }
             if let Some(pending) = pending_item.take() {
-                out.push_str(&format!("- {}\n", pending.trim()));
+                push_rendered_list_item(out, pending.trim());
             }
             out.push('\n');
         }
@@ -6009,12 +6196,22 @@ fn normalize_list_text(text: &str) -> String {
     trimmed.to_string()
 }
 
+fn push_rendered_list_item(out: &mut String, item: &str) {
+    if starts_with_enumerated_marker(item) {
+        out.push_str(item);
+        out.push('\n');
+    } else {
+        out.push_str(&format!("- {}\n", item));
+    }
+}
+
 fn should_merge_list_continuation(previous: &str, current: &str) -> bool {
     let trimmed = current.trim();
     if trimmed.is_empty()
         || looks_like_stray_list_page_number(trimmed)
         || is_list_section_heading(trimmed)
         || looks_like_numbered_section(trimmed)
+        || starts_with_enumerated_marker(trimmed)
     {
         return false;
     }
@@ -6911,6 +7108,10 @@ fn should_merge_paragraph_text(prev: &str, next: &str) -> bool {
         return false;
     }
 
+    if starts_with_enumerated_marker(next_trimmed) {
+        return false;
+    }
+
     if prev.ends_with('-')
         && prev.chars().rev().nth(1).is_some_and(|c| c.is_alphabetic())
         && next_trimmed.chars().next().is_some_and(char::is_lowercase)
@@ -6947,6 +7148,10 @@ fn should_merge_adjacent_semantic_paragraphs(prev: &str, next: &str) -> bool {
         return false;
     }
 
+    if starts_with_enumerated_marker(next_trimmed) {
+        return false;
+    }
+
     if prev.ends_with('-')
         && prev.chars().rev().nth(1).is_some_and(|c| c.is_alphabetic())
         && next_trimmed.chars().next().is_some_and(char::is_lowercase)
@@ -6955,6 +7160,130 @@ fn should_merge_adjacent_semantic_paragraphs(prev: &str, next: &str) -> bool {
     }
 
     next_trimmed.chars().next().is_some_and(char::is_lowercase)
+}
+
+fn starts_with_enumerated_marker(text: &str) -> bool {
+    let first_token = match text.trim_start().split_whitespace().next() {
+        Some(token) => token.trim_start_matches(['(', '[']),
+        None => return false,
+    };
+    if !first_token.ends_with(['.', ')', ':']) {
+        return false;
+    }
+
+    let marker = first_token.trim_end_matches(['.', ')', ':']);
+    if marker.is_empty() {
+        return false;
+    }
+
+    if marker.chars().all(|c| c.is_ascii_digit()) {
+        return true;
+    }
+
+    if marker.len() == 1 && marker.chars().all(|c| c.is_ascii_alphabetic()) {
+        return true;
+    }
+
+    let lower = marker.to_ascii_lowercase();
+    lower.len() <= 8 && lower.chars().all(|c| "ivxlcdm".contains(c))
+}
+
+fn should_skip_leading_figure_carryover(doc: &PdfDocument, idx: usize, text: &str) -> bool {
+    let trimmed = text.trim();
+    if !trimmed.starts_with("Figure ") || trimmed.split_whitespace().count() < 4 {
+        return false;
+    }
+
+    let element = &doc.kids[idx];
+    let Some(page) = element.page_number() else {
+        return false;
+    };
+
+    let mut page_top = f64::MIN;
+    for candidate in &doc.kids {
+        if candidate.page_number() == Some(page)
+            && matches!(
+                candidate,
+                ContentElement::Paragraph(_)
+                    | ContentElement::TextBlock(_)
+                    | ContentElement::TextLine(_)
+                    | ContentElement::Heading(_)
+                    | ContentElement::NumberHeading(_)
+                    | ContentElement::Caption(_)
+            )
+        {
+            page_top = page_top.max(candidate.bbox().top_y);
+        }
+    }
+    if !page_top.is_finite() || element.bbox().top_y < page_top - 72.0 {
+        return false;
+    }
+
+    for prior_idx in 0..idx {
+        let prior = &doc.kids[prior_idx];
+        let prior_text = extract_element_text(prior);
+        let prior_trimmed = prior_text.trim();
+        if prior_trimmed.is_empty()
+            || is_standalone_page_number(prior_trimmed)
+            || looks_like_footer_banner(prior_trimmed)
+        {
+            continue;
+        }
+        match prior {
+            ContentElement::Paragraph(_)
+            | ContentElement::TextBlock(_)
+            | ContentElement::TextLine(_) => {
+                if !starts_with_caption_prefix(prior_trimmed)
+                    && !looks_like_top_margin_running_header(doc, prior_idx, prior_trimmed)
+                {
+                    return false;
+                }
+            }
+            ContentElement::Heading(_) | ContentElement::NumberHeading(_) => {
+                if !should_skip_heading_text(prior_trimmed) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+
+    for lookahead_idx in idx + 1..doc.kids.len().min(idx + 8) {
+        let next = &doc.kids[lookahead_idx];
+        if next.page_number() != Some(page) {
+            break;
+        }
+        let next_text = extract_element_text(next);
+        let next_trimmed = next_text.trim();
+        if next_trimmed.is_empty() || is_standalone_page_number(next_trimmed) {
+            continue;
+        }
+
+        let is_numbered_heading = match next {
+            ContentElement::Heading(_) | ContentElement::NumberHeading(_) => {
+                looks_like_numbered_section(next_trimmed)
+                    || looks_like_keyword_numbered_section(next_trimmed)
+            }
+            ContentElement::Paragraph(_)
+            | ContentElement::TextBlock(_)
+            | ContentElement::TextLine(_) => {
+                should_render_paragraph_as_heading(doc, lookahead_idx, next_trimmed, doc.kids.get(lookahead_idx + 1))
+                    && (looks_like_numbered_section(next_trimmed)
+                        || looks_like_keyword_numbered_section(next_trimmed))
+            }
+            _ => false,
+        };
+
+        if is_numbered_heading {
+            return true;
+        }
+
+        if !starts_with_caption_prefix(next_trimmed) && next_trimmed.split_whitespace().count() >= 5 {
+            return false;
+        }
+    }
+
+    false
 }
 
 fn merge_paragraph_text(target: &mut String, next: &str) {
@@ -9744,6 +10073,31 @@ mod tests {
         assert!(md.contains("*298 | Ch. 13. Homogeneous Investment Types*"), "{md}");
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_appendix_tables_document_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000082.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(md.contains("# Appendices"), "{md}");
+        assert!(
+            md.contains("## TABLE 28: BREAKDOWN OF IMPRISONMENT CLAUSES IN STATE LAWS"),
+            "{md}"
+        );
+        assert!(md.contains("| Imprisonment terms | Number of clauses | Percentage of all states | Percentage of total |"), "{md}");
+        assert!(md.contains("| Less than 3 months | 4,448 | 21.3% | 17.0% |"), "{md}");
+        assert!(
+            md.contains("## TABLE 29: STATES WITH MORE THAN 1,000 IMPRISONMENT CLAUSES"),
+            "{md}"
+        );
+        assert!(md.contains("| State | Number of clauses | GSDP (In Rs lakh crore) | GSDP (In $ billion) |"), "{md}");
+        assert!(md.contains("| Gujarat | 1469 | 15.6 | 200.4 |"), "{md}");
+        assert!(md.contains("*Sources: TeamLease Regtech, and Reserve Bank of India for GSDPs*"), "{md}");
+        assert!(md.contains("*Exchange rate: Rs 75 to USD*"), "{md}");
+    }
+
     #[test]
     fn test_normalize_list_text_strips_redundant_bullets() {
         assert_eq!(normalize_list_text("• Collected via surveys"), "Collected via surveys");
@@ -9756,6 +10110,15 @@ mod tests {
             "Scaling laws for transfer.",
             "arXiv preprint arXiv:2102.01293."
         ));
+    }
+
+    #[test]
+    fn test_enumerated_markers_are_detected() {
+        assert!(starts_with_enumerated_marker("iii. Third item"));
+        assert!(starts_with_enumerated_marker("1) First item"));
+        assert!(starts_with_enumerated_marker("a. Lettered item"));
+        assert!(!starts_with_enumerated_marker("Figure 1. Caption"));
+        assert!(!starts_with_enumerated_marker("Natural dispersal"));
     }
 
     fn make_heading(text: &str) -> ContentElement {
@@ -10354,6 +10717,57 @@ mod tests {
     }
 
     #[test]
+    fn test_semantic_enumerated_paragraphs_are_not_merged() {
+        let mut doc = PdfDocument::new("enumerated-paragraphs.pdf".to_string());
+        doc.kids.push(make_paragraph(
+            "iii. Looking at cost items, the cost of raw woods procurement will be highest share.",
+            520.0,
+            532.0,
+        ));
+        doc.kids.push(make_paragraph(
+            "iv. This business model will be operating cost-oriented not capital cost-oriented.",
+            500.0,
+            512.0,
+        ));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains(
+            "iii. Looking at cost items, the cost of raw woods procurement will be highest share.\n\niv. This business model will be operating cost-oriented not capital cost-oriented."
+        ));
+    }
+
+    #[test]
+    fn test_leading_figure_carryover_is_skipped_before_first_numbered_heading() {
+        let mut doc = PdfDocument::new("leading-figure-carryover.pdf".to_string());
+        doc.number_of_pages = 1;
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            742.0,
+            540.0,
+            756.0,
+            "Figure 6. Mytella strigata biofouling green mussel farms in Bacoor City, Cavite, Manila Bay",
+        ));
+        doc.kids.push(make_heading_at(
+            72.0,
+            680.0,
+            260.0,
+            696.0,
+            "5. Natural dispersal",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            640.0,
+            540.0,
+            654.0,
+            "Dispersal by purely natural means is not included as a pathway of biological invasions.",
+        ));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.starts_with("# 5. Natural dispersal"));
+        assert!(!md.contains("Figure 6. Mytella strigata"));
+    }
+
+    #[test]
     fn test_list_renderer_strips_duplicate_bullets_and_skips_bullet_only_items() {
         let mut doc = PdfDocument::new("bullets.pdf".to_string());
         doc.kids
@@ -10382,6 +10796,20 @@ mod tests {
         ));
         assert!(md.contains("- Use a fresh pipet tip for each reaction tube."));
         assert!(!md.contains("\n- and down"));
+    }
+
+    #[test]
+    fn test_list_renderer_keeps_enumerated_items_separate() {
+        let mut doc = PdfDocument::new("enumerated-list.pdf".to_string());
+        doc.kids.push(make_fallback_list(&[
+            "iii. Looking at cost items, the cost of raw woods procurement will be highest share.",
+            "iv. This business model will be operating cost-oriented not capital cost-oriented.",
+            "v. Assumed selling price of wood pellet is $100 per tonne and appropriate.",
+        ]));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains("iii. Looking at cost items, the cost of raw woods procurement will be highest share.\niv. This business model will be operating cost-oriented not capital cost-oriented.\nv. Assumed selling price of wood pellet is $100 per tonne and appropriate."));
+        assert!(!md.contains("- iii."));
     }
 
     #[test]
