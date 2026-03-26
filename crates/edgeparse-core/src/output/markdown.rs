@@ -26,6 +26,9 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     if looks_like_compact_toc_document(doc) {
         return Ok(render_compact_toc_document(doc));
     }
+    if let Some(rendered) = render_top_table_plate_document(doc) {
+        return Ok(rendered);
+    }
     #[cfg(not(target_arch = "wasm32"))]
     if let Some(rendered) = render_layout_matrix_document(doc) {
         return Ok(rendered);
@@ -383,6 +386,87 @@ fn should_render_document_title_as_plaintext(doc: &PdfDocument, title: &str) -> 
     });
 
     has_tableish_content && !has_explicit_heading
+}
+
+fn render_top_table_plate_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let (table_idx, table) = doc
+        .kids
+        .iter()
+        .enumerate()
+        .find_map(|(idx, element)| table_border_from_element(element).map(|table| (idx, table)))?;
+    if table_idx > 1 || table.num_columns < 5 || table.rows.len() < 4 {
+        return None;
+    }
+
+    let mut header_probe = collect_table_border_rows(table);
+    if header_probe.len() < 3 || !preserve_grouped_header_rows(&mut header_probe) {
+        return None;
+    }
+
+    let table_page = table.bbox.page_number;
+    let table_bottom = table.bbox.bottom_y;
+    let mut caption_indices = Vec::new();
+    for idx in table_idx + 1..doc.kids.len() {
+        let element = &doc.kids[idx];
+        if element.page_number() != table_page {
+            break;
+        }
+        if !is_geometric_text_candidate(element) {
+            break;
+        }
+
+        let text = extract_element_text(element);
+        if text.trim().is_empty() || looks_like_margin_page_number(doc, element, &text) {
+            continue;
+        }
+
+        let gap = table_bottom - element.bbox().top_y;
+        if gap < -6.0 {
+            break;
+        }
+        if gap > 108.0 {
+            break;
+        }
+        caption_indices.push(idx);
+    }
+    if caption_indices.is_empty() {
+        return None;
+    }
+
+    let has_body_below = doc.kids.iter().enumerate().skip(caption_indices.last().copied()? + 1).any(
+        |(_, element)| {
+            element.page_number() == table_page
+                && is_geometric_text_candidate(element)
+                && !extract_element_text(element).trim().is_empty()
+                && table_bottom - element.bbox().top_y > 108.0
+        },
+    );
+    if !has_body_below {
+        return None;
+    }
+
+    let mut output = String::new();
+    render_table_border(&mut output, table);
+
+    let mut caption = String::new();
+    for idx in caption_indices {
+        let text = extract_element_text(&doc.kids[idx]);
+        if text.trim().is_empty() {
+            continue;
+        }
+        merge_paragraph_text(&mut caption, &text);
+    }
+    let trimmed = caption.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    output.push_str(&escape_md_line_start(trimmed));
+    output.push_str("\n\n");
+    Some(output)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -5860,6 +5944,64 @@ mod tests {
         ));
         assert!(!md.contains("Instruction OpenOrca"));
         assert!(!md.contains("Alignment Ultrafeedback"));
+    }
+
+    #[test]
+    fn test_top_table_plate_renderer_stops_before_article_body() {
+        let mut doc = PdfDocument::new("table-plate.pdf".to_string());
+        doc.number_of_pages = 1;
+        doc.kids.push(make_n_column_table(
+            &[
+                vec!["Properties", "", "Instruction", "", "", "Alignment", ""],
+                vec![
+                    "",
+                    "Alpaca-GPT4",
+                    "OpenOrca",
+                    "Synth. Math-Instruct",
+                    "Orca DPO Pairs",
+                    "Ultrafeedback Cleaned",
+                    "Synth. Math-Alignment",
+                ],
+                vec!["Total # Samples", "52K", "2.91M", "126K", "12.9K", "60.8K", "126K"],
+                vec!["Maximum # Samples Used", "52K", "100K", "52K", "12.9K", "60.8K", "20.1K"],
+                vec!["Open Source", "O", "O", "✗", "O", "O", "✗"],
+            ],
+            &[
+                (78.0, 125.0),
+                (125.0, 175.0),
+                (175.0, 225.0),
+                (225.0, 285.0),
+                (285.0, 345.0),
+                (345.0, 415.0),
+                (415.0, 490.0),
+            ],
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            680.0,
+            310.0,
+            694.0,
+            "Table 1: Training datasets used for the instruction and alignment tuning stages, respectively.",
+        ));
+        doc.kids.push(make_paragraph_at(
+            286.0,
+            664.0,
+            526.0,
+            678.0,
+            "Open source indicates whether the dataset is open-sourced.",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            560.0,
+            290.0,
+            588.0,
+            "Comparison to other up-scaling methods. Unlike Komatsuzaki et al. (2022)...",
+        ));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains("Table 1: Training datasets used for the instruction"));
+        assert!(md.contains("| Properties | Instruction | Instruction | Instruction | Alignment | Alignment | Alignment |"));
+        assert!(!md.contains("Comparison to other up-scaling methods"));
     }
 
     #[test]
