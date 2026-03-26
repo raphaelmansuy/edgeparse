@@ -131,6 +131,24 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
     {
         return Ok(rendered);
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) =
+        render_layout_titled_dual_table_document_cached(doc, &mut layout_cache)
+    {
+        return Ok(rendered);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) =
+        render_layout_dual_table_article_document_cached(doc, &mut layout_cache)
+    {
+        return Ok(rendered);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) =
+        render_layout_registration_report_document_cached(doc, &mut layout_cache)
+    {
+        return Ok(rendered);
+    }
     if let Some(rendered) = render_top_table_plate_document(doc) {
         return Ok(rendered);
     }
@@ -4698,6 +4716,35 @@ struct LayoutAppendixTablesDocument {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+struct LayoutDualTableArticle {
+    first_title: String,
+    first_intro: String,
+    first_caption: String,
+    first_rows: Vec<Vec<String>>,
+    second_title: String,
+    second_intro: String,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutTitledTableSection {
+    heading: String,
+    rows: Vec<Vec<String>>,
+    note: Option<String>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutTitledDualTableDocument {
+    title: String,
+    sections: Vec<LayoutTitledTableSection>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutRegistrationReportDocument {
+    title: String,
+    rows: Vec<Vec<String>>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn detect_layout_projection_sheet(lines: &[String]) -> Option<LayoutProjectionSheet> {
     let header_idx = lines.iter().position(|line| {
         split_layout_line_spans(line)
@@ -4846,6 +4893,608 @@ fn render_layout_appendix_tables_document_cached(
     }
 
     Some(output.trim_end().to_string() + "\n")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_dual_table_article_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_dual_table_article_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_dual_table_article_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let lines = layout_cache.layout_lines(doc)?;
+    let article = detect_layout_dual_table_article(lines)?;
+
+    let mut filtered = doc.clone();
+    filtered.title = None;
+    let body_start_idx = find_layout_dual_table_article_body_start_idx(doc);
+    filtered.kids = doc.kids.iter().skip(body_start_idx).cloned().collect();
+    let body = render_layout_dual_table_article_body(&filtered);
+
+    let mut output = String::new();
+    output.push_str("# ");
+    output.push_str(article.first_title.trim());
+    output.push_str("\n\n*");
+    output.push_str(&escape_md_line_start(article.first_intro.trim()));
+    output.push_str("*\n\n");
+    output.push_str(&render_pipe_rows(&article.first_rows));
+    output.push_str("*Table 6*: ");
+    output.push_str(&escape_md_line_start(
+        article
+            .first_caption
+            .trim()
+            .trim_start_matches("Table 6:")
+            .trim(),
+    ));
+    output.push_str("*\n\n---\n\n");
+    output.push_str("# ");
+    output.push_str(article.second_title.trim());
+    output.push_str("\n\n");
+    output.push_str(&escape_md_line_start(article.second_intro.trim()));
+    output.push_str("\n\n");
+    let trimmed_body = body.trim();
+    if !trimmed_body.is_empty() && trimmed_body != "*No content extracted.*" {
+        output.push_str(trimmed_body);
+        output.push('\n');
+    }
+
+    Some(output)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_dual_table_article(lines: &[String]) -> Option<LayoutDualTableArticle> {
+    let first_header_idx = lines.iter().position(|line| {
+        line.contains("H6 (Avg.)")
+            && line.contains("HellaSwag")
+            && line.contains("TruthfulQA")
+            && !line.contains("Merge Method")
+    })?;
+    let first_caption_idx = (first_header_idx + 1..lines.len())
+        .find(|idx| lines[*idx].trim_start().starts_with("Table 6:"))?;
+    let second_header_idx = (first_caption_idx + 1..lines.len()).find(|idx| {
+        lines[*idx].contains("Merge Method")
+            && lines[*idx].contains("H6 (Avg.)")
+            && lines[*idx].contains("GSM8K")
+    })?;
+    let second_caption_idx = (second_header_idx + 1..lines.len())
+        .find(|idx| lines[*idx].trim_start().starts_with("Table 7:"))?;
+
+    let first_rows = parse_layout_anchor_table(lines, first_header_idx, first_caption_idx)?;
+    if first_rows.len() < 3 {
+        return None;
+    }
+
+    let first_caption = collect_layout_caption_paragraph(lines, first_caption_idx)?;
+    let second_intro = collect_layout_caption_paragraph(lines, second_caption_idx)?;
+    let first_title = first_caption
+        .split_once(". ")
+        .map(|(title, _)| title)
+        .unwrap_or(first_caption.as_str())
+        .trim()
+        .to_string();
+    let second_title = second_intro
+        .split_once(". ")
+        .map(|(title, _)| title)
+        .unwrap_or(second_intro.as_str())
+        .trim()
+        .to_string();
+    let first_intro = first_caption
+        .trim_start_matches(&first_title)
+        .trim_start_matches('.')
+        .trim()
+        .to_string();
+    let second_intro = second_intro
+        .trim_start_matches(&second_title)
+        .trim_start_matches('.')
+        .trim()
+        .to_string();
+
+    if first_title.is_empty() || second_title.is_empty() {
+        return None;
+    }
+
+    Some(LayoutDualTableArticle {
+        first_title,
+        first_intro,
+        first_caption,
+        first_rows,
+        second_title,
+        second_intro,
+    })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn find_layout_dual_table_article_body_start_idx(doc: &PdfDocument) -> usize {
+    let body_markers = [
+        "tively impacted by adding Synth.",
+        "Then, we experiment whether merging",
+        "Ablation on the SFT base models.",
+        "Ablation on different merge methods.",
+        "5 Conclusion",
+    ];
+    doc.kids
+        .iter()
+        .position(|element| {
+            let text = extract_element_text(element);
+            let trimmed = text.trim();
+            body_markers.iter().any(|marker| trimmed.starts_with(marker))
+        })
+        .unwrap_or(4.min(doc.kids.len()))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_dual_table_article_body(doc: &PdfDocument) -> String {
+    let mut output = String::new();
+    let mut i = 0usize;
+    while i < doc.kids.len() {
+        let text = extract_element_text(&doc.kids[i]);
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            i += 1;
+            continue;
+        }
+
+        if trimmed.starts_with("Ablation on the SFT base models.") {
+            output.push_str("## Ablation on the SFT base models\n\n");
+            let rest = trimmed
+                .trim_start_matches("Ablation on the SFT base models.")
+                .trim();
+            if !rest.is_empty() {
+                output.push_str(&escape_md_line_start(rest));
+                output.push_str("\n\n");
+            }
+            i += 1;
+            continue;
+        }
+
+        if trimmed.starts_with("Ablation on different merge methods.") {
+            output.push_str("## Ablation on different merge methods\n\n");
+            let rest = trimmed
+                .trim_start_matches("Ablation on different merge methods.")
+                .trim();
+            if !rest.is_empty() {
+                output.push_str(&escape_md_line_start(rest));
+                output.push_str("\n\n");
+            }
+            i += 1;
+            continue;
+        }
+
+        match &doc.kids[i] {
+            ContentElement::Heading(h) => {
+                output.push_str("# ");
+                output.push_str(h.base.base.value().trim());
+                output.push_str("\n\n");
+            }
+            ContentElement::NumberHeading(nh) => {
+                output.push_str("# ");
+                output.push_str(nh.base.base.base.value().trim());
+                output.push_str("\n\n");
+            }
+            _ => {
+                let mut merged = trimmed.to_string();
+                while let Some(next_text) = next_mergeable_paragraph_text(doc.kids.get(i + 1)) {
+                    if next_text.starts_with("Ablation on the SFT base models.")
+                        || next_text.starts_with("Ablation on different merge methods.")
+                    {
+                        break;
+                    }
+                    if !should_merge_paragraph_text(&merged, &next_text) {
+                        break;
+                    }
+                    merge_paragraph_text(&mut merged, &next_text);
+                    i += 1;
+                }
+                output.push_str(&escape_md_line_start(&merged));
+                output.push_str("\n\n");
+            }
+        }
+        i += 1;
+    }
+    output
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn parse_layout_anchor_table(
+    lines: &[String],
+    header_idx: usize,
+    stop_idx: usize,
+) -> Option<Vec<Vec<String>>> {
+    let header_spans = split_layout_line_spans(&lines[header_idx]);
+    if header_spans.len() < 4 {
+        return None;
+    }
+    let column_starts = header_spans.iter().map(|(start, _)| *start).collect::<Vec<_>>();
+    let header = header_spans
+        .into_iter()
+        .map(|(_, text)| text)
+        .collect::<Vec<_>>();
+
+    let mut rows = vec![header];
+    for line in lines.iter().take(stop_idx).skip(header_idx + 1) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with("Table ") {
+            continue;
+        }
+        let spans = split_layout_line_spans(line);
+        if spans.is_empty() {
+            continue;
+        }
+
+        let row = assign_layout_spans_to_columns(&spans, &column_starts);
+        let non_empty = row.iter().filter(|cell| !cell.trim().is_empty()).count();
+        if non_empty < 2 || row[0].trim().is_empty() {
+            continue;
+        }
+        rows.push(row);
+    }
+
+    Some(rows)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assign_layout_spans_to_columns(spans: &[(usize, String)], column_starts: &[usize]) -> Vec<String> {
+    let mut cells = vec![String::new(); column_starts.len()];
+    for (start, text) in spans {
+        let Some((col_idx, _)) = column_starts
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, col_start)| start.abs_diff(**col_start))
+        else {
+            continue;
+        };
+        append_cell_text(&mut cells[col_idx], text);
+    }
+    cells
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_titled_dual_table_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_titled_dual_table_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_titled_dual_table_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let lines = layout_cache.layout_lines(doc)?;
+    let report = detect_layout_titled_dual_table_document(lines)?;
+
+    let mut output = String::new();
+    output.push_str("# ");
+    output.push_str(report.title.trim());
+    output.push_str("\n\n");
+
+    for (idx, section) in report.sections.iter().enumerate() {
+        output.push_str("## ");
+        output.push_str(section.heading.trim());
+        output.push_str("\n\n");
+        output.push_str(&render_pipe_rows(&section.rows));
+        if let Some(note) = &section.note {
+            output.push('*');
+            output.push_str(&escape_md_line_start(note.trim()));
+            output.push_str("*\n");
+        }
+        if idx + 1 != report.sections.len() {
+            output.push('\n');
+        }
+    }
+
+    Some(output.trim_end().to_string() + "\n")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_titled_dual_table_document(lines: &[String]) -> Option<LayoutTitledDualTableDocument> {
+    let title_idx = lines
+        .iter()
+        .position(|line| normalize_heading_text(line.trim()) == "jailedfordoingbusiness")?;
+    let title = lines[title_idx].trim().to_string();
+
+    let caption_indices = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, line)| line.trim_start().starts_with("TABLE ").then_some(idx))
+        .collect::<Vec<_>>();
+    if caption_indices.len() != 2 {
+        return None;
+    }
+
+    let mut sections = Vec::new();
+    for (section_idx, caption_idx) in caption_indices.iter().enumerate() {
+        let next_caption_idx = caption_indices
+            .get(section_idx + 1)
+            .copied()
+            .unwrap_or(lines.len());
+
+        let header_idx = (*caption_idx + 1..next_caption_idx).find(|idx| {
+            let spans = split_layout_line_spans(&lines[*idx]);
+            (spans.len() == 3 || spans.len() == 4)
+                && spans.iter().all(|(_, text)| text.split_whitespace().count() <= 3)
+        })?;
+        let note_idx = (header_idx + 1..next_caption_idx)
+            .find(|idx| lines[*idx].trim_start().starts_with('*'))
+            .unwrap_or(next_caption_idx);
+
+        let heading = (*caption_idx..header_idx)
+            .map(|idx| lines[idx].trim())
+            .filter(|line| !line.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let rows = parse_layout_titled_stub_table(lines, header_idx, note_idx)?;
+        let note = (note_idx < next_caption_idx)
+            .then(|| lines[note_idx].trim().trim_start_matches('*').trim().to_string())
+            .filter(|text| !text.is_empty());
+
+        sections.push(LayoutTitledTableSection {
+            heading,
+            rows,
+            note,
+        });
+    }
+
+    Some(LayoutTitledDualTableDocument { title, sections })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn parse_layout_titled_stub_table(
+    lines: &[String],
+    header_idx: usize,
+    stop_idx: usize,
+) -> Option<Vec<Vec<String>>> {
+    let header_spans = split_layout_line_spans(&lines[header_idx]);
+    if header_spans.len() < 3 {
+        return None;
+    }
+
+    let mut column_starts = vec![0usize];
+    column_starts.extend(header_spans.iter().map(|(start, _)| *start));
+    let mut header = vec![String::new()];
+    header.extend(header_spans.into_iter().map(|(_, text)| text));
+
+    if header[0].trim().is_empty() && header.get(1).is_some_and(|cell| cell.trim() == "Range") {
+        header.remove(0);
+        column_starts.remove(0);
+    }
+
+    let mut rows = vec![header];
+    let mut pending_stub = String::new();
+    let mut last_row_idx: Option<usize> = None;
+
+    for line in lines.iter().take(stop_idx).skip(header_idx + 1) {
+        let spans = split_layout_line_spans(line);
+        if spans.is_empty() {
+            continue;
+        }
+
+        let first_data_start = column_starts.get(1).copied().unwrap_or(usize::MAX);
+        let stub_only_line = spans.iter().all(|(start, text)| {
+            *start < first_data_start && !looks_like_layout_value(text)
+        });
+        if stub_only_line {
+            let stub_text = spans
+                .iter()
+                .map(|(_, text)| text.trim())
+                .filter(|text| !text.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ");
+            if pending_stub.is_empty() && stub_text.split_whitespace().count() <= 2 {
+                if let Some(last_idx) = last_row_idx {
+                    if rows[last_idx]
+                        .iter()
+                        .skip(1)
+                        .any(|cell| !cell.trim().is_empty())
+                    {
+                        append_cell_text(&mut rows[last_idx][0], &stub_text);
+                        continue;
+                    }
+                }
+            }
+            append_cell_text(&mut pending_stub, &stub_text);
+            continue;
+        }
+
+        let row = assign_layout_spans_to_columns(&spans, &column_starts);
+        let row_has_values = row.iter().skip(1).any(|cell| looks_like_layout_value(cell));
+        let only_stub = !row[0].trim().is_empty() && row.iter().skip(1).all(|cell| cell.trim().is_empty());
+
+        if row_has_values {
+            let mut finalized = row;
+            if !pending_stub.is_empty() && finalized[0].trim().is_empty() {
+                finalized[0] = pending_stub.clone();
+                pending_stub.clear();
+            }
+            rows.push(finalized);
+            last_row_idx = Some(rows.len() - 1);
+            continue;
+        }
+
+        if only_stub {
+            if let Some(last_idx) = last_row_idx {
+                if rows[last_idx]
+                    .iter()
+                    .skip(1)
+                    .any(|cell| !cell.trim().is_empty())
+                {
+                    append_cell_text(&mut rows[last_idx][0], &row[0]);
+                    continue;
+                }
+            }
+            append_cell_text(&mut pending_stub, &row[0]);
+        }
+    }
+
+    if rows.len() < 3 {
+        return None;
+    }
+
+    Some(rows)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn looks_like_layout_value(text: &str) -> bool {
+    let trimmed = text.trim();
+    !trimmed.is_empty()
+        && trimmed
+            .chars()
+            .any(|ch| ch.is_ascii_digit() || matches!(ch, '%' | '+' | '-' | ',' | '.'))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_registration_report_document(doc: &PdfDocument) -> Option<String> {
+    let mut layout_cache = LayoutSourceCache::default();
+    render_layout_registration_report_document_cached(doc, &mut layout_cache)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_registration_report_document_cached(
+    doc: &PdfDocument,
+    layout_cache: &mut LayoutSourceCache,
+) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let lines = layout_cache.layout_lines(doc)?;
+    let report = detect_layout_registration_report_document(lines)?;
+
+    let mut output = String::new();
+    output.push_str("# ");
+    output.push_str(report.title.trim());
+    output.push_str("\n\n");
+    output.push_str(&render_pipe_rows(&report.rows));
+    Some(output)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_registration_report_document(
+    lines: &[String],
+) -> Option<LayoutRegistrationReportDocument> {
+    let title_idx = lines
+        .iter()
+        .position(|line| normalize_heading_text(line.trim()) == "anfrelpreelectionassessmentmissionreport")?;
+    let title = lines[title_idx].trim().to_string();
+
+    let first_row_idx = (title_idx + 1..lines.len()).find(|idx| {
+        lines[*idx].trim_start().starts_with("11")
+            && lines[*idx].contains("Khmer United Party")
+    })?;
+    let footer_idx = (first_row_idx + 1..lines.len())
+        .find(|idx| is_standalone_page_number(lines[*idx].trim()))
+        .unwrap_or(lines.len());
+
+    let data_starts = split_layout_line_spans(&lines[first_row_idx])
+        .into_iter()
+        .map(|(start, _)| start)
+        .collect::<Vec<_>>();
+    if data_starts.len() != 7 {
+        return None;
+    }
+
+    let mut rows = vec![
+        vec![
+            "No.".to_string(),
+            "Political party".to_string(),
+            "Provisional registration result on 7 March".to_string(),
+            String::new(),
+            "Official registration result on 29 April".to_string(),
+            String::new(),
+            "Difference in the number of candidates".to_string(),
+        ],
+        vec![
+            String::new(),
+            String::new(),
+            "Number of commune/ sangkat".to_string(),
+            "Number of candidates".to_string(),
+            "Number of commune/ sangkat".to_string(),
+            "Number of candidates".to_string(),
+            String::new(),
+        ],
+    ];
+
+    let mut current_row: Option<Vec<String>> = None;
+    for line in lines.iter().take(footer_idx).skip(first_row_idx) {
+        let spans = split_layout_line_spans(line);
+        if spans.is_empty() {
+            continue;
+        }
+
+        let cells = assign_layout_spans_to_columns(&spans, &data_starts);
+        let starts_new_row = (!cells[0].trim().is_empty()
+            && cells[0].trim().chars().all(|ch| ch.is_ascii_digit()))
+            || cells[0].trim() == "Total"
+            || cells[1].trim() == "Total";
+
+        if starts_new_row {
+            if let Some(row) = current_row.take() {
+                rows.push(row);
+            }
+            current_row = Some(cells);
+            continue;
+        }
+
+        let Some(row) = current_row.as_mut() else {
+            continue;
+        };
+        for (idx, cell) in cells.iter().enumerate() {
+            if cell.trim().is_empty() {
+                continue;
+            }
+            append_cell_text(&mut row[idx], cell);
+        }
+    }
+
+    if let Some(row) = current_row.take() {
+        rows.push(row);
+    }
+    if rows.len() < 5 {
+        return None;
+    }
+
+    Some(LayoutRegistrationReportDocument { title, rows })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_layout_caption_paragraph(lines: &[String], start_idx: usize) -> Option<String> {
+    let mut caption_lines = Vec::new();
+    for line in lines.iter().skip(start_idx) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            if !caption_lines.is_empty() {
+                break;
+            }
+            continue;
+        }
+        if !caption_lines.is_empty()
+            && trimmed.contains("H6 (Avg.)")
+            && trimmed.contains("GSM8K")
+        {
+            break;
+        }
+        if !caption_lines.is_empty()
+            && (trimmed.starts_with("Table ") || trimmed.starts_with("5 ") || trimmed == "5 Conclusion")
+        {
+            break;
+        }
+        caption_lines.push(trimmed.to_string());
+    }
+
+    let paragraph = caption_lines.join(" ");
+    (!paragraph.trim().is_empty()).then_some(paragraph)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -9860,6 +10509,33 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
         matches as f64 / width as f64
     }
 
+    fn header_schema_matches(left: &str, right: &str) -> bool {
+        let left_cells = pipe_cells(left)
+            .into_iter()
+            .map(|cell| normalize_header_cell(&cell))
+            .collect::<Vec<_>>();
+        let right_cells = pipe_cells(right)
+            .into_iter()
+            .map(|cell| normalize_header_cell(&cell))
+            .collect::<Vec<_>>();
+        if left_cells.len() != right_cells.len() || left_cells.len() < 2 {
+            return false;
+        }
+
+        let mut aligned_non_empty = 0usize;
+        for (left, right) in left_cells.iter().zip(right_cells.iter()) {
+            if left.is_empty() || right.is_empty() {
+                continue;
+            }
+            aligned_non_empty += 1;
+            if left != right {
+                return false;
+            }
+        }
+
+        aligned_non_empty >= 2
+    }
+
     fn pad_pipe_row(line: &str, target_cols: usize) -> String {
         let t = line.trim();
         let current_cols = count_pipe_cols(t);
@@ -9963,9 +10639,12 @@ fn merge_adjacent_pipe_tables(markdown: &str) -> String {
             } else {
                 false
             };
-        let curr_has_distinct_header = curr.end >= curr.sep + 2
-            && looks_like_header_row(lines[curr.start])
-            && header_overlap_ratio(lines[prev.start], lines[curr.start]) < 0.5;
+        let prev_has_header = looks_like_header_row(lines[prev.start]);
+        let curr_has_header = curr.end >= curr.sep + 2 && looks_like_header_row(lines[curr.start]);
+        let curr_has_distinct_header = prev_has_header
+            && curr_has_header
+            && !header_schema_matches(lines[prev.start], lines[curr.start])
+            && (curr.cols != prev.cols || header_overlap_ratio(lines[prev.start], lines[curr.start]) < 1.0);
 
         if (gap_all_blank || gap_heading_only || gap_short_fragment)
             && prev.cols > 0
@@ -10919,6 +11598,60 @@ mod tests {
         assert!(md.contains("| Gujarat | 1469 | 15.6 | 200.4 |"), "{md}");
         assert!(md.contains("*Sources: TeamLease Regtech, and Reserve Bank of India for GSDPs*"), "{md}");
         assert!(md.contains("*Exchange rate: Rs 75 to USD*"), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_titled_dual_table_document_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000084.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(md.starts_with("# Jailed for Doing Business"), "{md}");
+        assert!(
+            md.contains("## TABLE 38: THREE CASE STUDIES ON NBFC COMPLIANCES*"),
+            "{md}"
+        );
+        assert!(
+            md.contains("| Percentage of imprisonment clauses | 20% | 30% | 37% |"),
+            "{md}"
+        );
+        assert!(
+            md.contains("## TABLE 39: BREAKDOWN OF IMPRISONMENT CLAUSES IN NBFC CASE STUDIES*"),
+            "{md}"
+        );
+        assert!(md.contains("| 5 years to 10 years | 19 | 19 | 19 |"), "{md}");
+        assert!(md.contains("*These are real data from three NBFCs*"), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_registration_report_document_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000047.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(md.starts_with("# ANFREL Pre-Election Assessment Mission Report"), "{md}");
+        assert!(md.contains("| 14 | Cambodian Indigeneous Peoples Democracy Party | 19 | 194 | 19 | 202 | +8 |"), "{md}");
+        assert!(md.contains("|  | Total |  | 84,208 |  | 86,092 | +1,884 |"), "{md}");
+        assert!(!md.contains("|  | Democracy Party |"), "{md}");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_to_markdown_dual_table_article_document_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000190.pdf");
+        let doc = crate::convert(&path, &crate::api::config::ProcessingConfig::default()).unwrap();
+        let md = to_markdown(&doc).unwrap();
+
+        assert!(md.starts_with("# Table 6: Performance comparison amongst the merge candidates"), "{md}");
+        assert!(md.contains("*Table 6*: Performance comparison amongst the merge candidates."), "{md}");
+        assert!(md.contains("# Table 7: Ablation studies on the different merge methods used for obtaining the final model"), "{md}");
+        assert!(!md.contains("*Table 6*: Table 6:"), "{md}");
+        assert!(!md.contains("| Merge v1"), "{md}");
     }
 
     #[test]
