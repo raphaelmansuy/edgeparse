@@ -35,6 +35,10 @@ pub fn to_markdown(doc: &PdfDocument) -> Result<String, EdgePdfError> {
         return Ok(rendered);
     }
     #[cfg(not(target_arch = "wasm32"))]
+    if let Some(rendered) = render_layout_multi_figure_chart_document(doc) {
+        return Ok(rendered);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(rendered) = render_layout_ocr_benchmark_dashboard_document(doc) {
         return Ok(rendered);
     }
@@ -844,6 +848,7 @@ struct LayoutRecommendationInfographic {
 struct LayoutBarToken {
     bbox: BoundingBox,
     value: i64,
+    text: String,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -868,6 +873,14 @@ struct LayoutStackedBarNarrative {
     paragraphs: Vec<String>,
     footnote: Option<String>,
     top_y: f64,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct LayoutSeriesFigure {
+    caption: String,
+    labels: Vec<String>,
+    values: Vec<String>,
+    source: Option<String>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1143,6 +1156,286 @@ fn render_layout_stacked_bar_report_document(doc: &PdfDocument) -> Option<String
     }
 
     Some(output)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_layout_multi_figure_chart_document(doc: &PdfDocument) -> Option<String> {
+    if doc.number_of_pages != 1 {
+        return None;
+    }
+
+    let source_path = doc.source_path.as_deref()?;
+    let (_page_width, lines) = read_pdftotext_bbox_layout_lines(Path::new(source_path))?;
+    let figures = detect_layout_multi_figure_chart_sections(&lines)?;
+    let rendered_table_count = figures
+        .iter()
+        .filter(|figure| figure.labels.len() >= 4 && figure.labels.len() == figure.values.len())
+        .count();
+    if figures.len() < 2 || rendered_table_count == 0 {
+        return None;
+    }
+
+    let mut output = String::from("# Figures from the Document\n\n");
+    for figure in figures {
+        output.push_str("## ");
+        output.push_str(figure.caption.trim());
+        output.push_str("\n\n");
+
+        if figure.labels.len() >= 4 && figure.labels.len() == figure.values.len() {
+            let label_header = if figure
+                .labels
+                .iter()
+                .all(|label| looks_like_yearish_label(label))
+            {
+                "Year"
+            } else {
+                "Label"
+            };
+            let value_header = chart_value_header(&figure.caption);
+            output.push_str(&format!("| {} | {} |\n", label_header, value_header));
+            output.push_str("| --- | --- |\n");
+            for (label, value) in figure.labels.iter().zip(figure.values.iter()) {
+                output.push_str(&format!("| {} | {} |\n", label, value));
+            }
+            output.push('\n');
+        }
+
+        if let Some(source) = figure.source.as_deref() {
+            output.push('*');
+            output.push_str(&escape_md_line_start(source.trim()));
+            output.push_str("*\n\n");
+        }
+    }
+
+    Some(output.trim_end().to_string() + "\n")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn detect_layout_multi_figure_chart_sections(lines: &[BBoxLayoutLine]) -> Option<Vec<LayoutSeriesFigure>> {
+    let caption_indices = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, line)| {
+            let text = bbox_layout_line_text(line);
+            (text.starts_with("Figure ") && text.split_whitespace().count() >= 4).then_some(idx)
+        })
+        .collect::<Vec<_>>();
+    if caption_indices.len() < 2 {
+        return None;
+    }
+
+    let mut figures = Vec::new();
+    for (pos, caption_idx) in caption_indices.iter().enumerate() {
+        let next_caption_idx = caption_indices
+            .get(pos + 1)
+            .copied()
+            .unwrap_or(lines.len());
+        let caption = bbox_layout_line_text(&lines[*caption_idx]);
+
+        let source_idx = (*caption_idx + 1..next_caption_idx).find(|idx| {
+            bbox_layout_line_text(&lines[*idx])
+                .to_ascii_lowercase()
+                .starts_with("source:")
+        });
+
+        let source = source_idx.map(|idx| {
+            let mut source_lines = vec![&lines[idx]];
+            let mut cursor = idx + 1;
+            while cursor < next_caption_idx {
+                let text = bbox_layout_line_text(&lines[cursor]);
+                if text.starts_with("Figure ") || looks_like_footer_banner(&text) || text.is_empty() {
+                    break;
+                }
+                source_lines.push(&lines[cursor]);
+                if text.ends_with('.') {
+                    break;
+                }
+                cursor += 1;
+            }
+            join_layout_lines_as_paragraph(&source_lines)
+        });
+
+        let series_region = &lines[*caption_idx + 1..source_idx.unwrap_or(next_caption_idx)];
+        let anchors = extract_year_label_anchors_from_section(series_region);
+        let (labels, values) = if anchors.len() >= 4 {
+            let values = map_series_values_to_label_anchors(&anchors, series_region);
+            (
+                anchors.into_iter().map(|anchor| anchor.text).collect::<Vec<_>>(),
+                values,
+            )
+        } else {
+            (Vec::new(), Vec::new())
+        };
+
+        if source.is_some() || !values.is_empty() {
+            figures.push(LayoutSeriesFigure {
+                caption: normalize_layout_dashboard_text(&caption),
+                labels,
+                values,
+                source,
+            });
+        }
+    }
+
+    (!figures.is_empty()).then_some(figures)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn extract_year_label_anchors_from_section(lines: &[BBoxLayoutLine]) -> Vec<LayoutTextFragment> {
+    let mut year_words = lines
+        .iter()
+        .flat_map(|line| line.words.iter())
+        .filter_map(|word| {
+            let token = word
+                .text
+                .trim_matches(|ch: char| matches!(ch, ',' | ';' | '.'));
+            looks_like_year_token(token).then_some((word.bbox.center_y(), word.clone()))
+        })
+        .collect::<Vec<_>>();
+    if year_words.len() < 4 {
+        return Vec::new();
+    }
+
+    year_words.sort_by(|left, right| {
+        right
+            .0
+            .partial_cmp(&left.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut best_band = Vec::<BBoxLayoutWord>::new();
+    for (center_y, _) in &year_words {
+        let band = year_words
+            .iter()
+            .filter(|(candidate_y, _)| (*candidate_y - *center_y).abs() <= 12.0)
+            .map(|(_, word)| word.clone())
+            .collect::<Vec<_>>();
+        if band.len() > best_band.len() {
+            best_band = band;
+        }
+    }
+    if best_band.len() < 4 {
+        return Vec::new();
+    }
+
+    let band_center = best_band
+        .iter()
+        .map(|word| word.bbox.center_y())
+        .sum::<f64>()
+        / best_band.len() as f64;
+    let mut band_words = lines
+        .iter()
+        .flat_map(|line| line.words.iter())
+        .filter(|word| (word.bbox.center_y() - band_center).abs() <= 12.0)
+        .cloned()
+        .collect::<Vec<_>>();
+    band_words.sort_by(|left, right| {
+        left.bbox
+            .left_x
+            .partial_cmp(&right.bbox.left_x)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut anchors = Vec::new();
+    let mut idx = 0usize;
+    while idx < band_words.len() {
+        let token = band_words[idx]
+            .text
+            .trim_matches(|ch: char| matches!(ch, ',' | ';' | '.'));
+        if !looks_like_year_token(token) {
+            idx += 1;
+            continue;
+        }
+
+        let mut bbox = band_words[idx].bbox.clone();
+        let mut label = token.to_string();
+        if let Some(next) = band_words.get(idx + 1) {
+            let suffix = next.text.trim_matches(|ch: char| matches!(ch, ',' | ';' | '.'));
+            let gap = next.bbox.left_x - band_words[idx].bbox.right_x;
+            if suffix.starts_with('(') && suffix.ends_with(')') && gap <= 18.0 {
+                label.push(' ');
+                label.push_str(suffix);
+                bbox = bbox.union(&next.bbox);
+                idx += 1;
+            }
+        }
+
+        anchors.push(LayoutTextFragment { bbox, text: label });
+        idx += 1;
+    }
+
+    anchors
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn map_series_values_to_label_anchors(
+    anchors: &[LayoutTextFragment],
+    lines: &[BBoxLayoutLine],
+) -> Vec<String> {
+    if anchors.len() < 2 {
+        return Vec::new();
+    }
+
+    let mut spacing = anchors
+        .windows(2)
+        .map(|pair| pair[1].bbox.center_x() - pair[0].bbox.center_x())
+        .filter(|gap| *gap > 0.0)
+        .collect::<Vec<_>>();
+    spacing.sort_by(|left, right| left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal));
+    let median_spacing = spacing
+        .get(spacing.len().saturating_sub(1) / 2)
+        .copied()
+        .unwrap_or(48.0);
+    let max_dx = (median_spacing * 0.42).clamp(18.0, 32.0);
+
+    let mut tokens = Vec::<LayoutBarToken>::new();
+    for line in lines {
+        for word in &line.words {
+            let raw = word.text.trim();
+            if raw.contains('/') || looks_like_year_token(raw.trim_matches(|ch: char| matches!(ch, ',' | ';' | '.'))) {
+                continue;
+            }
+            let Some(value) = parse_integer_token(raw) else {
+                continue;
+            };
+            tokens.push(LayoutBarToken {
+                bbox: word.bbox.clone(),
+                value,
+                text: sanitize_numberish_token(raw).unwrap_or_else(|| value.to_string()),
+            });
+        }
+    }
+
+    let mut used = vec![false; tokens.len()];
+    let mut values = Vec::with_capacity(anchors.len());
+    for anchor in anchors {
+        let anchor_center_x = anchor.bbox.center_x();
+        let anchor_center_y = anchor.bbox.center_y();
+        let best = tokens
+            .iter()
+            .enumerate()
+            .filter(|(idx, token)| {
+                !used[*idx]
+                    && token.bbox.center_y() > anchor_center_y + 8.0
+                    && (token.bbox.center_x() - anchor_center_x).abs() <= max_dx
+            })
+            .min_by(|left, right| {
+                let left_score = (left.1.bbox.center_x() - anchor_center_x).abs()
+                    + (left.1.bbox.center_y() - anchor_center_y).abs() * 0.05;
+                let right_score = (right.1.bbox.center_x() - anchor_center_x).abs()
+                    + (right.1.bbox.center_y() - anchor_center_y).abs() * 0.05;
+                left_score
+                    .partial_cmp(&right_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        let Some((best_idx, token)) = best else {
+            return Vec::new();
+        };
+        used[best_idx] = true;
+        values.push(token.text.clone());
+    }
+
+    values
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -2383,6 +2676,7 @@ where
             tokens.push(LayoutBarToken {
                 bbox: word.bbox.clone(),
                 value,
+                text: candidate.to_string(),
             });
         }
     }
@@ -3671,22 +3965,22 @@ fn find_layout_panel_header_candidate(lines: &[String]) -> Option<LayoutPanelHea
 
 #[cfg(not(target_arch = "wasm32"))]
 fn split_layout_line_spans(line: &str) -> Vec<(usize, String)> {
-    let bytes = line.as_bytes();
+    let chars = line.chars().collect::<Vec<_>>();
     let mut spans = Vec::new();
     let mut idx = 0usize;
-    while idx < bytes.len() {
-        while idx < bytes.len() && bytes[idx].is_ascii_whitespace() {
+    while idx < chars.len() {
+        while idx < chars.len() && chars[idx].is_whitespace() {
             idx += 1;
         }
-        if idx >= bytes.len() {
+        if idx >= chars.len() {
             break;
         }
 
         let start = idx;
         let mut end = idx;
         let mut gap = 0usize;
-        while end < bytes.len() {
-            if bytes[end].is_ascii_whitespace() {
+        while end < chars.len() {
+            if chars[end].is_whitespace() {
                 gap += 1;
                 if gap >= 2 {
                     break;
@@ -3696,13 +3990,23 @@ fn split_layout_line_spans(line: &str) -> Vec<(usize, String)> {
             }
             end += 1;
         }
-        let text = line[start..end].trim().to_string();
+        let text = slice_layout_column_text(line, start, end);
         if !text.is_empty() {
             spans.push((start, text));
         }
         idx = end.saturating_add(gap);
     }
     spans
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn slice_layout_column_text(line: &str, start: usize, end: usize) -> String {
+    line.chars()
+        .skip(start)
+        .take(end.saturating_sub(start))
+        .collect::<String>()
+        .trim()
+        .to_string()
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -3721,11 +4025,12 @@ fn extract_layout_entries(lines: &[String], header: &LayoutHeaderCandidate) -> V
             .copied()
             .zip(next_starts.iter().copied())
             .map(|(start, next_start)| {
-                if start >= line.len() {
+                let char_count = line.chars().count();
+                if start >= char_count {
                     String::new()
                 } else {
-                    let end = next_start.min(line.len());
-                    normalize_layout_matrix_text(line[start..end].trim())
+                    let end = next_start.min(char_count);
+                    normalize_layout_matrix_text(&slice_layout_column_text(line, start, end))
                 }
             })
             .collect::<Vec<_>>();
@@ -3766,11 +4071,12 @@ fn build_layout_panel_stub_rows(
             .copied()
             .zip(next_starts.iter().copied())
             .map(|(start, next_start)| {
-                if start >= line.len() {
+                let char_count = line.chars().count();
+                if start >= char_count {
                     String::new()
                 } else {
-                    let end = next_start.min(line.len());
-                    normalize_layout_matrix_text(line[start..end].trim())
+                    let end = next_start.min(char_count);
+                    normalize_layout_matrix_text(&slice_layout_column_text(line, start, end))
                 }
             })
             .collect::<Vec<_>>();
@@ -4703,6 +5009,11 @@ fn normalize_chart_like_markdown(markdown: &str) -> String {
     let mut normalized = Vec::new();
     let mut i = 0usize;
     while i < blocks.len() {
+        if let Some(rendered) = trim_large_top_table_plate(&blocks, i) {
+            normalized.push(rendered);
+            break;
+        }
+
         if let Some((rendered, consumed)) = render_header_pair_chart_table(&blocks, i) {
             normalized.push(rendered);
             i += consumed;
@@ -4733,6 +5044,36 @@ fn normalize_chart_like_markdown(markdown: &str) -> String {
     }
 
     normalized.join("\n\n").trim().to_string() + "\n"
+}
+
+fn trim_large_top_table_plate(blocks: &[&str], start: usize) -> Option<String> {
+    if start != 0 {
+        return None;
+    }
+
+    let rows = parse_pipe_table_block(blocks.first()?.trim())?;
+    let body_rows = rows.len().saturating_sub(2);
+    let max_cols = rows.iter().map(Vec::len).max().unwrap_or(0);
+    if body_rows < 8 || max_cols < 8 {
+        return None;
+    }
+
+    let caption = blocks.get(1)?.trim();
+    if !caption.starts_with("Table ") || caption.split_whitespace().count() < 12 {
+        return None;
+    }
+
+    let has_following_section = blocks.iter().skip(2).any(|block| {
+        let trimmed = block.trim();
+        trimmed.starts_with("# ")
+            || trimmed.starts_with("## ")
+            || trimmed
+                .chars()
+                .next()
+                .is_some_and(|ch| ch.is_ascii_digit())
+                && trimmed.contains(" Main Results")
+    });
+    has_following_section.then_some(blocks[0].trim().to_string())
 }
 
 fn render_header_pair_chart_table(blocks: &[&str], start: usize) -> Option<(String, usize)> {
@@ -8399,6 +8740,18 @@ mod tests {
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
+    fn test_split_layout_line_spans_handles_unicode_boundaries() {
+        let line = "Title  “Podcast #EP32: SDGs dan Anak Muda”  2024";
+        let spans = split_layout_line_spans(line);
+        assert_eq!(spans.len(), 3);
+        assert_eq!(spans[0].1, "Title");
+        assert!(spans[1].1.contains("Podcast #EP32: SDGs dan Anak Muda"));
+        assert!(spans[1].1.ends_with('”'));
+        assert!(spans[2].1.ends_with("24"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
     fn test_render_layout_single_caption_chart_document_on_real_pdf() {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../benchmark/pdfs/01030000000037.pdf");
@@ -8524,6 +8877,29 @@ mod tests {
         assert!(rendered.contains("# Figure 6.1.1:"));
         assert!(rendered.contains("| Will not terminate employment | 51 | 81 | 73 |"));
         assert!(rendered.contains("# 6.2. Expectations for Re-Hiring Employees"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_render_layout_multi_figure_chart_document_on_real_pdf() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmark/pdfs/01030000000076.pdf");
+        let doc = PdfDocument {
+            title: None,
+            source_path: Some(path.to_string_lossy().to_string()),
+            number_of_pages: 1,
+            kids: Vec::new(),
+            ..PdfDocument::new("01030000000076.pdf".to_string())
+        };
+        let rendered = render_layout_multi_figure_chart_document(&doc).unwrap();
+        assert!(rendered.contains("# Figures from the Document"));
+        assert!(rendered.contains("## Figure 1.7. Non-citizen population in Malaysia (in thousands)"));
+        assert!(rendered.contains("| 2016 | 3,230 |"));
+        assert!(rendered.contains("| 2021 | 2,693 |"));
+        assert!(rendered.contains("## Figure 1.8. Singapore foreign workforce stock (in thousands)"));
+        assert!(rendered.contains("| 2016 (Dec) | 1,393 |"));
+        assert!(rendered.contains("| 2021 (Dec) | 1,200 |"));
+        assert!(rendered.contains("Source: Department of Statistics, Malaysia (2022). Figure for 2021 is an estimate."));
     }
 
     #[test]
@@ -10062,6 +10438,29 @@ mod tests {
         let normalized = normalize_chart_like_markdown(input);
         assert!(!normalized.contains("| in | cm |"));
         assert!(normalized.contains("Figure 8.6: Growth in length of Alligator Gar in Texas."));
+    }
+
+    #[test]
+    fn test_normalize_chart_like_markdown_trims_large_top_table_plate() {
+        let input = "| A | B | C | D | E | F | G | H |\n\
+                     | --- | --- | --- | --- | --- | --- | --- | --- |\n\
+                     | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n\
+                     | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n\
+                     | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n\
+                     | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n\
+                     | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n\
+                     | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n\
+                     | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n\
+                     | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |\n\n\
+                     Table 2: Evaluation results for SOLAR 10.7B and SOLAR 10.7B-Instruct along with other top-performing models in the paper.\n\n\
+                     # 4.2 Main Results\n\n\
+                     The surrounding prose should be dropped.\n";
+
+        let normalized = normalize_chart_like_markdown(input);
+        assert!(normalized.starts_with("| A | B | C | D | E | F | G | H |"));
+        assert!(!normalized.contains("Table 2:"));
+        assert!(!normalized.contains("4.2 Main Results"));
+        assert!(!normalized.contains("surrounding prose"));
     }
 
 }
