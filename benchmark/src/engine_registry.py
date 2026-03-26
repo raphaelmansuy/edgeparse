@@ -3,6 +3,8 @@
 Engines:
   * ``edgeparse``      — Rust binary built from this repository (always available)
   * ``opendataloader`` — Published Java/Python package (opendataloader-pdf ≥ 2.0)
+  * ``opendataloader_hybrid_docling_fast`` — OpenDataLoader hybrid with Docling Fast backend
+  * ``opendataloader_hybrid_hancom``       — OpenDataLoader hybrid with Hancom backend
   * ``pymupdf4llm``    — PyMuPDF4LLM (pip install pymupdf4llm)
   * ``markitdown``     — Microsoft MarkItDown (pip install markitdown[all])
   * ``liteparse``      — LlamaIndex LiteParse (@llamaindex/liteparse, Node.js CLI)
@@ -14,6 +16,7 @@ External engines are registered automatically when their packages are installed.
 
 Engine groups (for benchmark segmentation):
   NON_OCR_ENGINES — no ML models, no GPU; pure text/geometry extraction
+  HYBRID_ENGINES  — mixed local + backend routing for complex pages
   OCR_ENGINES     — require deep-learning models; GPU optional but recommended
 """
 
@@ -35,6 +38,12 @@ NON_OCR_ENGINES: List[str] = [
     "liteparse",
 ]
 
+HYBRID_ENGINES: List[str] = [
+    "edgeparse",
+    "opendataloader_hybrid_docling_fast",
+    "opendataloader_hybrid_hancom",
+]
+
 OCR_ENGINES: List[str] = [
     "edgeparse",
     "docling",
@@ -54,15 +63,17 @@ ENGINE_DISPATCH: Dict[str, EngineHandler] = {
 
 # Engine display metadata: name → (display_name, pip_package, description)
 ENGINE_META: Dict[str, tuple] = {
-    "edgeparse":      ("EdgeParse",      None,                    "Rust PDF engine (this repo)"),
-    "opendataloader": ("OpenDataLoader", "opendataloader-pdf",    "Java/Python PDF engine"),
-    "pymupdf4llm":    ("PyMuPDF4LLM",   "pymupdf4llm",           "PyMuPDF for LLM/RAG"),
-    "markitdown":     ("MarkItDown",     "markitdown[all]",       "Microsoft multi-format converter"),
-    "liteparse":      ("LiteParse",      "@llamaindex/liteparse", "LlamaIndex local PDF parser"),
+    "edgeparse":      ("EdgeParse",                            None,                    "Rust PDF engine (this repo)"),
+    "opendataloader": ("OpenDataLoader",                       "opendataloader-pdf",    "Java/Python PDF engine"),
+    "opendataloader_hybrid_docling_fast": ("OpenDataLoader [hybrid/docling-fast]", None, "OpenDataLoader hybrid with Docling Fast backend"),
+    "opendataloader_hybrid_hancom":       ("OpenDataLoader [hybrid/hancom]",       None, "OpenDataLoader hybrid with Hancom backend"),
+    "pymupdf4llm":    ("PyMuPDF4LLM",                         "pymupdf4llm",           "PyMuPDF for LLM/RAG"),
+    "markitdown":     ("MarkItDown",                           "markitdown[all]",       "Microsoft multi-format converter"),
+    "liteparse":      ("LiteParse",                            "@llamaindex/liteparse", "LlamaIndex local PDF parser"),
     # OCR / ML engines
-    "docling":        ("Docling",        "docling",               "IBM Research document parser [OCR/ML]"),
-    "marker":         ("Marker",         "marker-pdf",            "Marker PDF — Surya OCR [isolated venv]"),
-    "mineru":         ("MinerU",         "mineru[all]",           "OpenDataLab PDF extractor [isolated venv]"),
+    "docling":        ("Docling",                              "docling",               "IBM Research document parser [OCR/ML]"),
+    "marker":         ("Marker",                               "marker-pdf",            "Marker PDF — Surya OCR [isolated venv]"),
+    "mineru":         ("MinerU",                               "mineru[all]",           "OpenDataLab PDF extractor [isolated venv]"),
 }
 
 # ── Auto-register external engines ───────────────────────────────────────────
@@ -77,6 +88,8 @@ def _try_register(name: str, module_name: str, version_label: str = "installed")
         pass
 
 _try_register("opendataloader", "pdf_parser_opendataloader", "published")
+_try_register("opendataloader_hybrid_docling_fast", "pdf_parser_opendataloader_hybrid_docling_fast", "local-hybrid")
+_try_register("opendataloader_hybrid_hancom", "pdf_parser_opendataloader_hybrid_hancom", "local-hybrid")
 _try_register("docling",        "pdf_parser_docling",        "installed")
 _try_register("pymupdf4llm",    "pdf_parser_pymupdf4llm",    "installed")
 _try_register("markitdown",     "pdf_parser_markitdown",     "installed")

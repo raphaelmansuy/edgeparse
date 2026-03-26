@@ -7,11 +7,16 @@ terminal + HTML reports with side-by-side metrics, charts, and rankings.
 Engine groups:
   Non-OCR (fast, no ML models): edgeparse, opendataloader, pymupdf4llm,
                                  markitdown, liteparse
+  Hybrid (backend-assisted):    edgeparse, opendataloader_hybrid_docling_fast,
+                                 opendataloader_hybrid_hancom
   OCR / ML (model-heavy):       edgeparse, docling, marker, mineru
 
 Usage:
     # Non-OCR comparison (fast, recommended first run):
     uv run python compare_all.py --group non-ocr --install
+
+    # OCR/ML comparison (slow — installs isolated venvs for marker & mineru):
+    uv run python compare_all.py --group hybrid
 
     # OCR/ML comparison (slow — installs isolated venvs for marker & mineru):
     uv run python compare_all.py --group ocr --install
@@ -30,6 +35,7 @@ Usage:
 
 Via Makefile:
     make bench-non-ocr
+    make bench-hybrid
     make bench-ocr
     make bench-ocr OCR_ENGINES=docling
     make bench-compare-all
@@ -53,7 +59,7 @@ from typing import Dict, List, Optional, Sequence
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from engine_registry import (
-    ENGINES, ENGINE_META, NON_OCR_ENGINES, OCR_ENGINES,
+    ENGINES, ENGINE_META, NON_OCR_ENGINES, HYBRID_ENGINES, OCR_ENGINES,
     available_engines, display_name,
 )
 from evaluation_schema import missing_evaluation_requirements
@@ -79,6 +85,8 @@ ISOLATED_VENVS_DIR = BENCH_DIR / ".venvs"
 ALL_ENGINES = [
     # Non-OCR (fast)
     "edgeparse", "opendataloader", "pymupdf4llm", "markitdown", "liteparse",
+    # Hybrid
+    "opendataloader_hybrid_docling_fast", "opendataloader_hybrid_hancom",
     # OCR / ML
     "docling", "marker", "mineru",
 ]
@@ -461,6 +469,7 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         epilog="""
 Examples:
   uv run python compare_all.py --group non-ocr --install
+  uv run python compare_all.py --group hybrid
   uv run python compare_all.py --group ocr --install
   uv run python compare_all.py --engines edgeparse,docling,pymupdf4llm --install
   uv run python compare_all.py --all --no-run
@@ -469,9 +478,9 @@ Examples:
     )
     parser.add_argument(
         "--group",
-        choices=["non-ocr", "ocr", "all"],
+        choices=["non-ocr", "hybrid", "ocr", "all"],
         default=None,
-        help="Engine group to benchmark: non-ocr (fast), ocr (ML/model-heavy), all",
+        help="Engine group to benchmark: non-ocr (fast), hybrid (backend-assisted), ocr (ML/model-heavy), all",
     )
     parser.add_argument(
         "--engines",
@@ -542,6 +551,9 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     elif args.group == "non-ocr":
         engines = list(NON_OCR_ENGINES)
         default_title = "EdgeParse Benchmark — Non-OCR Tools"
+    elif args.group == "hybrid":
+        engines = list(HYBRID_ENGINES)
+        default_title = "EdgeParse Benchmark — Hybrid Tools"
     elif args.group == "ocr":
         engines = list(OCR_ENGINES)
         default_title = "EdgeParse Benchmark — OCR / ML Tools"

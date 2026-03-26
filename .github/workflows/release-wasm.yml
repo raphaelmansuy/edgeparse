@@ -94,19 +94,9 @@ jobs:
           name: wasm-package
           path: crates/edgeparse-wasm/pkg/*.tgz
 
-      - name: Publish WASM package to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Skip WASM npm publication
         run: |
-          cd crates/edgeparse-wasm/pkg
-          OUTPUT=$(npm publish --access public 2>&1) && echo "$OUTPUT" || {
-            echo "$OUTPUT"
-            if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
-              echo "edgeparse-wasm already published at this version — skipping."
-            else
-              exit 1
-            fi
-          }
+          echo "::warning::WASM npm publication is disabled. The package tarball will still be uploaded to the GitHub Release."
 
       - name: Upload npm tarball to GitHub Release
         env:

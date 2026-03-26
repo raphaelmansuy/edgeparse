@@ -84,6 +84,10 @@ struct Cli {
     #[arg(long = "image-dir")]
     image_dir: Option<String>,
 
+    /// Raster table OCR recovery (on, off)
+    #[arg(long = "raster-table-ocr", default_value = "on")]
+    raster_table_ocr: String,
+
     /// Pages to extract (e.g., "1,3,5-7")
     #[arg(long = "pages")]
     pages: Option<String>,
@@ -206,6 +210,11 @@ fn build_config(cli: &Cli) -> edgeparse_core::api::config::ProcessingConfig {
     use edgeparse_core::api::config::*;
     use edgeparse_core::api::filter::FilterConfig;
 
+    let raster_table_ocr = std::env::var("EDGEPARSE_RASTER_TABLE_OCR")
+        .ok()
+        .map(|value| !matches!(value.as_str(), "off" | "false" | "0"))
+        .unwrap_or_else(|| !matches!(cli.raster_table_ocr.as_str(), "off" | "false" | "0"));
+
     let formats = if let Some(ref fmt) = cli.format {
         fmt.split(',')
             .filter_map(|s| match s.trim() {
@@ -258,6 +267,7 @@ fn build_config(cli: &Cli) -> edgeparse_core::api::config::ProcessingConfig {
             _ => ImageFormat::Png,
         },
         image_dir: cli.image_dir.clone(),
+        raster_table_ocr,
         pages: cli.pages.clone(),
         include_header_footer: cli.include_header_footer,
         hybrid: match cli.hybrid.as_str() {
