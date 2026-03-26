@@ -398,7 +398,7 @@ fn render_top_table_plate_document(doc: &PdfDocument) -> Option<String> {
         .iter()
         .enumerate()
         .find_map(|(idx, element)| table_border_from_element(element).map(|table| (idx, table)))?;
-    if table_idx > 1 || table.num_columns < 5 || table.rows.len() < 4 {
+    if table.num_columns < 5 || table.rows.len() < 4 {
         return None;
     }
 
@@ -407,16 +407,27 @@ fn render_top_table_plate_document(doc: &PdfDocument) -> Option<String> {
         return None;
     }
 
-    let table_page = table.bbox.page_number;
+    let table_top = table.bbox.top_y;
     let table_bottom = table.bbox.bottom_y;
+    let table_height = table.bbox.height().max(1.0);
+    let page_top = doc
+        .kids
+        .iter()
+        .map(|element| element.bbox().top_y)
+        .fold(f64::NEG_INFINITY, f64::max);
+    if !page_top.is_finite() || page_top - table_top > table_height * 3.0 {
+        return None;
+    }
+
+    let caption_gap_limit = (table_height * 2.2).clamp(48.0, 132.0);
     let mut caption_indices = Vec::new();
     for idx in table_idx + 1..doc.kids.len() {
         let element = &doc.kids[idx];
-        if element.page_number() != table_page {
-            break;
-        }
         if !is_geometric_text_candidate(element) {
-            break;
+            if table_bottom - element.bbox().top_y > caption_gap_limit {
+                break;
+            }
+            continue;
         }
 
         let text = extract_element_text(element);
@@ -428,7 +439,7 @@ fn render_top_table_plate_document(doc: &PdfDocument) -> Option<String> {
         if gap < -6.0 {
             break;
         }
-        if gap > 108.0 {
+        if gap > caption_gap_limit {
             break;
         }
         caption_indices.push(idx);
@@ -439,10 +450,9 @@ fn render_top_table_plate_document(doc: &PdfDocument) -> Option<String> {
 
     let has_body_below = doc.kids.iter().enumerate().skip(caption_indices.last().copied()? + 1).any(
         |(_, element)| {
-            element.page_number() == table_page
-                && is_geometric_text_candidate(element)
+            is_geometric_text_candidate(element)
                 && !extract_element_text(element).trim().is_empty()
-                && table_bottom - element.bbox().top_y > 108.0
+                && table_bottom - element.bbox().top_y > caption_gap_limit
         },
     );
     if !has_body_below {
@@ -453,8 +463,8 @@ fn render_top_table_plate_document(doc: &PdfDocument) -> Option<String> {
     render_table_border(&mut output, table);
 
     let mut caption = String::new();
-    for idx in caption_indices {
-        let text = extract_element_text(&doc.kids[idx]);
+    for idx in &caption_indices {
+        let text = extract_element_text(&doc.kids[*idx]);
         if text.trim().is_empty() {
             continue;
         }
@@ -5950,6 +5960,20 @@ mod tests {
     fn test_top_table_plate_renderer_stops_before_article_body() {
         let mut doc = PdfDocument::new("table-plate.pdf".to_string());
         doc.number_of_pages = 1;
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            724.0,
+            200.0,
+            736.0,
+            "SOLAR 10.7B",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            704.0,
+            220.0,
+            716.0,
+            "Training datasets",
+        ));
         doc.kids.push(make_n_column_table(
             &[
                 vec!["Properties", "", "Instruction", "", "", "Alignment", ""],
@@ -5978,23 +6002,23 @@ mod tests {
         ));
         doc.kids.push(make_paragraph_at(
             72.0,
-            680.0,
+            500.0,
             310.0,
-            694.0,
+            514.0,
             "Table 1: Training datasets used for the instruction and alignment tuning stages, respectively.",
         ));
         doc.kids.push(make_paragraph_at(
             286.0,
-            664.0,
+            484.0,
             526.0,
-            678.0,
+            498.0,
             "Open source indicates whether the dataset is open-sourced.",
         ));
         doc.kids.push(make_paragraph_at(
             72.0,
-            560.0,
+            360.0,
             290.0,
-            588.0,
+            388.0,
             "Comparison to other up-scaling methods. Unlike Komatsuzaki et al. (2022)...",
         ));
 
