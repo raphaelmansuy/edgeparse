@@ -40,6 +40,8 @@ const MIN_EMPTY_TABLE_COVERAGE_FOR_PAGE_RASTER_OCR: f64 = 0.08;
 const MAX_EMPTY_TABLES_FOR_PAGE_RASTER_OCR: usize = 24;
 const LOCAL_BINARIZATION_RADIUS: u32 = 14;
 const MIN_BINARIZATION_BLOCK_PIXELS: usize = 81;
+const MIN_RASTER_TABLE_TEXT_CELL_RATIO: f64 = 0.18;
+const MIN_RASTER_TABLE_ROWS_WITH_TEXT: usize = 2;
 
 #[derive(Debug, Clone)]
 struct OcrWord {
@@ -1420,6 +1422,9 @@ fn recover_bordered_raster_table_from_gray(
     )?;
 
     let mut rows = Vec::with_capacity(num_rows);
+    let mut non_empty_cells = 0usize;
+    let mut rows_with_text = 0usize;
+    let mut total_cells = 0usize;
     for row_idx in 0..num_rows {
         let row_bbox = BoundingBox::new(
             image.bbox.page_number,
@@ -1429,6 +1434,7 @@ fn recover_bordered_raster_table_from_gray(
             y_coordinates[row_idx],
         );
         let mut cells = Vec::with_capacity(num_cols);
+        let mut row_has_text = false;
 
         for col_idx in 0..num_cols {
             let x1 = grid.vertical_lines[col_idx];
@@ -1443,9 +1449,12 @@ fn recover_bordered_raster_table_from_gray(
                 y_coordinates[row_idx],
             );
             let text = extract_raster_cell_text(&gray, row_idx, col_idx, x1, y1, x2, y2)?;
+            total_cells += 1;
 
             let mut content = Vec::new();
             if !text.is_empty() {
+                row_has_text = true;
+                non_empty_cells += 1;
                 content.push(TableToken {
                     base: TextChunk {
                         value: text,
@@ -1484,6 +1493,10 @@ fn recover_bordered_raster_table_from_gray(
             });
         }
 
+        if row_has_text {
+            rows_with_text += 1;
+        }
+
         rows.push(TableBorderRow {
             bbox: row_bbox,
             index: None,
@@ -1492,6 +1505,16 @@ fn recover_bordered_raster_table_from_gray(
             cells,
             semantic_type: None,
         });
+    }
+
+    if total_cells == 0 {
+        return None;
+    }
+    let text_cell_ratio = non_empty_cells as f64 / total_cells as f64;
+    if text_cell_ratio < MIN_RASTER_TABLE_TEXT_CELL_RATIO
+        || rows_with_text < MIN_RASTER_TABLE_ROWS_WITH_TEXT
+    {
+        return None;
     }
 
     Some(TableBorder {

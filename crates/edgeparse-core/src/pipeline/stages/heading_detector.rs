@@ -199,6 +199,7 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
         let font_weight = p.base.font_weight.unwrap_or(400.0);
         let lines = p.base.lines_number();
 
+
         // Skip space-only, very long nodes, or very short text
         if p.base.is_space_node() || lines > MAX_HEADING_LINES {
             continue;
@@ -1997,4 +1998,5 @@ mod tests {
         assert!(matches!(pages[0][0], ContentElement::Heading(_)));
         assert!(matches!(pages[0][1], ContentElement::Paragraph(_)));
     }
+
 }
