@@ -53,12 +53,21 @@ def run_benchmark(args: argparse.Namespace) -> dict:
     else:
         engine_name = "edgeparse"
 
+    doc_ids: Optional[List[str]] = None
+    if args.doc_id:
+        doc_ids = None
+    elif getattr(args, "max_docs", None):
+        max_docs = int(args.max_docs)
+        if max_docs > 0:
+            gt_paths = sorted(ground_truth_dir.glob("*.md"))
+            doc_ids = [p.stem for p in gt_paths[:max_docs]]
+
     # Step 1: Parse PDFs unless this is an evaluation refresh.
     if args.skip_parse:
         logging.info("Skipping PDF parsing for %s; refreshing evaluation only.", engine_name)
     else:
         logging.info("Starting PDF parsing with %s...", engine_name)
-        process_markdown(engine_name, str(input_dir), doc_id=args.doc_id)
+        process_markdown(engine_name, str(input_dir), doc_id=args.doc_id, doc_ids=doc_ids)
 
     # Step 2: Run evaluation
     logging.info("Running evaluation...")
@@ -68,6 +77,7 @@ def run_benchmark(args: argparse.Namespace) -> dict:
         args.evaluation_filename,
         target_engine=engine_name,
         target_doc_id=args.doc_id,
+        target_doc_ids=doc_ids,
     )
 
     if not evaluation_paths:
@@ -80,7 +90,7 @@ def run_benchmark(args: argparse.Namespace) -> dict:
     prediction_markdown_dir = prediction_engine_dir / "markdown"
 
     table_detection_metrics = evaluate_table_detection_batch(
-        reference_path, prediction_markdown_dir
+        reference_path, prediction_markdown_dir, doc_ids=set(doc_ids) if doc_ids else None
     )
 
     # Load evaluation results
@@ -104,7 +114,11 @@ def run_benchmark(args: argparse.Namespace) -> dict:
         }
 
     # Step 5: Triage evaluation (for hybrid mode)
-    triage_metrics = evaluate_triage_batch(reference_path, prediction_engine_dir)
+    triage_metrics = evaluate_triage_batch(
+        reference_path,
+        prediction_engine_dir,
+        doc_ids=set(doc_ids) if doc_ids else None,
+    )
     if triage_metrics.total_pages_evaluated > 0:
         eval_data["triage"] = triage_metrics.to_dict()
         logging.info("Triage evaluation: recall=%.4f, fn=%d",
@@ -272,6 +286,12 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "--doc-id",
         default=None,
         help="Process only the specified document ID",
+    )
+    parser.add_argument(
+        "--max-docs",
+        type=int,
+        default=None,
+        help="Limit the benchmark to the first N documents (by ground-truth order).",
     )
     parser.add_argument(
         "--ground-truth-dir",

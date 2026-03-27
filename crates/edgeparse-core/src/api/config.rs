@@ -164,6 +164,21 @@ impl Default for ProcessingConfig {
     }
 }
 
+impl ProcessingConfig {
+    /// Returns true when a hybrid backend is configured.
+    pub fn hybrid_enabled(&self) -> bool {
+        !matches!(self.hybrid, HybridBackend::Off)
+    }
+
+    /// Returns true when local OCR recovery should run.
+    ///
+    /// OCR is only active in hybrid mode and can still be disabled explicitly
+    /// via `raster_table_ocr`.
+    pub fn raster_table_ocr_enabled(&self) -> bool {
+        self.raster_table_ocr && self.hybrid_enabled()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +196,19 @@ mod tests {
         assert!(config.raster_table_ocr);
         assert_eq!(config.hybrid, HybridBackend::Off);
         assert_eq!(config.hybrid_timeout, 30000);
+    }
+
+    #[test]
+    fn test_raster_table_ocr_requires_hybrid_mode() {
+        let mut config = ProcessingConfig::default();
+        assert!(!config.hybrid_enabled());
+        assert!(!config.raster_table_ocr_enabled());
+
+        config.hybrid = HybridBackend::DoclingFast;
+        assert!(config.hybrid_enabled());
+        assert!(config.raster_table_ocr_enabled());
+
+        config.raster_table_ocr = false;
+        assert!(!config.raster_table_ocr_enabled());
     }
 }

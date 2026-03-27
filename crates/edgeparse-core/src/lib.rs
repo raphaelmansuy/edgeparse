@@ -25,10 +25,12 @@ use crate::pdf::chunk_parser::extract_page_chunks;
 use crate::pdf::page_info;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::pdf::raster_table_ocr::{
-    recover_page_raster_table_cell_text, recover_raster_table_borders,
+    recover_dominant_image_text_chunks, recover_page_raster_table_cell_text,
+    recover_raster_table_borders,
 };
 use crate::pipeline::orchestrator::{run_pipeline, PipelineState};
 use crate::tagged::struct_tree::build_mcid_map;
+use std::time::Instant;
 
 /// Main entry point: convert a PDF file to structured data.
 ///
@@ -46,23 +48,50 @@ pub fn convert(
     input_path: &std::path::Path,
     config: &ProcessingConfig,
 ) -> Result<PdfDocument, EdgePdfError> {
+    let timing_enabled = timing_enabled();
+    let total_start = Instant::now();
+
+    let phase_start = Instant::now();
     let raw_doc = pdf::loader::load_pdf(input_path, config.password.as_deref())?;
+    log_phase_duration(timing_enabled, "load_pdf", phase_start);
 
     // Extract per-page geometry (MediaBox, CropBox, rotation) for use throughout the pipeline.
+    let phase_start = Instant::now();
     let page_info_list = page_info::extract_page_info(&raw_doc.document);
+    log_phase_duration(timing_enabled, "extract_page_info", phase_start);
 
     // Extract text chunks from each page
     let pages_map = raw_doc.document.get_pages();
+    // Index by 1-based page number for fast lookup during optional OCR recovery.
+    // Keep this out of the default fast path when OCR is disabled.
+    let page_info_by_number: Vec<Option<&page_info::PageInfo>> =
+        if config.raster_table_ocr_enabled() {
+            let mut index = vec![None; pages_map.len().saturating_add(1)];
+            for info in &page_info_list {
+                if let Some(slot) = index.get_mut(info.page_number as usize) {
+                    *slot = Some(info);
+                }
+            }
+            index
+        } else {
+            Vec::new()
+        };
     let mut page_contents = Vec::with_capacity(pages_map.len());
 
+    let phase_start = Instant::now();
     for (&page_num, &page_id) in &pages_map {
         let page_chunks = extract_page_chunks(&raw_doc.document, page_num, page_id)?;
+        let mut recovered_text_chunks = Vec::new();
         let mut recovered_tables = Vec::new();
-        if config.raster_table_ocr {
-            if let Some(page_info) = page_info_list
-                .iter()
-                .find(|info| info.page_number == page_num)
-            {
+        if config.raster_table_ocr_enabled() {
+            if let Some(Some(page_info)) = page_info_by_number.get(page_num as usize) {
+                recovered_text_chunks = recover_dominant_image_text_chunks(
+                    input_path,
+                    &page_info.crop_box,
+                    page_num,
+                    &page_chunks.text_chunks,
+                    &page_chunks.image_chunks,
+                );
                 recovered_tables = recover_raster_table_borders(
                     input_path,
                     &page_info.crop_box,
@@ -77,6 +106,7 @@ pub fn convert(
             .into_iter()
             .map(ContentElement::TextChunk)
             .collect();
+        elements.extend(recovered_text_chunks.into_iter().map(ContentElement::TextChunk));
 
         elements.extend(
             page_chunks
@@ -104,12 +134,15 @@ pub fn convert(
 
         page_contents.push(elements);
     }
+    log_phase_duration(timing_enabled, "extract_page_chunks", phase_start);
 
     // Run the processing pipeline
+    let phase_start = Instant::now();
     let mcid_map = build_mcid_map(&raw_doc.document);
     let mut pipeline_state = PipelineState::with_mcid_map(page_contents, config.clone(), mcid_map)
-        .with_page_info(page_info_list.clone());
+        .with_page_info(page_info_list);
     run_pipeline(&mut pipeline_state)?;
+    log_phase_duration(timing_enabled, "run_pipeline", phase_start);
 
     // Build the output document
     let file_name = input_path
@@ -126,9 +159,10 @@ pub fn convert(
     doc.creation_date = raw_doc.metadata.creation_date;
     doc.modification_date = raw_doc.metadata.modification_date;
 
-    if config.raster_table_ocr {
+    let phase_start = Instant::now();
+    if config.raster_table_ocr_enabled() {
         for (page_idx, page) in pipeline_state.pages.iter_mut().enumerate() {
-            if let Some(page_info) = page_info_list.get(page_idx) {
+            if let Some(page_info) = pipeline_state.page_info.get(page_idx) {
                 recover_page_raster_table_cell_text(
                     input_path,
                     &page_info.crop_box,
@@ -138,11 +172,19 @@ pub fn convert(
             }
         }
     }
+    log_phase_duration(
+        timing_enabled,
+        "recover_page_raster_table_cell_text",
+        phase_start,
+    );
 
     // Flatten pipeline output into document kids
+    let phase_start = Instant::now();
     for page in pipeline_state.pages {
         doc.kids.extend(page);
     }
+    log_phase_duration(timing_enabled, "flatten_document", phase_start);
+    log_phase_duration(timing_enabled, "convert_total", total_start);
 
     Ok(doc)
 }
@@ -268,6 +310,27 @@ pub enum EdgePdfError {
 impl From<lopdf::Error> for EdgePdfError {
     fn from(e: lopdf::Error) -> Self {
         EdgePdfError::LopdfError(e.to_string())
+    }
+}
+
+fn timing_enabled() -> bool {
+    std::env::var("EDGEPARSE_TIMING")
+        .map(|value| {
+            matches!(
+                value.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn log_phase_duration(enabled: bool, phase: &str, start: Instant) {
+    if enabled {
+        log::info!(
+            "Timing {}: {:.2} ms",
+            phase,
+            start.elapsed().as_secs_f64() * 1000.0
+        );
     }
 }
 

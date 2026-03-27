@@ -7,6 +7,7 @@
 #    make ci                             # full CI gate (fmt + lint + test)
 #    make bench                          # benchmark EdgeParse alone (200 PDFs)
 #    make bench-non-ocr                  # compare vs non-OCR tools  →  HTML
+#    make bench-hybrid                   # compare vs hybrid tools   →  HTML
 #    make bench-ocr                      # compare vs OCR/ML tools   →  HTML
 #    make bench-ocr OCR_ENGINES=docling  # partial OCR comparison
 # ==============================================================================
@@ -16,7 +17,7 @@
         build build-debug check fmt fmt-check lint test ci \
         install uninstall \
         bench bench-setup bench-check bench-doc \
-        bench-engines bench-non-ocr bench-ocr bench-compare-all bench-report \
+        bench-engines bench-non-ocr bench-hybrid bench-ocr bench-compare-all bench-report \
         run demo \
         publish-rust publish-rust-dry publish-python publish-python-dry \
         publish-node publish-node-dry publish-wasm publish-wasm-dry \
@@ -193,13 +194,29 @@ bench-non-ocr: build bench-setup ## EdgeParse vs non-OCR tools: OpenDataLoader, 
 		--group non-ocr --install \
 		--title "EdgeParse vs Non-OCR Tools"
 
+## Benchmark — Hybrid Comparison (backend-assisted)
+
+bench-hybrid: build bench-setup ## EdgeParse vs hybrid tools  →  HTML
+	$(call log,Hybrid comparison  —  EdgeParse + Hybrid adapters)
+	@cd $(BENCH_DIR) && uv run python compare_all.py \
+		--group hybrid --install \
+		--title "EdgeParse vs Hybrid Tools"
+
 ## Benchmark — OCR / ML Comparison (model-heavy)
 
 bench-ocr: build bench-setup ## EdgeParse vs OCR/ML tools  →  make bench-ocr  or  make bench-ocr OCR_ENGINES=docling
 	$(call log,OCR/ML comparison  —  EdgeParse + $(OCR_ENGINES))
 	@cd $(BENCH_DIR) && uv run python compare_all.py \
 		--engines edgeparse,$(OCR_ENGINES) --install \
+		$(if $(MAX_DOCS),--max-docs $(MAX_DOCS),) \
 		--title "EdgeParse vs OCR / ML Tools ($(OCR_ENGINES))"
+
+bench-ocr-chandra: build bench-setup ## EdgeParse vs Chandra OCR (no LLM)  →  make bench-ocr-chandra
+	$(call log,OCR comparison  —  EdgeParse + Chandra)
+	@cd $(BENCH_DIR) && uv run python compare_all.py \
+		--engines edgeparse,chandra --install \
+		$(if $(MAX_DOCS),--max-docs $(MAX_DOCS),) \
+		--title "EdgeParse vs Chandra OCR"
 
 ## Benchmark — Combined & Utilities
 

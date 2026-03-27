@@ -27,6 +27,7 @@ def process_markdown(
     engine_name: str,
     input_dir_name: str,
     doc_id: Optional[str] = None,
+    doc_ids: Optional[List[str]] = None,
 ):
     """Run PDF-to-Markdown conversion for a single engine.
 
@@ -40,12 +41,23 @@ def process_markdown(
     output_dir = project_root / "prediction" / engine_name / "markdown"
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    if doc_id and doc_ids:
+        raise ValueError("Use either doc_id or doc_ids, not both.")
+
     if doc_id:
         candidate_path = input_dir / f"{doc_id.strip()}.pdf"
         if not candidate_path.exists():
             raise FileNotFoundError(f"'{doc_id.strip()}.pdf' not found in {input_dir}.")
         document_paths = [candidate_path]
         input_path = candidate_path
+    elif doc_ids:
+        document_paths = []
+        for did in doc_ids:
+            candidate_path = input_dir / f"{did.strip()}.pdf"
+            if not candidate_path.exists():
+                raise FileNotFoundError(f"'{did.strip()}.pdf' not found in {input_dir}.")
+            document_paths.append(candidate_path)
+        input_path = input_dir
     else:
         document_paths = sorted(input_dir.glob("*.pdf"))
         input_path = input_dir

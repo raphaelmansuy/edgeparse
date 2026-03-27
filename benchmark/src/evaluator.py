@@ -399,6 +399,7 @@ def _evaluate_engine_version(
     prediction_dir: Path,
     output_filename: str,
     target_doc_id: Optional[str] = None,
+    target_doc_ids: Optional[set[str]] = None,
 ) -> Optional[Path]:
     """Run evaluation for a single ``engine/version`` directory."""
 
@@ -411,6 +412,11 @@ def _evaluate_engine_version(
     if not gt_paths:
         logging.error("No ground truth markdown files found in %s", gt_dir)
         return None
+    if target_doc_ids:
+        gt_paths = [p for p in gt_paths if p.stem in target_doc_ids]
+        if not gt_paths:
+            logging.warning("No matching documents to evaluate for %s", prediction_dir)
+            return None
 
     documents: List[DocumentScores] = []
 
@@ -424,6 +430,8 @@ def _evaluate_engine_version(
     for gt_path in gt_paths:
         doc_id = gt_path.stem
         if target_doc_id and doc_id != target_doc_id:
+            continue
+        if target_doc_ids and doc_id not in target_doc_ids:
             continue
 
         pred_path = markdown_dir / f"{doc_id}.md"
@@ -520,6 +528,7 @@ def run(
     output_filename: str,
     target_engine: Optional[str] = None,
     target_doc_id: Optional[str] = None,
+    target_doc_ids: Optional[List[str]] = None,
 ) -> List[Path]:
     """Evaluate engine/version pairs under ``prediction_root`` optionally filtered to a single document."""
     project_root = Path(__file__).parent.parent.resolve()
@@ -536,6 +545,7 @@ def run(
     start_time = time.time()
 
     generated_files: List[Path] = []
+    doc_id_set = set(target_doc_ids) if target_doc_ids else None
 
     if target_engine:
         engine_dirs = [prediction_root / target_engine]
@@ -547,7 +557,7 @@ def run(
 
     for engine_dir in engine_dirs:
         result_path = _evaluate_engine_version(
-            ground_truth_dir, engine_dir, output_filename, target_doc_id
+            ground_truth_dir, engine_dir, output_filename, target_doc_id, doc_id_set
         )
         if result_path:
             generated_files.append(result_path)

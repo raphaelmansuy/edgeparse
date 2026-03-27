@@ -172,6 +172,7 @@ def evaluate_triage(
 def evaluate_triage_batch(
     reference_path: Path,
     triage_dir: Path,
+    doc_ids: Optional[set[str]] = None,
 ) -> TriageMetrics:
     """Evaluate triage accuracy across multiple documents.
 
@@ -220,6 +221,8 @@ def evaluate_triage_batch(
 
         doc_name = triage_data.get("document", "")
         doc_id = doc_name.replace(".pdf", "")
+        if doc_ids and doc_id not in doc_ids:
+            continue
 
         table_pages = gt_table_pages.get(doc_id, set())
 

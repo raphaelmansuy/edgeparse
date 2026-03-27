@@ -5,7 +5,8 @@ description: "Combine EdgeParse with ML-based backends for maximum accuracy."
 
 ## What Is Hybrid Mode?
 
-Hybrid mode lets EdgeParse use an ML-based backend (like Docling) for specific tasks while keeping its fast rule-based pipeline for everything else.
+Hybrid mode is the switch that enables EdgeParse's OCR recovery path for raster-backed tables.
+In the current runtime, the local rule-based pipeline remains the main extractor and the OCR recovery path only activates when a hybrid backend is configured.
 
 ## Usage
 
@@ -36,10 +37,10 @@ result = edgeparse.convert("document.pdf",
 
 | Backend | Description |
 |---------|-------------|
-| `docling-fast` | Uses Docling's layout model for table detection |
+| `docling-fast` | Enables hybrid mode and OCR recovery for raster-backed tables |
 
 ## Trade-offs
 
-- **Speed**: Hybrid mode is slower (~1s/doc vs 0.064s/doc)
-- **Accuracy**: Higher TEDS score for complex tables
+- **Speed**: Hybrid mode is slower because OCR recovery is enabled on qualifying pages
+- **Accuracy**: Better recovery on image-backed tables and scanned table regions
 - **Dependencies**: Requires the backend to be installed

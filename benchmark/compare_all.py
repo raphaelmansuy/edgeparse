@@ -49,10 +49,13 @@ import json
 import logging
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 from typing import Dict, List, Optional, Sequence
 
 # Add src to path
@@ -88,7 +91,7 @@ ALL_ENGINES = [
     # Hybrid
     "opendataloader_hybrid_docling_fast", "opendataloader_hybrid_hancom",
     # OCR / ML
-    "docling", "marker", "mineru",
+    "chandra", "docling", "marker", "mineru",
 ]
 
 # pip install commands for each engine
@@ -97,9 +100,17 @@ INSTALL_COMMANDS = {
     "pymupdf4llm":    "pymupdf4llm",
     "markitdown":     "markitdown[all]",
     "liteparse":      "@llamaindex/liteparse",  # installed via run.py node adapter
+    "chandra":        "chandra-ocr",
     "docling":        "docling",
     "marker":         "marker-pdf",
     "mineru":         "mineru[all]",
+}
+
+# Engines that are not installed via pip/uv and require manual setup.
+MANUAL_INSTALL_HINTS = {
+    "chandra": "pip install chandra-ocr  (then run `chandra_vllm` or set CHANDRA_METHOD=hf and install chandra-ocr[hf])",
+    "opendataloader_hybrid_docling_fast": "pip install opendataloader-pdf[hybrid] and run opendataloader-pdf-hybrid",
+    "opendataloader_hybrid_hancom": "configure Hancom backend and run the hybrid service",
 }
 
 
@@ -139,9 +150,11 @@ def _load_result(engine: str) -> Optional[dict]:
     return data
 
 
-def _run_engine(engine: str) -> bool:
+def _run_engine(engine: str, max_docs: Optional[int] = None) -> bool:
     """Run benchmark for a single engine. Returns True on success."""
     cmd = [sys.executable, str(BENCH_DIR / "run.py"), "--engine", engine]
+    if max_docs:
+        cmd.extend(["--max-docs", str(max_docs)])
     result = subprocess.run(cmd, cwd=str(BENCH_DIR))
     return result.returncode == 0
 
@@ -176,6 +189,7 @@ def _install_engine(engine: str) -> bool:
 _ENGINE_PKG_MODULE: Dict[str, str] = {
     "pymupdf4llm": "pymupdf4llm",
     "markitdown":  "markitdown",
+    "chandra":     "chandra",
     "docling":     "docling",
     "marker":      "marker",
     "mineru":      "mineru",
@@ -189,6 +203,27 @@ _ISOLATED_ENGINES: Dict[str, str] = {
     "mineru": "mineru[all]",
 }
 
+def _tcp_reachable(host: str, port: int, timeout_s: float = 0.4) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout_s):
+            return True
+    except OSError:
+        return False
+
+def _openai_models_endpoint_ok(api_base: str, timeout_s: float = 0.8) -> bool:
+    """Return True if the given base URL looks like an OpenAI-compatible endpoint."""
+    url = api_base.rstrip("/") + "/models"
+    try:
+        req = Request(url, headers={"Accept": "application/json"})
+        with urlopen(req, timeout=timeout_s) as resp:
+            if getattr(resp, "status", 200) != 200:
+                return False
+            body = resp.read(2048)
+    except Exception:
+        return False
+    # Cheap check to avoid importing json in this hot path.
+    return b"data" in body
+
 
 def _check_engine_available(engine: str) -> bool:
     """Check if an engine is installed and available."""
@@ -199,10 +234,20 @@ def _check_engine_available(engine: str) -> bool:
         # opendataloader-pdf ships a CLI command. It lives in the active venv's
         # bin/ during `uv run`, so shutil.which covers both venv and system PATH.
         return shutil.which("opendataloader-pdf") is not None
-    if engine == "edgequake":
-        # pdf2md is a standalone Rust binary installed via cargo
-        cargo_bin = Path.home() / ".cargo" / "bin" / "pdf2md"
-        return cargo_bin.exists() or shutil.which("pdf2md") is not None
+    if engine == "chandra":
+        # Chandra is a CLI-based OCR engine.
+        if shutil.which("chandra") is None:
+            return False
+        method = os.environ.get("CHANDRA_METHOD", "vllm").lower()
+        if method == "hf":
+            # HF mode requires torch.
+            return importlib.util.find_spec("torch") is not None
+        # vLLM mode requires a running local server (default: http://localhost:8000/v1).
+        api_base = os.environ.get("VLLM_API_BASE", "http://localhost:8000/v1")
+        parsed = urlparse(api_base)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        return _tcp_reachable(host, port) and _openai_models_endpoint_ok(api_base)
     # Isolated engines are never permanently installed – always run via uv --with.
     if engine in _ISOLATED_ENGINES:
         return False
@@ -252,7 +297,7 @@ def _get_or_create_isolated_venv(engine: str) -> Optional[Path]:
     return python_bin
 
 
-def _run_engine_isolated(engine: str) -> bool:
+def _run_engine_isolated(engine: str, max_docs: Optional[int] = None) -> bool:
     """Run the benchmark for an engine in its own dedicated isolated venv.
 
     Marker and MinerU carry torch/pillow versions that conflict with the base
@@ -284,6 +329,8 @@ def _run_engine_isolated(engine: str) -> bool:
     env["PYTHONPATH"] = ":".join(extra_paths + ([existing] if existing else []))
 
     cmd = [str(python_bin), str(BENCH_DIR / "run.py"), "--engine", engine]
+    if max_docs:
+        cmd.extend(["--max-docs", str(max_docs)])
     result = subprocess.run(cmd, cwd=str(BENCH_DIR), env=env)
     return result.returncode == 0
 
@@ -317,6 +364,7 @@ def run_comparison(
     install_missing: bool = False,
     html_output: Optional[Path] = None,
     title: str = "EdgeParse Multi-Engine Benchmark",
+    max_docs: Optional[int] = None,
 ) -> Dict[str, dict]:
     """Run benchmarks for all specified engines and produce reports.
 
@@ -348,13 +396,25 @@ def run_comparison(
             isolated_engines.append(eng)
         elif install_missing:
             if _install_engine(eng):
-                active_engines.append(eng)
+                # Some engines require additional runtime setup (e.g. a local server)
+                # beyond package installation. Only schedule if they are now runnable.
+                if _check_engine_available(eng):
+                    active_engines.append(eng)
+                else:
+                    print(f"  {YELLOW}⚠ Skipping {display_name(eng)} (runtime not ready){RESET}")
+                    hint = MANUAL_INSTALL_HINTS.get(eng)
+                    if hint:
+                        print(f"    {DIM}Setup: {hint}{RESET}")
             else:
                 print(f"  {YELLOW}⚠ Skipping {display_name(eng)} (install failed){RESET}")
         else:
             print(f"  {YELLOW}⚠ Skipping {display_name(eng)} (not installed){RESET}")
-            pkg = INSTALL_COMMANDS.get(eng, "?")
-            print(f"    {DIM}Install with: pip install {pkg}{RESET}")
+            hint = MANUAL_INSTALL_HINTS.get(eng)
+            if hint:
+                print(f"    {DIM}Install with: {hint}{RESET}")
+            else:
+                pkg = INSTALL_COMMANDS.get(eng, "?")
+                print(f"    {DIM}Install with: pip install {pkg}{RESET}")
 
     all_planned = active_engines + isolated_engines
     if not all_planned:
@@ -378,7 +438,11 @@ def run_comparison(
         else:
             print(f"  [{i}/{len(all_planned)}] {BOLD}▶ Running {dname} benchmark...{RESET}")
             start = time.time()
-            success = _run_engine_isolated(eng) if is_isolated else _run_engine(eng)
+            success = (
+                _run_engine_isolated(eng, max_docs=max_docs)
+                if is_isolated
+                else _run_engine(eng, max_docs=max_docs)
+            )
             elapsed = time.time() - start
             if success:
                 print(f"  {GREEN}✓ {dname} completed in {elapsed:.1f}s{RESET}")
@@ -516,6 +580,12 @@ Examples:
         help="Custom title for the HTML report header",
     )
     parser.add_argument(
+        "--max-docs",
+        type=int,
+        default=None,
+        help="Limit all engines to the first N documents (by ground-truth order). Useful for expensive OCR/VLM engines.",
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         dest="list_engines",
@@ -573,6 +643,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         install_missing=args.install,
         html_output=html_path,
         title=title,
+        max_docs=args.max_docs,
     )
 
 
