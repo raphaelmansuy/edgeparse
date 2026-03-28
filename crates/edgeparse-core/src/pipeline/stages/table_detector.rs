@@ -561,7 +561,7 @@ pub fn filter_empty_tables(elements: Vec<ContentElement>) -> Vec<ContentElement>
                         .rows
                         .iter()
                         .flat_map(|r| &r.cells)
-                        .filter(|c| c.content.is_empty() && c.contents.is_empty())
+                        .filter(|cell| !cell_has_textual_content(cell))
                         .count();
 
                     let empty_fraction = empty_cells as f64 / total_cells as f64;
@@ -571,10 +571,16 @@ pub fn filter_empty_tables(elements: Vec<ContentElement>) -> Vec<ContentElement>
                         for row in &table.rows {
                             for cell in &row.cells {
                                 for token in &cell.content {
+                                    let text = token.base.value.trim();
+                                    if text.is_empty() || text == "[image]" {
+                                        continue;
+                                    }
                                     result.push(ContentElement::TextChunk(token.base.clone()));
                                 }
                                 for sub in &cell.contents {
-                                    result.push(sub.clone());
+                                    if element_has_textual_content(sub) {
+                                        result.push(sub.clone());
+                                    }
                                 }
                             }
                         }
@@ -601,12 +607,37 @@ fn is_tiny_empty_table(table: &TableBorder) -> bool {
         .rows
         .iter()
         .flat_map(|r| r.cells.iter())
-        .any(|c| !c.content.is_empty() || !c.contents.is_empty());
+        .any(cell_has_textual_content);
     if has_any_content {
         return false;
     }
 
     table.num_rows <= 1 || (table.bbox.width() <= 220.0 && table.bbox.height() <= 60.0)
+}
+
+fn cell_has_textual_content(cell: &TableBorderCell) -> bool {
+    cell.content.iter().any(|token| {
+        let text = token.base.value.trim();
+        !text.is_empty() && text != "[image]"
+    }) || cell.contents.iter().any(element_has_textual_content)
+}
+
+fn element_has_textual_content(element: &ContentElement) -> bool {
+    match element {
+        ContentElement::TextChunk(chunk) => !chunk.value.trim().is_empty(),
+        ContentElement::TextLine(line) => !line.value().trim().is_empty(),
+        ContentElement::TextBlock(block) => !block.value().trim().is_empty(),
+        ContentElement::Paragraph(paragraph) => !paragraph.base.value().trim().is_empty(),
+        ContentElement::Heading(heading) => !heading.base.base.value().trim().is_empty(),
+        ContentElement::NumberHeading(heading) => !heading.base.base.base.value().trim().is_empty(),
+        ContentElement::List(list) => list
+            .list_items
+            .iter()
+            .flat_map(|item| item.contents.iter())
+            .any(element_has_textual_content),
+        ContentElement::Table(_) | ContentElement::TableBorder(_) => true,
+        _ => false,
+    }
 }
 
 /// Filter out structurally suspicious tables and release their content back as
@@ -1884,6 +1915,101 @@ mod tests {
         let result = filter_suspicious_tables(vec![ContentElement::TableBorder(table)]);
         assert_eq!(result.len(), 1);
         assert!(matches!(result[0], ContentElement::TableBorder(_)));
+    }
+
+    #[test]
+    fn test_filter_empty_tables_drops_structural_only_cells() {
+        let image = ContentElement::Image(crate::models::chunks::ImageChunk {
+            bbox: BoundingBox::new(Some(1), 110.0, 110.0, 150.0, 150.0),
+            index: None,
+            level: None,
+        });
+        let table = TableBorder {
+            bbox: BoundingBox::new(Some(1), 100.0, 100.0, 300.0, 300.0),
+            index: None,
+            level: None,
+            x_coordinates: vec![100.0, 200.0, 300.0],
+            x_widths: vec![0.0; 3],
+            y_coordinates: vec![300.0, 200.0, 100.0],
+            y_widths: vec![0.0; 3],
+            rows: vec![
+                TableBorderRow {
+                    bbox: BoundingBox::new(Some(1), 100.0, 200.0, 300.0, 300.0),
+                    index: None,
+                    level: None,
+                    row_number: 0,
+                    cells: vec![
+                        TableBorderCell {
+                            bbox: BoundingBox::new(Some(1), 100.0, 200.0, 200.0, 300.0),
+                            index: None,
+                            level: None,
+                            row_number: 0,
+                            col_number: 0,
+                            row_span: 1,
+                            col_span: 1,
+                            content: vec![make_token("[image]", 12.0)],
+                            contents: vec![image.clone()],
+                            semantic_type: None,
+                        },
+                        TableBorderCell {
+                            bbox: BoundingBox::new(Some(1), 200.0, 200.0, 300.0, 300.0),
+                            index: None,
+                            level: None,
+                            row_number: 0,
+                            col_number: 1,
+                            row_span: 1,
+                            col_span: 1,
+                            content: Vec::new(),
+                            contents: vec![image.clone()],
+                            semantic_type: None,
+                        },
+                    ],
+                    semantic_type: None,
+                },
+                TableBorderRow {
+                    bbox: BoundingBox::new(Some(1), 100.0, 100.0, 300.0, 200.0),
+                    index: None,
+                    level: None,
+                    row_number: 1,
+                    cells: vec![
+                        TableBorderCell {
+                            bbox: BoundingBox::new(Some(1), 100.0, 100.0, 200.0, 200.0),
+                            index: None,
+                            level: None,
+                            row_number: 1,
+                            col_number: 0,
+                            row_span: 1,
+                            col_span: 1,
+                            content: vec![make_token("[image]", 12.0)],
+                            contents: vec![image.clone()],
+                            semantic_type: None,
+                        },
+                        TableBorderCell {
+                            bbox: BoundingBox::new(Some(1), 200.0, 100.0, 300.0, 200.0),
+                            index: None,
+                            level: None,
+                            row_number: 1,
+                            col_number: 1,
+                            row_span: 1,
+                            col_span: 1,
+                            content: Vec::new(),
+                            contents: vec![image],
+                            semantic_type: None,
+                        },
+                    ],
+                    semantic_type: None,
+                },
+            ],
+            num_rows: 2,
+            num_columns: 2,
+            is_bad_table: false,
+            is_table_transformer: false,
+            previous_table: None,
+            next_table: None,
+        };
+
+        let result = filter_empty_tables(vec![ContentElement::TableBorder(table)]);
+        assert!(result.is_empty());
     }
 
     #[test]

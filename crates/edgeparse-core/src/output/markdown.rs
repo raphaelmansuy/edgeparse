@@ -208,6 +208,15 @@ fn render_markdown_core(doc: &PdfDocument) -> String {
                     continue;
                 }
 
+                // Demote carried-over table header rows that were promoted to
+                // headings by the pipeline but only duplicate the table above.
+                if looks_like_table_header_duplicate_heading(doc, i, trimmed) {
+                    output.push_str(&escape_md_line_start(trimmed));
+                    output.push_str("\n\n");
+                    i += 1;
+                    continue;
+                }
+
                 // Demote headings that sit in the bottom margin of the page
                 // (running footers misclassified as headings by the pipeline).
                 if looks_like_bottom_margin_heading(doc, i) {
@@ -7814,6 +7823,9 @@ fn should_render_paragraph_as_heading(
     if looks_like_top_margin_running_header(doc, idx, text) {
         return false;
     }
+    if looks_like_hyphenated_table_title_continuation(doc, idx, text, next) {
+        return true;
+    }
     if should_render_element_as_heading(&doc.kids[idx], text, next) {
         return true;
     }
@@ -8377,6 +8389,129 @@ fn should_render_element_as_heading(
         && matches!(next, Some(ContentElement::List(_)))
         && !looks_like_chart_label_heading(element, trimmed)
         && !is_attribution
+}
+
+fn looks_like_hyphenated_table_title_continuation(
+    doc: &PdfDocument,
+    idx: usize,
+    text: &str,
+    next: Option<&ContentElement>,
+) -> bool {
+    if !matches!(next, Some(ContentElement::Table(_)) | Some(ContentElement::TableBorder(_))) {
+        return false;
+    }
+
+    let trimmed = text.trim();
+    if trimmed.is_empty()
+        || starts_with_caption_prefix(trimmed)
+        || looks_like_numbered_section(trimmed)
+        || looks_like_keyword_numbered_section(trimmed)
+        || !trimmed.ends_with(':')
+    {
+        return false;
+    }
+
+    let word_count = trimmed.split_whitespace().count();
+    if !(3..=5).contains(&word_count) || trimmed.len() > 60 {
+        return false;
+    }
+
+    let Some(first_alpha) = trimmed.chars().find(|ch| ch.is_alphabetic()) else {
+        return false;
+    };
+    if first_alpha.is_lowercase() {
+        return false;
+    }
+
+    let Some(prev_idx) = idx.checked_sub(1) else {
+        return false;
+    };
+    let prev_text = extract_element_text(&doc.kids[prev_idx]);
+    let prev_trimmed = prev_text.trim();
+    !prev_trimmed.is_empty() && prev_trimmed.ends_with('-')
+}
+
+fn looks_like_table_header_duplicate_heading(doc: &PdfDocument, idx: usize, text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.is_empty()
+        || starts_with_caption_prefix(trimmed)
+        || looks_like_numbered_section(trimmed)
+        || looks_like_keyword_numbered_section(trimmed)
+    {
+        return false;
+    }
+
+    let word_count = trimmed.split_whitespace().count();
+    if !(3..=10).contains(&word_count) || trimmed.len() > 96 {
+        return false;
+    }
+
+    let Some(prev_idx) = idx.checked_sub(1) else {
+        return false;
+    };
+    let Some(previous_table) = table_border_from_element(&doc.kids[prev_idx]) else {
+        return false;
+    };
+    if previous_table.num_columns < 3 || previous_table.rows.len() < 3 {
+        return false;
+    }
+
+    let mut rendered_rows = collect_table_border_rows(previous_table);
+    if rendered_rows.is_empty() {
+        return false;
+    }
+    merge_continuation_rows(&mut rendered_rows);
+    trim_leading_table_carryover_rows(&mut rendered_rows);
+
+    let Some(header_row) = rendered_rows.first() else {
+        return false;
+    };
+    let header_text = header_row
+        .iter()
+        .map(|cell| cell.trim())
+        .filter(|cell| !cell.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if !equivalent_heading_text(trimmed, &header_text) {
+        return false;
+    }
+
+    let page_number = doc.kids[idx].page_number();
+    let mut short_fragments = 0usize;
+    let mut numeric_fragments = 0usize;
+
+    for candidate in doc.kids.iter().skip(idx + 1) {
+        if candidate.page_number() != page_number {
+            break;
+        }
+        if matches!(candidate, ContentElement::Table(_) | ContentElement::TableBorder(_)) {
+            break;
+        }
+
+        let fragment = extract_element_text(candidate);
+        let fragment_trimmed = fragment.trim();
+        if fragment_trimmed.is_empty()
+            || looks_like_margin_page_number(doc, candidate, fragment_trimmed)
+        {
+            continue;
+        }
+
+        let fragment_words = fragment_trimmed.split_whitespace().count();
+        if fragment_words > 6 {
+            return false;
+        }
+
+        short_fragments += 1;
+        if fragment_trimmed.chars().any(|ch| ch.is_ascii_digit()) {
+            numeric_fragments += 1;
+        }
+
+        if short_fragments >= 3 {
+            break;
+        }
+    }
+
+    short_fragments >= 2 && numeric_fragments >= 1
 }
 
 fn looks_like_top_margin_running_header(doc: &PdfDocument, idx: usize, text: &str) -> bool {
@@ -13387,6 +13522,70 @@ mod tests {
         assert!(md.contains(
             "| Finland | N | Y | Prior approval from the Government of Aland may be required. |  |"
         ));
+    }
+
+    #[test]
+    fn test_hyphenated_table_title_continuation_renders_as_heading() {
+        let mut doc = PdfDocument::new("hyphenated-table-title.pdf".to_string());
+        doc.number_of_pages = 1;
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            724.0,
+            520.0,
+            738.0,
+            "With this in mind, here we have the 7 key competence areas selected to form a part of Eco-",
+        ));
+        doc.kids.push(make_paragraph_at(
+            72.0,
+            704.0,
+            260.0,
+            718.0,
+            "Circle's Competence Framework:",
+        ));
+        doc.kids.push(make_n_column_table(
+            &[
+                vec!["Eco-Circle Competence Framework"],
+                vec!["#1: The 3 Rs: Recycle-Reuse-Reduce"],
+                vec!["#2: Lifecycle of Circular Economy"],
+            ],
+            &[(140.0, 460.0)],
+        ));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains("# Circle's Competence Framework:"), "{md}");
+    }
+
+    #[test]
+    fn test_duplicate_table_header_heading_is_demoted() {
+        let mut doc = PdfDocument::new("duplicate-table-header-heading.pdf".to_string());
+        doc.number_of_pages = 1;
+        doc.kids.push(make_heading("MOHAVE COMMUNITY COLLEGE BIO181"));
+        doc.kids.push(make_n_column_table(
+            &[
+                vec!["", "Saccharometer", "DI Water", "Glucose Solution", "Yeast Suspension"],
+                vec!["1", "", "8 ml", "6 ml", "0 ml"],
+                vec!["2", "", "12 ml", "0 ml", "2 ml"],
+                vec!["3", "", "6 ml", "6 ml", "2 ml"],
+            ],
+            &[(72.0, 110.0), (110.0, 210.0), (210.0, 300.0), (300.0, 430.0), (430.0, 540.0)],
+        ));
+        doc.kids.push(make_heading_at(
+            72.0,
+            92.0,
+            390.0,
+            108.0,
+            "Saccharometer DI Water Glucose Solution Yeast Suspension",
+        ));
+        doc.kids.push(make_paragraph_at(72.0, 72.0, 120.0, 88.0, "below"));
+        doc.kids.push(make_paragraph_at(72.0, 56.0, 240.0, 72.0, "1 16 ml 12 ml"));
+        doc.kids.push(make_paragraph_at(296.0, 56.0, 340.0, 72.0, "0 ml"));
+
+        let md = to_markdown(&doc).unwrap();
+        assert!(md.contains("Saccharometer DI Water Glucose Solution Yeast Suspension"), "{md}");
+        assert!(
+            !md.contains("# Saccharometer DI Water Glucose Solution Yeast Suspension"),
+            "{md}"
+        );
     }
 
     #[test]

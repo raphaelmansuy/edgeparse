@@ -110,6 +110,26 @@ METRIC_INFO = {
             ("Flat documents (no headings)", "Any engine works"),
         ],
     },
+    "pbf": {
+        "name": "PBF — Paragraph Boundaries",
+        "short": "PBF",
+        "description": (
+            "Paragraph Boundary F1: compares paragraph breaks against ground truth. "
+            "It penalizes merged paragraphs and spurious splits even when token "
+            "content is otherwise similar."
+        ),
+        "higher_better": True,
+        "why": (
+            "Paragraph boundaries control chunking quality for retrieval and downstream "
+            "summarization. A parser that merges or fragments paragraphs changes context "
+            "windows even when the raw tokens are still present."
+        ),
+        "when": [
+            ("Narrative documents and articles", "EdgeParse [hybrid OCR]"),
+            ("Paragraph-sensitive chunking", "EdgeParse [hybrid OCR]"),
+            ("Flat line-oriented content", "Any engine works"),
+        ],
+    },
     "td_f1": {
         "name": "Table Detection F1",
         "short": "TD F1",
@@ -225,6 +245,7 @@ def _esc(text: str) -> str:
 def _get_display_name(engine: str) -> str:
     names = {
         "edgeparse": "EdgeParse",
+        "edgeparse_hybrid": "EdgeParse [hybrid OCR]",
         "opendataloader": "OpenDataLoader",
         "docling": "Docling",
         "marker": "Marker",
@@ -254,8 +275,22 @@ def _rank_class(rank: int) -> str:
 
 def _compute_ranks(values: List[tuple], higher_better: bool = True) -> Dict[str, int]:
     scored = [(e, v) for e, v in values if v is not None]
-    scored.sort(key=lambda x: x[1], reverse=higher_better)
-    return {e: i + 1 for i, (e, _) in enumerate(scored)}
+    if not scored:
+        return {}
+
+    decimals = 3 if not higher_better else 4
+    scored.sort(key=lambda x: round(x[1], decimals), reverse=higher_better)
+
+    ranks: Dict[str, int] = {}
+    current_rank = 0
+    last_value = None
+    for eng, value in scored:
+        rounded = round(value, decimals)
+        if last_value is None or rounded != last_value:
+            current_rank += 1
+            last_value = rounded
+        ranks[eng] = current_rank
+    return ranks
 
 
 def _svg_defs(engine_colors: Dict[str, str]) -> str:
@@ -396,9 +431,9 @@ def _svg_grouped_bar_chart(
 
     Inspired by the opendataloader.org benchmark visual comparison.
     """
-    metrics = ["nid", "teds", "mhs", "td_f1", "tqs"]
+    metrics = ["nid", "teds", "mhs", "pbf", "td_f1", "tqs"]
     metric_labels = {
-        "nid": "NID", "teds": "TEDS", "mhs": "MHS", "td_f1": "TD F1", "tqs": "TQS",
+        "nid": "NID", "teds": "TEDS", "mhs": "MHS", "pbf": "PBF", "td_f1": "TD F1", "tqs": "TQS",
     }
     n_metrics = len(metrics)
     n_engines = len(engines)
@@ -900,7 +935,7 @@ def generate_html_report(
 
     # Extract metric data
     metric_data: Dict[str, Dict[str, Optional[float]]] = {
-        "nid": {}, "teds": {}, "mhs": {}, "td_f1": {}, "speed": {}, "overall": {},
+        "nid": {}, "teds": {}, "mhs": {}, "pbf": {}, "td_f1": {}, "speed": {}, "overall": {},
         "tqs": {}, "rouge1": {}, "rougeL": {}, "bleu4": {}, "frag": {},
         "word_boundary_integrity_score": {}, "token_boundary_f1": {}, "cer": {}, "wer": {},
     }
@@ -912,6 +947,7 @@ def generate_html_report(
         metric_data["nid"][eng] = scores.get("nid_mean")
         metric_data["teds"][eng] = scores.get("teds_mean")
         metric_data["mhs"][eng] = scores.get("mhs_mean")
+        metric_data["pbf"][eng] = scores.get("paragraph_boundary_f1_mean")
         metric_data["td_f1"][eng] = td.get("f1")
         metric_data["speed"][eng] = spd.get("elapsed_per_doc")
         metric_data["overall"][eng] = scores.get("overall_mean")
@@ -927,7 +963,7 @@ def generate_html_report(
 
     # Compute ranks
     ranks: Dict[str, Dict[str, int]] = {}
-    for mk in ["nid", "teds", "mhs", "td_f1", "overall", "tqs", "rouge1", "rougeL", "bleu4", "frag", "word_boundary_integrity_score", "token_boundary_f1"]:
+    for mk in ["nid", "teds", "mhs", "pbf", "td_f1", "overall", "tqs", "rouge1", "rougeL", "bleu4", "frag", "word_boundary_integrity_score", "token_boundary_f1"]:
         vals = [(e, metric_data[mk].get(e)) for e in engines]
         ranks[mk] = _compute_ranks(vals, True)
     for mk in ["speed", "cer", "wer"]:
@@ -982,6 +1018,7 @@ def generate_html_report(
                  '<th scope="col">NID</th>'
                  '<th scope="col">TEDS</th>'
                  '<th scope="col">MHS</th>'
+                 '<th scope="col">PBF</th>'
                  '<th scope="col">TQS</th>'
                  '<th scope="col">TD F1</th>'
                  '<th scope="col">s/doc</th>'
@@ -995,7 +1032,7 @@ def generate_html_report(
     for eng in sorted_engines:
         ov_r = ranks.get("overall", {}).get(eng, 99)
         row = f'<tr><td><strong>{_esc(_get_display_name(eng))}</strong></td>'
-        for mk in ["nid", "teds", "mhs", "tqs", "td_f1"]:
+        for mk in ["nid", "teds", "mhs", "pbf", "tqs", "td_f1"]:
             val = metric_data[mk].get(eng)
             r = ranks[mk].get(eng, 99)
             cls = _rank_class(r)
@@ -1033,7 +1070,8 @@ def generate_html_report(
     # Individual metric bar charts (2-col grid) — structural metrics
     parts.append('<div class="charts-grid">')
     for mk, info in [("nid", METRIC_INFO["nid"]), ("teds", METRIC_INFO["teds"]),
-                     ("mhs", METRIC_INFO["mhs"]), ("td_f1", METRIC_INFO["td_f1"])]:
+                     ("mhs", METRIC_INFO["mhs"]), ("pbf", METRIC_INFO["pbf"]),
+                     ("td_f1", METRIC_INFO["td_f1"])]:
         data = [(e, metric_data[mk].get(e)) for e in engines]
         chart = _svg_bar_chart(
             info["name"], data, info["higher_better"],
@@ -1084,22 +1122,59 @@ def generate_html_report(
     parts.append("</section>")
 
     # ── Verdict ───────────────────────────────────────────────────────────────
-    win_counts: Dict[str, int] = {e: 0 for e in engines}
-    for mk in ["nid", "teds", "mhs", "td_f1", "tqs", "speed"]:
-        for eng, r in ranks[mk].items():
-            if r == 1:
-                win_counts[eng] += 1
+    verdict_metrics = ["nid", "teds", "mhs", "pbf", "td_f1", "tqs", "speed"]
+    outright_wins: Dict[str, int] = {e: 0 for e in engines}
+    shared_best: Dict[str, int] = {e: 0 for e in engines}
 
-    winner = max(win_counts, key=win_counts.get)
-    winner_wins = win_counts[winner]
+    for mk in verdict_metrics:
+        higher_better = METRIC_INFO[mk]["higher_better"]
+        decimals = 3 if mk == "speed" else 4
+        scored = [
+            (eng, metric_data[mk].get(eng))
+            for eng in engines
+            if metric_data[mk].get(eng) is not None
+        ]
+        if not scored:
+            continue
+
+        best_value = max(round(val, decimals) for _, val in scored) if higher_better else min(
+            round(val, decimals) for _, val in scored
+        )
+        best_engines = [eng for eng, val in scored if round(val, decimals) == best_value]
+        if len(best_engines) == 1:
+            outright_wins[best_engines[0]] += 1
+        else:
+            for eng in best_engines:
+                shared_best[eng] += 1
+
+    winner = max(
+        engines,
+        key=lambda eng: (
+            outright_wins[eng],
+            shared_best[eng],
+            metric_data["overall"].get(eng) or float("-inf"),
+        ),
+    )
 
     parts.append('<div class="verdict" role="status" aria-live="polite">')
-    parts.append(f'  <h3>{_esc(_get_display_name(winner))} wins {winner_wins}/6 metrics</h3>')
+    summary = f'{_esc(_get_display_name(winner))} leads with {outright_wins[winner]} outright metric wins'
+    if shared_best[winner] > 0:
+        summary += f' and {shared_best[winner]} shared-best ties'
+    parts.append(f'  <h3>{summary}</h3>')
     parts.append('  <p class="detail">')
-    others = [(e, c) for e, c in win_counts.items() if e != winner and c > 0]
+    others = [
+        (e, outright_wins[e], shared_best[e])
+        for e in engines
+        if e != winner and (outright_wins[e] > 0 or shared_best[e] > 0)
+    ]
     if others:
-        others.sort(key=lambda x: x[1], reverse=True)
-        other_parts = [f"{_get_display_name(e)}: {c}" for e, c in others]
+        others.sort(key=lambda x: (x[1], x[2]), reverse=True)
+        other_parts = []
+        for eng, wins, ties in others:
+            detail = f"{_get_display_name(eng)}: {wins} outright"
+            if ties > 0:
+                detail += f", {ties} tied"
+            other_parts.append(detail)
         parts.append(f'Other wins: {", ".join(other_parts)}')
     parts.append("</p></div>")
 

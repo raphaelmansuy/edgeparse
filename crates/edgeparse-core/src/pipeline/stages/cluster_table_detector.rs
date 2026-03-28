@@ -202,7 +202,7 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
             let tb = &ct.table_border;
             let tb_area = tb.bbox.width().max(0.0) * tb.bbox.height().max(0.0);
             let coverage = tb_area / page_area;
-            coverage <= max_page_coverage_for_table(tb)
+            coverage <= max_page_coverage_for_table(tb) && !is_sparse_ocr_layout_table(tb)
         })
         .collect();
 
@@ -1845,6 +1845,80 @@ fn is_key_value_table(table: &TableBorder) -> bool {
     }
 
     matched_rows * 10 >= table.num_rows * 6
+}
+
+fn is_sparse_ocr_layout_table(table: &TableBorder) -> bool {
+    if table.num_rows < 3 || table.num_columns < 2 {
+        return false;
+    }
+
+    let mut total_cells = 0usize;
+    let mut non_empty_cells = 0usize;
+    let mut occupied_columns = vec![0usize; table.num_columns];
+    let mut rows_with_multiple_cells = 0usize;
+    let mut total_tokens = 0usize;
+    let mut ocr_tokens = 0usize;
+    let mut numeric_tokens = 0usize;
+    let mut verbose_cells = 0usize;
+
+    for row in &table.rows {
+        let mut row_non_empty = 0usize;
+        for (col_idx, cell) in row.cells.iter().enumerate() {
+            total_cells += 1;
+            let text = cell_text(cell);
+            if text.is_empty() {
+                continue;
+            }
+            non_empty_cells += 1;
+            row_non_empty += 1;
+            if let Some(count) = occupied_columns.get_mut(col_idx) {
+                *count += 1;
+            }
+            if text.split_whitespace().count() >= 5 {
+                verbose_cells += 1;
+            }
+
+            for token in &cell.content {
+                let value = token.base.value.trim();
+                if value.is_empty() {
+                    continue;
+                }
+                total_tokens += 1;
+                if token.base.font_name == "OCR" {
+                    ocr_tokens += 1;
+                }
+                if value.chars().any(|ch| ch.is_ascii_digit()) {
+                    numeric_tokens += 1;
+                }
+            }
+        }
+        if row_non_empty >= 2 {
+            rows_with_multiple_cells += 1;
+        }
+    }
+
+    if total_cells == 0 || non_empty_cells == 0 || total_tokens == 0 {
+        return false;
+    }
+
+    let occupied_column_count = occupied_columns.iter().filter(|count| **count > 0).count();
+    let repeated_columns = occupied_columns.iter().filter(|count| **count >= 2).count();
+    let dominant_column_fill = occupied_columns.iter().copied().max().unwrap_or(0);
+
+    let occupancy_ratio = non_empty_cells as f64 / total_cells as f64;
+    let ocr_ratio = ocr_tokens as f64 / total_tokens as f64;
+    let numeric_ratio = numeric_tokens as f64 / total_tokens as f64;
+    let dominant_column_ratio = dominant_column_fill as f64 / non_empty_cells as f64;
+    let verbose_ratio = verbose_cells as f64 / non_empty_cells as f64;
+
+    ocr_ratio >= 0.85
+        && occupancy_ratio <= 0.55
+        && numeric_ratio <= 0.35
+        && rows_with_multiple_cells >= 2
+        && (repeated_columns < 3
+            || occupied_column_count <= 2
+            || dominant_column_ratio >= 0.62
+            || verbose_ratio >= 0.35)
 }
 
 fn is_key_value_cell_pair(left: &str, right: &str) -> bool {

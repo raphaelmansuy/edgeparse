@@ -106,7 +106,11 @@ pub fn convert(
             .into_iter()
             .map(ContentElement::TextChunk)
             .collect();
-        elements.extend(recovered_text_chunks.into_iter().map(ContentElement::TextChunk));
+        elements.extend(
+            recovered_text_chunks
+                .into_iter()
+                .map(ContentElement::TextChunk),
+        );
 
         elements.extend(
             page_chunks

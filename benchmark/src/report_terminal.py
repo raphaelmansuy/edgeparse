@@ -249,6 +249,15 @@ METRIC_INFO = {
     },
 }
 
+# Short aliases used by the comparison table and verdict logic.
+METRIC_INFO.update(
+    {
+        "pbf": dict(METRIC_INFO["paragraph_boundary_f1"]),
+        "td_f1": dict(METRIC_INFO["table_detection_f1"]),
+        "tqs": dict(METRIC_INFO["text_quality_score"]),
+    }
+)
+
 
 def _strip_ansi(text: str) -> str:
     return re.sub(r"\033\[[0-9;]*m", "", text)
@@ -546,8 +555,22 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
     # Compute ranks
     def _rank(values: list, higher_better: bool = True) -> Dict[str, int]:
         scored = [(e, v) for e, v in values if v is not None]
-        scored.sort(key=lambda x: x[1], reverse=higher_better)
-        return {e: i + 1 for i, (e, _) in enumerate(scored)}
+        if not scored:
+            return {}
+
+        decimals = 3 if not higher_better else 4
+        scored.sort(key=lambda x: round(x[1], decimals), reverse=higher_better)
+
+        ranks: Dict[str, int] = {}
+        current_rank = 0
+        last_value = None
+        for eng, value in scored:
+            rounded = round(value, decimals)
+            if last_value is None or rounded != last_value:
+                current_rank += 1
+                last_value = rounded
+            ranks[eng] = current_rank
+        return ranks
 
     ranks = {
         "nid": _rank(metric_values["nid"], True),
@@ -657,25 +680,54 @@ def print_comparison_report(results: Dict[str, dict]) -> None:
 
     # ── Verdict ───────────────────────────────────────────────────────────────
     print(SEP_DOUBLE)
-    # Count wins per engine
-    win_counts: Dict[str, int] = {e: 0 for e in engines}
-    for metric_key in ["nid", "teds", "mhs", "tqs", "td_f1", "speed"]:
-        for eng, rank in ranks[metric_key].items():
-            if rank == 1:
-                win_counts[eng] += 1
+    verdict_metrics = ["nid", "teds", "mhs", "pbf", "tqs", "td_f1", "speed"]
+    outright_wins: Dict[str, int] = {e: 0 for e in engines}
+    shared_best: Dict[str, int] = {e: 0 for e in engines}
+    for metric_key in verdict_metrics:
+        higher_better = METRIC_INFO[metric_key]["higher_better"]
+        decimals = 3 if metric_key == "speed" else 4
+        scored = [(e, v) for e, v in metric_values[metric_key] if v is not None]
+        if not scored:
+            continue
+        best_value = max(round(v, decimals) for _, v in scored) if higher_better else min(
+            round(v, decimals) for _, v in scored
+        )
+        best_engines = [eng for eng, value in scored if round(value, decimals) == best_value]
+        if len(best_engines) == 1:
+            outright_wins[best_engines[0]] += 1
+        else:
+            for eng in best_engines:
+                shared_best[eng] += 1
 
-    winner = max(win_counts, key=win_counts.get)
-    winner_wins = win_counts[winner]
-    total_metrics = 6
+    winner = max(
+        engines,
+        key=lambda eng: (
+            outright_wins[eng],
+            shared_best[eng],
+            next((value for name, value in metric_values["overall"] if name == eng), float("-inf")) or float("-inf"),
+        ),
+    )
 
-    print(f"  {BOLD}Verdict:{RESET}  {GREEN}{BOLD}{display_name(winner)}{RESET}"
-          f" wins {winner_wins}/{total_metrics} metrics.")
+    verdict = (f"  {BOLD}Verdict:{RESET}  {GREEN}{BOLD}{display_name(winner)}{RESET}"
+               f" leads with {outright_wins[winner]} outright metric wins")
+    if shared_best[winner] > 0:
+        verdict += f" and {shared_best[winner]} shared-best ties"
+    verdict += "."
+    print(verdict)
 
-    # Runner up
-    others = [(e, c) for e, c in win_counts.items() if e != winner and c > 0]
+    others = [
+        (e, outright_wins[e], shared_best[e])
+        for e in engines
+        if e != winner and (outright_wins[e] > 0 or shared_best[e] > 0)
+    ]
     if others:
-        others.sort(key=lambda x: x[1], reverse=True)
-        parts = [f"{display_name(e)}: {c}" for e, c in others]
+        others.sort(key=lambda x: (x[1], x[2]), reverse=True)
+        parts = []
+        for eng, wins, ties in others:
+            detail = f"{display_name(eng)}: {wins} outright"
+            if ties > 0:
+                detail += f", {ties} tied"
+            parts.append(detail)
         print(f"  {DIM}Other wins: {', '.join(parts)}{RESET}")
 
     print(SEP_DOUBLE)
