@@ -1,6 +1,6 @@
 {
   "name": "edgeparse",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "High-performance PDF extraction — Rust engine, Node.js interface",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -21,11 +21,11 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "edgeparse-darwin-arm64": "0.2.2",
-    "edgeparse-darwin-x64": "0.2.2",
-    "edgeparse-linux-arm64-gnu": "0.2.2",
-    "edgeparse-linux-x64-gnu": "0.2.2",
-    "edgeparse-win32-x64-msvc": "0.2.2"
+    "edgeparse-darwin-arm64": "0.2.3",
+    "edgeparse-darwin-x64": "0.2.3",
+    "edgeparse-linux-arm64-gnu": "0.2.3",
+    "edgeparse-linux-x64-gnu": "0.2.3",
+    "edgeparse-win32-x64-msvc": "0.2.3"
   },
   "engines": {
     "node": ">=18"

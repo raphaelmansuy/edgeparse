@@ -7,6 +7,24 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.3] — 2026-03-28
+
+### Added
+- Hybrid OCR false-positive guard: photo/matrix heuristics now prevent non-table images from being classified as tables in raster OCR mode
+- Tie-aware benchmark ranking: identical scores across engines now share a rank rather than producing misleading orderings
+
+### Changed
+- Heading detector robustness improvements for edge-case font-size clustering
+- Table cluster detector refined to reduce false positives on dense text regions
+- Benchmark HTML and terminal reporters include PBF in verdict summary; hybrid engines show correct display names
+- Site benchmark figures updated to 2026-03-28 snapshot: EdgeParse 0.7811 overall, 0.007 s/doc (83× faster than Docling, 49× faster than PyMuPDF4LLM, 2× faster than OpenDataLoader, TEDS 73% better than OpenDataLoader)
+
+### Fixed
+- Raster table OCR no longer triggers on photo-heavy or matrix-style pages that lack tabular structure
+- Speed and quality claims on the website corrected to match current measured benchmark figures
+
+---
+
 ## [0.2.2] — 2026-03-26
 
 ### Added

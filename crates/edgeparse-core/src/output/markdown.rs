@@ -8397,7 +8397,10 @@ fn looks_like_hyphenated_table_title_continuation(
     text: &str,
     next: Option<&ContentElement>,
 ) -> bool {
-    if !matches!(next, Some(ContentElement::Table(_)) | Some(ContentElement::TableBorder(_))) {
+    if !matches!(
+        next,
+        Some(ContentElement::Table(_)) | Some(ContentElement::TableBorder(_))
+    ) {
         return false;
     }
 
@@ -8484,7 +8487,10 @@ fn looks_like_table_header_duplicate_heading(doc: &PdfDocument, idx: usize, text
         if candidate.page_number() != page_number {
             break;
         }
-        if matches!(candidate, ContentElement::Table(_) | ContentElement::TableBorder(_)) {
+        if matches!(
+            candidate,
+            ContentElement::Table(_) | ContentElement::TableBorder(_)
+        ) {
             break;
         }
 
@@ -13559,15 +13565,28 @@ mod tests {
     fn test_duplicate_table_header_heading_is_demoted() {
         let mut doc = PdfDocument::new("duplicate-table-header-heading.pdf".to_string());
         doc.number_of_pages = 1;
-        doc.kids.push(make_heading("MOHAVE COMMUNITY COLLEGE BIO181"));
+        doc.kids
+            .push(make_heading("MOHAVE COMMUNITY COLLEGE BIO181"));
         doc.kids.push(make_n_column_table(
             &[
-                vec!["", "Saccharometer", "DI Water", "Glucose Solution", "Yeast Suspension"],
+                vec![
+                    "",
+                    "Saccharometer",
+                    "DI Water",
+                    "Glucose Solution",
+                    "Yeast Suspension",
+                ],
                 vec!["1", "", "8 ml", "6 ml", "0 ml"],
                 vec!["2", "", "12 ml", "0 ml", "2 ml"],
                 vec!["3", "", "6 ml", "6 ml", "2 ml"],
             ],
-            &[(72.0, 110.0), (110.0, 210.0), (210.0, 300.0), (300.0, 430.0), (430.0, 540.0)],
+            &[
+                (72.0, 110.0),
+                (110.0, 210.0),
+                (210.0, 300.0),
+                (300.0, 430.0),
+                (430.0, 540.0),
+            ],
         ));
         doc.kids.push(make_heading_at(
             72.0,
@@ -13576,12 +13595,18 @@ mod tests {
             108.0,
             "Saccharometer DI Water Glucose Solution Yeast Suspension",
         ));
-        doc.kids.push(make_paragraph_at(72.0, 72.0, 120.0, 88.0, "below"));
-        doc.kids.push(make_paragraph_at(72.0, 56.0, 240.0, 72.0, "1 16 ml 12 ml"));
-        doc.kids.push(make_paragraph_at(296.0, 56.0, 340.0, 72.0, "0 ml"));
+        doc.kids
+            .push(make_paragraph_at(72.0, 72.0, 120.0, 88.0, "below"));
+        doc.kids
+            .push(make_paragraph_at(72.0, 56.0, 240.0, 72.0, "1 16 ml 12 ml"));
+        doc.kids
+            .push(make_paragraph_at(296.0, 56.0, 340.0, 72.0, "0 ml"));
 
         let md = to_markdown(&doc).unwrap();
-        assert!(md.contains("Saccharometer DI Water Glucose Solution Yeast Suspension"), "{md}");
+        assert!(
+            md.contains("Saccharometer DI Water Glucose Solution Yeast Suspension"),
+            "{md}"
+        );
         assert!(
             !md.contains("# Saccharometer DI Water Glucose Solution Yeast Suspension"),
             "{md}"

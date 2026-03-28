@@ -983,7 +983,6 @@ fn extract_page_raster_cell_text(
     // Improved PSM selection based on cell aspect ratio
     let aspect_ratio = cell_bbox.width() / cell_bbox.height();
     let is_vertical = aspect_ratio < 0.8;
-    let is_horizontal = aspect_ratio > 1.3;
 
     // PSM modes ordered by likelihood of success for each cell shape.
     // Typography rationale:
@@ -996,8 +995,6 @@ fn extract_page_raster_cell_text(
     // contain at least one full token, so char-level segmentation yields fragments.
     let psm_modes: [&str; 5] = if is_vertical {
         ["7", "8", "6", "11", "13"]
-    } else if is_horizontal {
-        ["6", "7", "8", "11", "13"]
     } else {
         ["6", "7", "8", "11", "13"]
     };
@@ -1094,8 +1091,7 @@ fn parse_tesseract_tsv(tsv: &str) -> Vec<OcrWord> {
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(-1.0);
         let text = cols.next().unwrap_or("").trim().to_string();
-        if confidence < MIN_OCR_WORD_CONFIDENCE
-            || confidence > MAX_OCR_WORD_CONFIDENCE
+        if !(MIN_OCR_WORD_CONFIDENCE..=MAX_OCR_WORD_CONFIDENCE).contains(&confidence)
             || text.is_empty()
             || width == 0
             || height == 0
@@ -1173,7 +1169,6 @@ fn looks_like_chart_label_ocr(words: &[OcrWord]) -> bool {
         {
             inner_words += 1;
         }
-
     }
 
     if by_line.len() < 5 {
@@ -1218,7 +1213,9 @@ fn looks_like_chart_label_ocr(words: &[OcrWord]) -> bool {
         .map(|pair| pair[1] - pair[0])
         .fold(0.0, f64::max);
     let spans_full_table_width = stable_centers.len() >= 3
-        && stable_centers.iter().any(|center| *center - f64::from(min_left) <= width_f * 0.25)
+        && stable_centers
+            .iter()
+            .any(|center| *center - f64::from(min_left) <= width_f * 0.25)
         && stable_centers
             .iter()
             .any(|center| *center - f64::from(min_left) >= width_f * 0.75)
@@ -1396,9 +1393,7 @@ fn looks_like_equation_label_word(text: &str) -> bool {
     }
 
     let remainder: String = chars.collect();
-    !remainder.is_empty()
-        && remainder.len() <= 3
-        && remainder.chars().all(|ch| ch.is_ascii_digit())
+    !remainder.is_empty() && remainder.len() <= 3 && remainder.chars().all(|ch| ch.is_ascii_digit())
 }
 
 fn looks_like_table_ocr(words: &[OcrWord]) -> bool {
@@ -1628,7 +1623,11 @@ fn has_dense_prose_block_geometry(words: &[OcrWord]) -> bool {
         return false;
     }
 
-    let image_width = spatial_lines.iter().map(|line| line.right).max().unwrap_or(0);
+    let image_width = spatial_lines
+        .iter()
+        .map(|line| line.right)
+        .max()
+        .unwrap_or(0);
     if image_width == 0 {
         return false;
     }
@@ -1674,7 +1673,8 @@ fn has_dense_prose_block_geometry(words: &[OcrWord]) -> bool {
         best_right = current_right;
     }
 
-    let block_width_ratio = f64::from(best_right.saturating_sub(best_left)) / f64::from(image_width);
+    let block_width_ratio =
+        f64::from(best_right.saturating_sub(best_left)) / f64::from(image_width);
     best_line_count >= MIN_DENSE_PROSE_BLOCK_LINES
         && block_width_ratio >= MIN_DENSE_PROSE_BLOCK_WIDTH_RATIO
 }
@@ -1804,8 +1804,8 @@ fn build_numeric_table_border(words: &[OcrWord], image: &ImageChunk) -> Option<T
 
     let mut sorted_fill_counts = row_fill_counts.clone();
     sorted_fill_counts.sort_unstable();
-    let median_fill_ratio = sorted_fill_counts[sorted_fill_counts.len() / 2] as f64
-        / centers.len() as f64;
+    let median_fill_ratio =
+        sorted_fill_counts[sorted_fill_counts.len() / 2] as f64 / centers.len() as f64;
     if median_fill_ratio < MIN_NUMERIC_TABLE_MEDIAN_FILL_RATIO {
         return None;
     }
@@ -2058,8 +2058,8 @@ fn build_structured_ocr_table_border(words: &[OcrWord], image: &ImageChunk) -> O
 
     let mut sorted_fill_counts = row_fill_counts.clone();
     sorted_fill_counts.sort_unstable();
-    let median_fill_ratio = sorted_fill_counts[sorted_fill_counts.len() / 2] as f64
-        / centers.len() as f64;
+    let median_fill_ratio =
+        sorted_fill_counts[sorted_fill_counts.len() / 2] as f64 / centers.len() as f64;
     if median_fill_ratio < 0.5 {
         return None;
     }
@@ -2194,7 +2194,10 @@ fn is_matrixish_ocr_artifact_table(table: &TableBorder) -> bool {
         .iter()
         .filter(|text| is_substantive_ocr_cell_text(text))
         .count();
-    let short_cells = texts.iter().filter(|text| is_short_ocr_cell_text(text)).count();
+    let short_cells = texts
+        .iter()
+        .filter(|text| is_short_ocr_cell_text(text))
+        .count();
     let ambiguous_cells = texts
         .iter()
         .filter(|text| is_ambiguous_matrix_cell_text(text))
@@ -2253,7 +2256,7 @@ fn recover_bordered_raster_caption_from_gray(
     gray: &GrayImage,
     image: &ImageChunk,
 ) -> Option<TextChunk> {
-    let grid = detect_bordered_raster_grid(&gray)?;
+    let grid = detect_bordered_raster_grid(gray)?;
     let first_h = *grid.horizontal_lines.first()?;
     if first_h <= 2 {
         return None;
@@ -2305,7 +2308,7 @@ fn recover_bordered_raster_table_from_gray(
     gray: &GrayImage,
     image: &ImageChunk,
 ) -> Option<TableBorder> {
-    let grid = detect_bordered_raster_grid(&gray)?;
+    let grid = detect_bordered_raster_grid(gray)?;
     let num_cols = grid.vertical_lines.len().checked_sub(1)?;
     let num_rows = grid.horizontal_lines.len().checked_sub(1)?;
     if num_cols < 2 || num_rows < 2 {
@@ -2365,7 +2368,7 @@ fn recover_bordered_raster_table_from_gray(
                 x_coordinates[col_idx + 1],
                 y_coordinates[row_idx],
             );
-            let text = extract_raster_cell_text(&gray, row_idx, col_idx, x1, y1, x2, y2)
+            let text = extract_raster_cell_text(gray, row_idx, col_idx, x1, y1, x2, y2)
                 .unwrap_or_default();
             total_cells += 1;
 
@@ -2463,7 +2466,8 @@ fn is_obvious_bar_chart_raster(gray: &GrayImage) -> bool {
     let min_ink_pixels = (f64::from(width) * 0.35).ceil() as u32;
     let min_run_height = (height / 80).max(6);
     let wide_ink_row_runs = merge_runs(
-        (0..height).filter(|&y| count_ink_in_row(gray, y, RASTER_CHART_INK_THRESHOLD) >= min_ink_pixels),
+        (0..height)
+            .filter(|&y| count_ink_in_row(gray, y, RASTER_CHART_INK_THRESHOLD) >= min_ink_pixels),
     );
     let thick_runs = wide_ink_row_runs
         .into_iter()
@@ -2486,9 +2490,10 @@ fn is_obvious_vertical_bar_chart_raster(gray: &GrayImage) -> bool {
     let max_baseline_delta = (height / 14).max(8);
     let min_fill_ratio = 0.10;
 
-    let candidate_runs = merge_runs(
-        (0..width).filter(|&x| count_ink_in_column(gray, x, RASTER_CHART_INK_THRESHOLD) >= min_ink_pixels),
-    );
+    let candidate_runs =
+        merge_runs((0..width).filter(|&x| {
+            count_ink_in_column(gray, x, RASTER_CHART_INK_THRESHOLD) >= min_ink_pixels
+        }));
     let mut baselines = Vec::new();
     let mut has_dominant_bar = false;
     let mut qualifying_bars = 0usize;
@@ -2549,8 +2554,7 @@ fn is_obvious_vertical_bar_chart_raster(gray: &GrayImage) -> bool {
         .filter(|baseline| baseline.abs_diff(median_baseline) <= max_baseline_delta)
         .count();
 
-    aligned_baselines >= 2
-        && (has_dominant_bar || (qualifying_bars >= 4 && aligned_baselines >= 4))
+    aligned_baselines >= 2 && (has_dominant_bar || (qualifying_bars >= 4 && aligned_baselines >= 4))
 }
 
 /// Return true when the image appears to be a natural photograph rather than a
@@ -2727,12 +2731,8 @@ fn detect_bordered_raster_grid_single(gray: &GrayImage) -> Option<(RasterTableGr
         .map(|(start, end)| (start + end) / 2)
         .collect();
 
-    let Some((&rough_min_x, &rough_max_x)) = vertical_lines.first().zip(vertical_lines.last()) else {
-        return None;
-    };
-    let Some((&rough_min_y, &rough_max_y)) = horizontal_lines.first().zip(horizontal_lines.last()) else {
-        return None;
-    };
+    let (&rough_min_x, &rough_max_x) = vertical_lines.first().zip(vertical_lines.last())?;
+    let (&rough_min_y, &rough_max_y) = horizontal_lines.first().zip(horizontal_lines.last())?;
     if rough_max_x <= rough_min_x || rough_max_y <= rough_min_y {
         return None;
     }
@@ -3467,19 +3467,19 @@ fn score_ocr_words(words: &[OcrWord], width: u32, height: u32) -> f64 {
 }
 
 fn build_ocr_variants(gray: &GrayImage) -> Vec<GrayImage> {
-    let mut variants = Vec::with_capacity(7);
-    variants.push(gray.clone());
-    variants.push(contrast_stretch(gray));
-    variants.push(global_otsu_binarize(gray));
-    variants.push(local_mean_binarize(gray, LOCAL_BINARIZATION_RADIUS));
-    // Add morphological cleaning as a variant for denoising
-    variants.push(morphological_clean(gray));
-    // Sharpening (unsharp mask) helps Tesseract detect character boundaries on
-    // blurry / low-DPI cells that survive from low-resolution source PDFs.
-    variants.push(unsharp_mask(gray, 1.5));
-    // Gamma brightening improves contrast for very light ink cells.
-    variants.push(gamma_correct(gray, 0.6));
-    variants
+    vec![
+        gray.clone(),
+        contrast_stretch(gray),
+        global_otsu_binarize(gray),
+        local_mean_binarize(gray, LOCAL_BINARIZATION_RADIUS),
+        // Add morphological cleaning as a variant for denoising
+        morphological_clean(gray),
+        // Sharpening (unsharp mask) helps Tesseract detect character boundaries on
+        // blurry / low-DPI cells that survive from low-resolution source PDFs.
+        unsharp_mask(gray, 1.5),
+        // Gamma brightening improves contrast for very light ink cells.
+        gamma_correct(gray, 0.6),
+    ]
 }
 
 /// Sharpen a grayscale image using an unsharp mask.
@@ -3909,8 +3909,7 @@ fn lines_from_ocr_words(
             value: block.text,
             bbox: BoundingBox::new(image.bbox.page_number, left_x, bottom_y, right_x, top_y),
             font_name: "OCR".to_string(),
-            font_size: (f64::from(block.line_height_sum) / block.line_count.max(1) as f64)
-                .max(6.0),
+            font_size: (f64::from(block.line_height_sum) / block.line_count.max(1) as f64).max(6.0),
             font_weight: 400.0,
             italic_angle: 0.0,
             font_color: "#000000".to_string(),
@@ -4448,7 +4447,12 @@ mod tests {
     #[test]
     fn test_vertical_bar_chart_raster_is_rejected() {
         let mut image = GrayImage::from_pixel(360, 240, Luma([255]));
-        for &(x1, x2, y1) in &[(40, 78, 52), (92, 126, 118), (140, 170, 146), (184, 210, 162)] {
+        for &(x1, x2, y1) in &[
+            (40, 78, 52),
+            (92, 126, 118),
+            (140, 170, 146),
+            (184, 210, 162),
+        ] {
             for x in x1..x2 {
                 for y in y1..212 {
                     image.put_pixel(x, y, Luma([90]));
@@ -5001,7 +5005,11 @@ mod tests {
 
         enrich_empty_table_from_page_raster(&chart, &page_bbox, &mut table);
 
-        assert!(table.rows.iter().flat_map(|row| row.cells.iter()).all(|cell| cell.content.is_empty()));
+        assert!(table
+            .rows
+            .iter()
+            .flat_map(|row| row.cells.iter())
+            .all(|cell| cell.content.is_empty()));
     }
 
     #[test]
