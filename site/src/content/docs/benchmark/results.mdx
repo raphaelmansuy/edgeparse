@@ -35,7 +35,7 @@ import { benchmarkSnapshot, formatSpeed, getBenchmarkTool } from '../../../data/
 ## Key Takeaways
 
 - **Latest published snapshot:** updated {benchmarkSnapshot.lastUpdated} on {benchmarkSnapshot.hardware} across {benchmarkSnapshot.documentCount} documents
-- **EdgeParse is the fastest** — {formatSpeed(getBenchmarkTool('EdgeParse').speedSeconds)} per document, 12× faster than Docling
+- **EdgeParse is the fastest** — {formatSpeed(getBenchmarkTool('EdgeParse').speedSeconds)} per document, 83× faster than Docling
 - **Highest overall score** — {getBenchmarkTool('EdgeParse').overall.toFixed(3)} across the current six-engine comparison
 - **Best structure metrics** — leading NID ({getBenchmarkTool('EdgeParse').nid.toFixed(3)}), TEDS ({getBenchmarkTool('EdgeParse').teds.toFixed(3)}), and MHS ({getBenchmarkTool('EdgeParse').mhs.toFixed(3)})
 - **Best text metrics** — also leads paragraph boundaries, text quality, and table-detection F1 in the full benchmark report

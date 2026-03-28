@@ -1,12 +1,12 @@
 ---
 title: EdgeParse — Fast PDF Parser. Zero ML. Best Benchmark Score.
-description: EdgeParse extracts structured Markdown, JSON, and HTML from born-digital PDFs. 0.787 overall and 0.064 s/doc on the current 200-document benchmark. Python, Node.js, Rust, CLI, WebAssembly. Zero GPU. Zero OCR.
+description: EdgeParse extracts structured Markdown, JSON, and HTML from born-digital PDFs. 0.781 overall and 0.007 s/doc on the current 200-document benchmark. Python, Node.js, Rust, CLI, WebAssembly. Zero GPU. Zero OCR.
 template: splash
 hero:
   title: |
     PDF parsing for <span class="font-black text-transparent bg-clip-text bg-gradient-to-b from-accent-700 to-accent-400">AI Agents</span>
   tagline: |
-    The PDF-to-Markdown engine that leads the current benchmark without ML. 12× faster than Docling · 1.5× faster than OpenDataLoader · best reported scores across reading order, tables, headings, paragraphs, text quality, and speed. Python · Node.js · WebAssembly · Rust · CLI.
+    The PDF-to-Markdown engine that leads the current benchmark without ML. 83× faster than Docling · 2× faster than OpenDataLoader · best reported scores across reading order, tables, headings, paragraphs, text quality, and speed. Python · Node.js · WebAssembly · Rust · CLI.
   actions:
     - text: Get Started Free
       link: /getting-started/quick-start-python/
@@ -139,8 +139,8 @@ const html = convert_to_string(bytes, 'html');
   title="Everything Your AI Stack Needs From a PDF"
   subtitle="EdgeParse is the only PDF parser with ML-level accuracy that runs without ML — in Python, Node.js, the browser, and Rust."
   features={[
-    { icon: 'zap', title: '12× Faster Than Docling', description: `${formatSpeed(getBenchmarkTool('EdgeParse').speedSeconds)} on ${benchmarkSnapshot.hardware}. 6.9× faster than PyMuPDF4LLM and 1.5× faster than OpenDataLoader. Parallel per-page processing via Rayon — CPU only.` },
-    { icon: 'table', title: 'Best-in-Class Table Extraction', description: `TEDS score of ${getBenchmarkTool('EdgeParse').teds.toFixed(3)} — best in the current published comparison and 83% better than OpenDataLoader heuristic mode (${getBenchmarkTool('OpenDataLoader').teds.toFixed(3)}). Ruling-line + borderless cluster detection with merged cell support.` },
+    { icon: 'zap', title: '83× Faster Than Docling', description: `${formatSpeed(getBenchmarkTool('EdgeParse').speedSeconds)} on ${benchmarkSnapshot.hardware}. 49× faster than PyMuPDF4LLM and 2× faster than OpenDataLoader. Parallel per-page processing via Rayon — CPU only.` },
+    { icon: 'table', title: 'Best-in-Class Table Extraction', description: `TEDS score of ${getBenchmarkTool('EdgeParse').teds.toFixed(3)} — best in the current published comparison and 73% better than OpenDataLoader heuristic mode (${getBenchmarkTool('OpenDataLoader').teds.toFixed(3)}). Ruling-line + borderless cluster detection with merged cell support.` },
     { icon: 'target', title: 'Multi-Column Reading Order', description: `XY-Cut++ reads multi-column layouts, sidebars, and mixed content in the correct logical order. NID score of ${getBenchmarkTool('EdgeParse').nid.toFixed(3)} — highest in the current benchmark snapshot.` },
     { icon: 'layers', title: 'Full Document Hierarchy', description: `Headings, paragraphs, lists, figures — all classified with nesting. MHS score of ${getBenchmarkTool('EdgeParse').mhs.toFixed(3)}, best among the compared engines in the current release snapshot.` },
     { icon: 'globe', title: 'WebAssembly: Runs in the Browser', description: 'The only PDF parser with a WebAssembly build. Full Rust engine in the browser — PDF data never leaves the device. No server, no uploads, offline-capable.' },
