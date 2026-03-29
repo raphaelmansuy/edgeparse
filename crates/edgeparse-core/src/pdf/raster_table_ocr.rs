@@ -67,6 +67,7 @@ const MIN_NUMERIC_TABLE_MEDIAN_FILL_RATIO: f64 = 0.40;
 const MIN_BORDERED_CELL_DARK_RATIO: f64 = 0.03;
 const MIN_BORDERED_INKED_CELL_RATIO: f64 = 0.18;
 const MIN_BORDERED_ROWS_WITH_INK: usize = 2;
+const MAX_BORDERED_TABLE_PER_CELL_FALLBACK_CELLS: usize = 24;
 const MIN_BRIGHT_PHOTO_MID_TONE_RATIO: f64 = 0.24;
 const MIN_BRIGHT_PHOTO_HISTOGRAM_BINS: usize = 8;
 const MIN_BRIGHT_PHOTO_ENTROPY: f64 = 1.6;
@@ -502,17 +503,22 @@ pub fn recover_page_raster_table_cell_text(
     }
 
     let native_text_chars = page_native_text_chars(elements);
-    if native_text_chars > MAX_NATIVE_TEXT_CHARS_FOR_PAGE_RASTER_OCR {
-        return;
-    }
 
     let candidate_indices: Vec<usize> = elements
         .iter()
         .enumerate()
         .filter_map(|(idx, elem)| {
-            table_candidate_ref(elem)
-                .filter(|table| table_needs_page_raster_ocr(table))
-                .map(|_| idx)
+            let table = table_candidate_ref(elem)?;
+            let local_text_chars = native_text_chars_in_region(elements, &table.bbox);
+            if !table_needs_page_raster_ocr(table) {
+                return None;
+            }
+            if native_text_chars > MAX_NATIVE_TEXT_CHARS_FOR_PAGE_RASTER_OCR
+                && local_text_chars > MAX_NATIVE_TEXT_CHARS_FOR_PAGE_RASTER_OCR
+            {
+                return None;
+            }
+            Some(idx)
         })
         .take(MAX_EMPTY_TABLES_FOR_PAGE_RASTER_OCR)
         .collect();
@@ -590,6 +596,38 @@ fn table_candidate_mut(elem: &mut ContentElement) -> Option<&mut TableBorder> {
     }
 }
 
+fn page_native_text_chars(elements: &[ContentElement]) -> usize {
+    native_text_chars_in_region(elements, &BoundingBox::new(None, f64::MIN, f64::MIN, f64::MAX, f64::MAX))
+}
+
+fn native_text_chars_in_region(elements: &[ContentElement], region: &BoundingBox) -> usize {
+    elements
+        .iter()
+        .filter(|elem| region.overlaps(elem.bbox()))
+        .map(|elem| match elem {
+            ContentElement::Paragraph(p) => p.base.value().chars().count(),
+            ContentElement::Heading(h) => h.base.base.value().chars().count(),
+            ContentElement::NumberHeading(h) => h.base.base.base.value().chars().count(),
+            ContentElement::TextBlock(tb) => tb.value().chars().count(),
+            ContentElement::TextLine(tl) => tl.value().chars().count(),
+            ContentElement::TextChunk(tc) => tc.value.chars().count(),
+            ContentElement::List(list) => list
+                .list_items
+                .iter()
+                .flat_map(|item| item.contents.iter())
+                .map(|content| match content {
+                    ContentElement::Paragraph(p) => p.base.value().chars().count(),
+                    ContentElement::TextBlock(tb) => tb.value().chars().count(),
+                    ContentElement::TextLine(tl) => tl.value().chars().count(),
+                    ContentElement::TextChunk(tc) => tc.value.chars().count(),
+                    _ => 0,
+                })
+                .sum(),
+            _ => 0,
+        })
+        .sum()
+}
+
 fn recover_from_page_images(
     input_path: &Path,
     temp_dir: &Path,
@@ -660,46 +698,54 @@ fn recover_from_page_images(
     recovered
 }
 
-fn page_native_text_chars(elements: &[ContentElement]) -> usize {
-    elements
-        .iter()
-        .map(|elem| match elem {
-            ContentElement::Paragraph(p) => p.base.value().chars().count(),
-            ContentElement::Heading(h) => h.base.base.value().chars().count(),
-            ContentElement::NumberHeading(h) => h.base.base.base.value().chars().count(),
-            ContentElement::TextBlock(tb) => tb.value().chars().count(),
-            ContentElement::TextLine(tl) => tl.value().chars().count(),
-            ContentElement::TextChunk(tc) => tc.value.chars().count(),
-            ContentElement::List(list) => list
-                .list_items
-                .iter()
-                .flat_map(|item| item.contents.iter())
-                .map(|content| match content {
-                    ContentElement::Paragraph(p) => p.base.value().chars().count(),
-                    ContentElement::TextBlock(tb) => tb.value().chars().count(),
-                    ContentElement::TextLine(tl) => tl.value().chars().count(),
-                    ContentElement::TextChunk(tc) => tc.value.chars().count(),
-                    _ => 0,
-                })
-                .sum(),
-            _ => 0,
-        })
-        .sum()
+fn table_needs_page_raster_ocr(table: &TableBorder) -> bool {
+    if table.num_rows < 1 || table.num_columns < 2 {
+        return false;
+    }
+
+    let total_cells = table.rows.iter().map(|row| row.cells.len()).sum::<usize>();
+    if total_cells == 0 {
+        return false;
+    }
+
+    let text_cells = table_text_cell_count(table);
+    let text_cell_ratio = text_cells as f64 / total_cells as f64;
+    text_cells == 0 || text_cell_ratio < MIN_RASTER_TABLE_TEXT_CELL_RATIO
 }
 
-fn table_needs_page_raster_ocr(table: &TableBorder) -> bool {
-    table.num_rows >= 1
-        && table.num_columns >= 2
-        && table
-            .rows
-            .iter()
-            .flat_map(|row| row.cells.iter())
-            .all(|cell| {
-                !cell
-                    .content
-                    .iter()
-                    .any(|token| matches!(token.token_type, TableTokenType::Text))
-            })
+fn table_text_cell_count(table: &TableBorder) -> usize {
+    table
+        .rows
+        .iter()
+        .flat_map(|row| row.cells.iter())
+        .filter(|cell| cell_has_substantive_text(cell))
+        .count()
+}
+
+fn cell_has_substantive_text(cell: &TableBorderCell) -> bool {
+    let has_token_text = cell.content.iter().any(|token| {
+        matches!(token.token_type, TableTokenType::Text)
+            && token.base.value.chars().any(|ch| ch.is_alphanumeric())
+    });
+    if has_token_text {
+        return true;
+    }
+
+    cell.contents.iter().any(|elem| match elem {
+        ContentElement::Paragraph(p) => p.base.value().chars().any(|ch| ch.is_alphanumeric()),
+        ContentElement::Heading(h) => h.base.base.value().chars().any(|ch| ch.is_alphanumeric()),
+        ContentElement::NumberHeading(h) => h
+            .base
+            .base
+            .base
+            .value()
+            .chars()
+            .any(|ch| ch.is_alphanumeric()),
+        ContentElement::TextBlock(tb) => tb.value().chars().any(|ch| ch.is_alphanumeric()),
+        ContentElement::TextLine(tl) => tl.value().chars().any(|ch| ch.is_alphanumeric()),
+        ContentElement::TextChunk(tc) => tc.value.chars().any(|ch| ch.is_alphanumeric()),
+        _ => false,
+    })
 }
 
 fn enrich_empty_table_from_page_raster(
@@ -763,10 +809,10 @@ fn enrich_empty_table_from_page_raster(
     let cropped = gray
         .view(crop_left, crop_top, crop_width, crop_height)
         .to_image();
-    if is_obvious_bar_chart_raster(&cropped)
-        || is_natural_photograph_raster(&cropped)
-        || is_dark_ui_screenshot_raster(&cropped)
-    {
+    let is_bar_chart = is_obvious_bar_chart_raster(&cropped);
+    let is_photo = is_natural_photograph_raster(&cropped);
+    let is_ui = is_dark_ui_screenshot_raster(&cropped);
+    if is_bar_chart || is_photo || is_ui {
         return;
     }
     let bordered = expand_white_border(&cropped, TABLE_RASTER_OCR_BORDER_PX);
@@ -785,7 +831,8 @@ fn enrich_empty_table_from_page_raster(
         fill_cells_with_per_cell_ocr(gray, table, &empty_cells);
         return;
     }
-    if looks_like_chart_label_ocr(&words) {
+    let chart_like = looks_like_chart_label_ocr(&words);
+    if chart_like {
         return;
     }
 
@@ -1815,8 +1862,12 @@ fn build_numeric_table_border(words: &[OcrWord], image: &ImageChunk) -> Option<T
             .partial_cmp(&a.top_y)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    let x_coordinates =
-        build_boundaries_from_centers(&centers, image.bbox.left_x, image.bbox.right_x);
+    let x_coordinates = build_boundaries_from_centers(
+        &centers,
+        image.bbox.left_x,
+        image.bbox.right_x,
+        image_width,
+    );
     let row_bounds: Vec<(f64, f64)> = built_rows
         .iter()
         .map(|row| (row.top_y, row.bottom_y))
@@ -2069,8 +2120,12 @@ fn build_structured_ocr_table_border(words: &[OcrWord], image: &ImageChunk) -> O
             .partial_cmp(&a.top_y)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    let x_coordinates =
-        build_boundaries_from_centers(&centers, image.bbox.left_x, image.bbox.right_x);
+    let x_coordinates = build_boundaries_from_centers(
+        &centers,
+        image.bbox.left_x,
+        image.bbox.right_x,
+        image_width,
+    );
     let row_bounds: Vec<(f64, f64)> = built_rows
         .iter()
         .map(|row| (row.top_y, row.bottom_y))
@@ -2345,6 +2400,11 @@ fn recover_bordered_raster_table_from_gray(
     let mut non_empty_cells = 0usize;
     let mut rows_with_text = 0usize;
     let mut total_cells = 0usize;
+    let mut whole_table_buckets =
+        collect_bordered_table_ocr_buckets(gray, &grid, num_rows, num_cols)
+            .unwrap_or_else(|| vec![Vec::new(); num_rows * num_cols]);
+    let allow_per_cell_fallback =
+        num_rows.saturating_mul(num_cols) <= MAX_BORDERED_TABLE_PER_CELL_FALLBACK_CELLS;
     for row_idx in 0..num_rows {
         let row_bbox = BoundingBox::new(
             image.bbox.page_number,
@@ -2368,8 +2428,27 @@ fn recover_bordered_raster_table_from_gray(
                 x_coordinates[col_idx + 1],
                 y_coordinates[row_idx],
             );
-            let text = extract_raster_cell_text(gray, row_idx, col_idx, x1, y1, x2, y2)
-                .unwrap_or_default();
+            let bucket_idx = row_idx * num_cols + col_idx;
+            let text = if let Some(parts) = whole_table_buckets.get_mut(bucket_idx) {
+                if parts.is_empty() {
+                    String::new()
+                } else {
+                    parts.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+                    let raw = parts
+                        .iter()
+                        .map(|(_, _, text)| text.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    normalize_raster_cell_text(row_idx, col_idx, raw)
+                }
+            } else {
+                String::new()
+            };
+            let text = if text.is_empty() && allow_per_cell_fallback {
+                extract_raster_cell_text(gray, row_idx, col_idx, x1, y1, x2, y2).unwrap_or_default()
+            } else {
+                text
+            };
             total_cells += 1;
 
             let mut content = Vec::new();
@@ -2454,6 +2533,69 @@ fn recover_bordered_raster_table_from_gray(
         previous_table: None,
         next_table: None,
     })
+}
+
+fn collect_bordered_table_ocr_buckets(
+    gray: &GrayImage,
+    grid: &RasterTableGrid,
+    num_rows: usize,
+    num_cols: usize,
+) -> Option<Vec<Vec<(u32, u32, String)>>> {
+    if num_rows == 0 || num_cols == 0 {
+        return None;
+    }
+
+    let bordered = expand_white_border(gray, TABLE_RASTER_OCR_BORDER_PX);
+    let scaled = image::imageops::resize(
+        &bordered,
+        bordered.width() * OCR_SCALE_FACTOR,
+        bordered.height() * OCR_SCALE_FACTOR,
+        image::imageops::FilterType::Lanczos3,
+    );
+    let words = run_tesseract_tsv_words_best(&scaled, &["6", "11"], |_| true)?;
+    if words.is_empty() || looks_like_chart_label_ocr(&words) {
+        return None;
+    }
+
+    let mut buckets = vec![Vec::new(); num_rows * num_cols];
+    let scale = f64::from(OCR_SCALE_FACTOR);
+    let border = f64::from(TABLE_RASTER_OCR_BORDER_PX);
+
+    for word in words {
+        let cx_scaled = f64::from(word.left) + f64::from(word.width) / 2.0;
+        let cy_scaled = f64::from(word.top) + f64::from(word.height) / 2.0;
+
+        let cx = cx_scaled / scale - border;
+        let cy = cy_scaled / scale - border;
+        if cx < 0.0 || cy < 0.0 {
+            continue;
+        }
+
+        let cx = match u32::try_from(cx.round() as i64) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        let cy = match u32::try_from(cy.round() as i64) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+
+        let col_idx = grid
+            .vertical_lines
+            .windows(2)
+            .position(|span| cx >= span[0] && cx < span[1]);
+        let row_idx = grid
+            .horizontal_lines
+            .windows(2)
+            .position(|span| cy >= span[0] && cy < span[1]);
+        let (Some(row_idx), Some(col_idx)) = (row_idx, col_idx) else {
+            continue;
+        };
+
+        buckets[row_idx * num_cols + col_idx].push((cy, cx, word.text));
+    }
+
+    Some(buckets)
 }
 
 fn is_obvious_bar_chart_raster(gray: &GrayImage) -> bool {
@@ -2897,11 +3039,28 @@ fn merge_runs(values: impl Iterator<Item = u32>) -> Vec<(u32, u32)> {
     runs
 }
 
-fn build_boundaries_from_centers(centers: &[f64], left_edge: f64, right_edge: f64) -> Vec<f64> {
+fn build_boundaries_from_centers(
+    centers: &[f64],
+    left_edge: f64,
+    right_edge: f64,
+    image_width: u32,
+) -> Vec<f64> {
     let mut boundaries = Vec::with_capacity(centers.len() + 1);
     boundaries.push(left_edge);
+    if centers.len() < 2 || image_width == 0 || right_edge <= left_edge {
+        boundaries.push(right_edge.max(left_edge));
+        return boundaries;
+    }
+
+    let page_width = right_edge - left_edge;
+    let mut previous = left_edge;
     for pair in centers.windows(2) {
-        boundaries.push((pair[0] + pair[1]) / 2.0);
+        let midpoint_px = ((pair[0] + pair[1]) / 2.0).clamp(0.0, f64::from(image_width));
+        let boundary =
+            left_edge + midpoint_px / f64::from(image_width) * page_width;
+        let boundary = boundary.clamp(previous, right_edge);
+        boundaries.push(boundary);
+        previous = boundary;
     }
     boundaries.push(right_edge);
     boundaries
@@ -4251,6 +4410,7 @@ fn parse_pdfimages_list(output: &str) -> Vec<PdfImagesListEntry> {
 mod tests {
     use super::*;
     use image::GrayImage;
+    use crate::models::enums::{PdfLayer, TextFormat, TextType};
 
     fn image_chunk() -> ImageChunk {
         ImageChunk {
@@ -4281,6 +4441,28 @@ mod tests {
             height: 12,
             text: text.to_string(),
             confidence: 90.0,
+        }
+    }
+
+    fn text_chunk(value: &str, bbox: BoundingBox) -> TextChunk {
+        TextChunk {
+            value: value.to_string(),
+            bbox,
+            font_name: "Helvetica".to_string(),
+            font_size: 12.0,
+            font_weight: 400.0,
+            italic_angle: 0.0,
+            font_color: "#000000".to_string(),
+            contrast_ratio: 21.0,
+            symbol_ends: Vec::new(),
+            text_format: TextFormat::Normal,
+            text_type: TextType::Regular,
+            pdf_layer: PdfLayer::Main,
+            ocg_visible: true,
+            index: None,
+            page_number: Some(1),
+            level: None,
+            mcid: None,
         }
     }
 
@@ -4338,6 +4520,40 @@ mod tests {
         assert_eq!(test_cell_text(&table.rows[0].cells[0]), "Tube");
         assert_eq!(test_cell_text(&table.rows[1].cells[1]), "BamHI");
         assert_eq!(test_cell_text(&table.rows[3].cells[2]), "control");
+    }
+
+    #[test]
+    fn test_structured_ocr_table_border_scales_column_boundaries_to_page_bbox() {
+        let image = ImageChunk {
+            bbox: BoundingBox::new(Some(1), 56.6929, 163.6519, 555.3071, 442.0069),
+            index: Some(1),
+            level: None,
+        };
+        let words = vec![
+            word_at((1, 1, 1), 10, 10, 110, "TempC"),
+            word_at((1, 1, 1), 255, 10, 150, "KinViscA"),
+            word_at((1, 1, 1), 520, 10, 110, "TempC"),
+            word_at((1, 1, 1), 760, 10, 170, "KinViscB"),
+            word_at((1, 1, 2), 10, 44, 24, "0"),
+            word_at((1, 1, 2), 255, 44, 130, "1.793E-06"),
+            word_at((1, 1, 2), 520, 44, 28, "25"),
+            word_at((1, 1, 2), 760, 44, 130, "8.930E-07"),
+            word_at((1, 1, 3), 10, 78, 24, "1"),
+            word_at((1, 1, 3), 255, 78, 130, "1.732E-06"),
+            word_at((1, 1, 3), 520, 78, 28, "26"),
+            word_at((1, 1, 3), 760, 78, 130, "8.760E-07"),
+        ];
+
+        let table = build_structured_ocr_table_border(&words, &image).expect("structured table");
+
+        assert_eq!(table.num_columns, 4);
+        assert_eq!(table.num_rows, 3);
+        assert_eq!(test_cell_text(&table.rows[1].cells[1]), "1.793E-06");
+        assert!(table.x_coordinates.windows(2).all(|pair| pair[1] >= pair[0]));
+        assert!(table
+            .x_coordinates
+            .iter()
+            .all(|x| *x >= image.bbox.left_x && *x <= image.bbox.right_x));
     }
 
     #[test]
@@ -5010,6 +5226,76 @@ mod tests {
             .iter()
             .flat_map(|row| row.cells.iter())
             .all(|cell| cell.content.is_empty()));
+    }
+
+    #[test]
+    fn test_native_text_chars_in_region_ignores_distant_page_text() {
+        let table_bbox = BoundingBox::new(Some(1), 40.0, 120.0, 360.0, 280.0);
+        let distant_text = ContentElement::TextChunk(text_chunk(
+            &"A".repeat(MAX_NATIVE_TEXT_CHARS_FOR_PAGE_RASTER_OCR + 40),
+            BoundingBox::new(Some(1), 40.0, 500.0, 380.0, 560.0),
+        ));
+        let overlapping_text = ContentElement::TextChunk(text_chunk(
+            "1234",
+            BoundingBox::new(Some(1), 60.0, 160.0, 100.0, 176.0),
+        ));
+        let elements = vec![distant_text, overlapping_text];
+
+        assert!(page_native_text_chars(&elements) > MAX_NATIVE_TEXT_CHARS_FOR_PAGE_RASTER_OCR);
+        assert_eq!(native_text_chars_in_region(&elements, &table_bbox), 4);
+    }
+
+    #[test]
+    fn test_table_needs_page_raster_ocr_for_sparse_partial_table() {
+        let mut table = TableBorder {
+            bbox: BoundingBox::new(Some(1), 0.0, 0.0, 300.0, 200.0),
+            index: None,
+            level: None,
+            x_coordinates: vec![0.0, 60.0, 120.0, 180.0, 240.0, 300.0],
+            x_widths: vec![0.0; 6],
+            y_coordinates: vec![200.0, 160.0, 120.0, 80.0, 40.0, 0.0],
+            y_widths: vec![0.0; 6],
+            rows: Vec::new(),
+            num_rows: 5,
+            num_columns: 5,
+            is_bad_table: false,
+            is_table_transformer: true,
+            previous_table: None,
+            next_table: None,
+        };
+
+        for row_idx in 0..5 {
+            let mut row = TableBorderRow {
+                bbox: BoundingBox::new(Some(1), 0.0, 0.0, 300.0, 200.0),
+                index: None,
+                level: None,
+                row_number: row_idx,
+                cells: Vec::new(),
+                semantic_type: None,
+            };
+            for col_idx in 0..5 {
+                row.cells.push(TableBorderCell {
+                    bbox: BoundingBox::new(Some(1), 0.0, 0.0, 60.0, 40.0),
+                    index: None,
+                    level: None,
+                    row_number: row_idx,
+                    col_number: col_idx,
+                    row_span: 1,
+                    col_span: 1,
+                    content: Vec::new(),
+                    contents: Vec::new(),
+                    semantic_type: None,
+                });
+            }
+            table.rows.push(row);
+        }
+
+        table.rows[0].cells[0].content.push(TableToken {
+            base: text_chunk("12", BoundingBox::new(Some(1), 0.0, 0.0, 20.0, 10.0)),
+            token_type: TableTokenType::Text,
+        });
+
+        assert!(table_needs_page_raster_ocr(&table));
     }
 
     #[test]

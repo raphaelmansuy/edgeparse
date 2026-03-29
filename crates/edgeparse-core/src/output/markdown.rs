@@ -1445,6 +1445,9 @@ fn render_layout_single_caption_chart_document_cached(
     if doc.number_of_pages != 1 {
         return None;
     }
+    if document_has_populated_table(doc) {
+        return None;
+    }
 
     let caption_indices = doc
         .kids
@@ -1553,6 +1556,22 @@ fn render_layout_single_caption_chart_document_cached(
     }
 
     Some(output.trim_end().to_string() + "\n")
+}
+
+fn document_has_populated_table(doc: &PdfDocument) -> bool {
+    doc.kids.iter().any(|element| {
+        table_border_from_element(element).is_some_and(|table| {
+            table.num_rows >= 2
+                && table.num_columns >= 2
+                && table.rows.iter().any(|row| {
+                    row.cells
+                        .iter()
+                        .filter(|cell| !cell_text_content(cell).trim().is_empty())
+                        .count()
+                        >= 2
+                })
+        })
+    })
 }
 
 fn looks_like_chart_noise_element(_element: &ContentElement, text: &str) -> bool {
@@ -13172,6 +13191,32 @@ mod tests {
         let md = to_markdown(&doc).unwrap();
         assert!(md.contains("| --- | --- |"));
         assert!(md.contains("| kaolinite | 10 |"));
+    }
+
+    #[test]
+    fn test_single_caption_chart_renderer_skips_documents_with_populated_tables() {
+        let mut doc = PdfDocument::new("table-with-caption.pdf".to_string());
+        doc.number_of_pages = 1;
+        for idx in 0..10 {
+            let bottom = 720.0 - idx as f64 * 18.0;
+            doc.kids.push(make_paragraph(
+                "Explanatory body text that should remain outside the chart-only renderer.",
+                bottom,
+                bottom + 10.0,
+            ));
+        }
+        doc.kids.push(make_paragraph(
+            "Figure 7.2: Kinematic Viscosity of Water at Atmospheric Pressure.",
+            150.0,
+            162.0,
+        ));
+        doc.kids.push(make_two_column_table(&[
+            ("Temperature", "Viscosity"),
+            ("20", "1.004"),
+            ("25", "0.893"),
+        ]));
+
+        assert!(render_layout_single_caption_chart_document(&doc).is_none());
     }
 
     #[test]

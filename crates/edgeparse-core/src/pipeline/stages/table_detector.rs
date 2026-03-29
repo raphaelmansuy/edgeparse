@@ -554,6 +554,11 @@ pub fn filter_empty_tables(elements: Vec<ContentElement>) -> Vec<ContentElement>
                     continue;
                 }
 
+                if should_preserve_sparse_recovered_table(table) {
+                    result.push(elem);
+                    continue;
+                }
+
                 let total_cells: usize = table.rows.iter().map(|r| r.cells.len()).sum();
 
                 if total_cells >= MIN_CELLS_FOR_EMPTY_FILTER {
@@ -595,6 +600,32 @@ pub fn filter_empty_tables(elements: Vec<ContentElement>) -> Vec<ContentElement>
     }
 
     result
+}
+
+fn should_preserve_sparse_recovered_table(table: &TableBorder) -> bool {
+    if !table.is_table_transformer || table.num_rows < 2 || table.num_columns < 2 {
+        return false;
+    }
+
+    let mut populated_rows = 0usize;
+    let mut populated_cols = std::collections::HashSet::new();
+    let mut populated_cells = 0usize;
+
+    for row in &table.rows {
+        let mut row_has_text = false;
+        for cell in &row.cells {
+            if cell_has_textual_content(cell) {
+                row_has_text = true;
+                populated_cols.insert(cell.col_number);
+                populated_cells += 1;
+            }
+        }
+        if row_has_text {
+            populated_rows += 1;
+        }
+    }
+
+    populated_cells >= 2 && populated_rows >= 2 && populated_cols.len() >= 2
 }
 
 fn is_tiny_empty_table(table: &TableBorder) -> bool {
@@ -1661,6 +1692,53 @@ mod tests {
         make_positioned_token(value, font_size, 0.0, 0.0, 100.0, 20.0)
     }
 
+    fn make_table_cell(
+        row_number: usize,
+        col_number: usize,
+        left_x: f64,
+        bottom_y: f64,
+        right_x: f64,
+        top_y: f64,
+        text: &str,
+    ) -> TableBorderCell {
+        TableBorderCell {
+            bbox: BoundingBox::new(Some(1), left_x, bottom_y, right_x, top_y),
+            index: None,
+            level: None,
+            row_number,
+            col_number,
+            row_span: 1,
+            col_span: 1,
+            content: vec![make_positioned_token(
+                text, 12.0, left_x, bottom_y, right_x, top_y,
+            )],
+            contents: Vec::new(),
+            semantic_type: None,
+        }
+    }
+
+    fn make_empty_table_cell(
+        row_number: usize,
+        col_number: usize,
+        left_x: f64,
+        bottom_y: f64,
+        right_x: f64,
+        top_y: f64,
+    ) -> TableBorderCell {
+        TableBorderCell {
+            bbox: BoundingBox::new(Some(1), left_x, bottom_y, right_x, top_y),
+            index: None,
+            level: None,
+            row_number,
+            col_number,
+            row_span: 1,
+            col_span: 1,
+            content: Vec::new(),
+            contents: Vec::new(),
+            semantic_type: None,
+        }
+    }
+
     #[test]
     fn test_simple_2x2_table() {
         // A 2-column, 2-row grid
@@ -2010,6 +2088,85 @@ mod tests {
 
         let result = filter_empty_tables(vec![ContentElement::TableBorder(table)]);
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_filter_empty_tables_keeps_sparse_raster_recovered_table() {
+        let table = TableBorder {
+            bbox: BoundingBox::new(Some(1), 100.0, 100.0, 520.0, 360.0),
+            index: None,
+            level: None,
+            x_coordinates: vec![100.0, 200.0, 320.0, 420.0, 520.0],
+            x_widths: vec![0.0; 5],
+            y_coordinates: vec![360.0, 300.0, 240.0, 180.0, 100.0],
+            y_widths: vec![0.0; 5],
+            rows: vec![
+                TableBorderRow {
+                    bbox: BoundingBox::new(Some(1), 100.0, 300.0, 520.0, 360.0),
+                    index: None,
+                    level: None,
+                    row_number: 0,
+                    cells: vec![
+                        make_table_cell(0, 0, 100.0, 300.0, 200.0, 360.0, "Biomass Type"),
+                        make_empty_table_cell(0, 1, 200.0, 300.0, 320.0, 360.0),
+                        make_table_cell(0, 2, 320.0, 300.0, 420.0, 360.0, "Domestic logs"),
+                        make_empty_table_cell(0, 3, 420.0, 300.0, 520.0, 360.0),
+                    ],
+                    semantic_type: None,
+                },
+                TableBorderRow {
+                    bbox: BoundingBox::new(Some(1), 100.0, 240.0, 520.0, 300.0),
+                    index: None,
+                    level: None,
+                    row_number: 1,
+                    cells: vec![
+                        make_table_cell(1, 0, 100.0, 240.0, 200.0, 300.0, "Biogas"),
+                        make_table_cell(1, 1, 200.0, 240.0, 320.0, 300.0, "98%"),
+                        make_empty_table_cell(1, 2, 320.0, 240.0, 420.0, 300.0),
+                        make_empty_table_cell(1, 3, 420.0, 240.0, 520.0, 300.0),
+                    ],
+                    semantic_type: None,
+                },
+                TableBorderRow {
+                    bbox: BoundingBox::new(Some(1), 100.0, 180.0, 520.0, 240.0),
+                    index: None,
+                    level: None,
+                    row_number: 2,
+                    cells: vec![
+                        make_table_cell(2, 0, 100.0, 180.0, 200.0, 240.0, "Unutilised wood"),
+                        make_empty_table_cell(2, 1, 200.0, 180.0, 320.0, 240.0),
+                        make_table_cell(2, 2, 320.0, 180.0, 420.0, 240.0, "2%"),
+                        make_empty_table_cell(2, 3, 420.0, 180.0, 520.0, 240.0),
+                    ],
+                    semantic_type: None,
+                },
+                TableBorderRow {
+                    bbox: BoundingBox::new(Some(1), 100.0, 100.0, 520.0, 180.0),
+                    index: None,
+                    level: None,
+                    row_number: 3,
+                    cells: vec![
+                        make_empty_table_cell(3, 0, 100.0, 100.0, 200.0, 180.0),
+                        make_empty_table_cell(3, 1, 200.0, 100.0, 320.0, 180.0),
+                        make_empty_table_cell(3, 2, 320.0, 100.0, 420.0, 180.0),
+                        make_empty_table_cell(3, 3, 420.0, 100.0, 520.0, 180.0),
+                    ],
+                    semantic_type: None,
+                },
+            ],
+            num_rows: 4,
+            num_columns: 4,
+            is_bad_table: false,
+            is_table_transformer: true,
+            previous_table: None,
+            next_table: None,
+        };
+
+        let result = filter_empty_tables(vec![ContentElement::TableBorder(table)]);
+        assert!(matches!(
+            result.first(),
+            Some(ContentElement::TableBorder(_))
+        ));
     }
 
     #[test]
