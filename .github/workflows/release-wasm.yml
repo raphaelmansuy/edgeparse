@@ -196,3 +196,196 @@ jobs:
           gh release upload "$TAG_NAME" crates/edgeparse-wasm/pkg/*.tgz \
             --repo "${{ github.repository }}" --clobber
 
+  # ───────────────────────────────────────────────────────────────────────────
+  # Post-publish verification — runs after publish-wasm completes.
+  # Verifies every distribution channel independently.  Failures here do NOT
+  # roll back the publish but they do fail the workflow so the release is
+  # flagged visibly in GitHub UI and the team is alerted.
+  # ───────────────────────────────────────────────────────────────────────────
+  verify-wasm:
+    name: Verify — ${{ matrix.channel }}
+    needs: publish-wasm
+    runs-on: ubuntu-latest
+    # A fresh Node.js environment; no Rust toolchain needed.
+    strategy:
+      fail-fast: false   # check every channel even if one fails
+      matrix:
+        include:
+          - channel: npm-registry
+            description: "edgeparse-wasm published on registry.npmjs.org"
+          - channel: github-packages
+            description: "@raphaelmansuy/edgeparse-wasm on npm.pkg.github.com"
+          - channel: jsdelivr-cdn
+            description: "WASM binary reachable via jsDelivr CDN"
+          - channel: unpkg-cdn
+            description: "WASM binary reachable via unpkg CDN"
+          - channel: github-release
+            description: "npm tarball attached to GitHub Release"
+
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── Resolve the version to check (supports both tag push and manual dispatch) ──
+      - name: Resolve version
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          TAG_NAME="${INPUT_TAG_NAME:-$GITHUB_REF_NAME}"
+          VERSION="${TAG_NAME#v}"
+          echo "VERSION=$VERSION"   >> "$GITHUB_ENV"
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "Verifying channel: ${{ matrix.channel }} for version $VERSION"
+
+      # ── npm registry — poll with retries (index propagation can take ~60 s) ──
+      - name: Check npm registry
+        if: matrix.channel == 'npm-registry'
+        run: |
+          MAX=12
+          DELAY=15
+          for i in $(seq 1 $MAX); do
+            echo "Attempt $i/$MAX — checking npm for edgeparse-wasm@$VERSION"
+            PUBLISHED=$(npm view "edgeparse-wasm@$VERSION" version 2>/dev/null || true)
+            if [[ "$PUBLISHED" == "$VERSION" ]]; then
+              echo "✓ npm: edgeparse-wasm@$VERSION is live"
+              # Verify the expected files are present in the package manifest.
+              npm view "edgeparse-wasm@$VERSION" --json | \
+                python3 -c "
+          import json, sys
+          pkg = json.load(sys.stdin)
+          files = pkg.get('dist', {})
+          assert pkg['version'] == '${VERSION}', f'version mismatch: {pkg[\"version\"]}'
+          assert pkg.get('dist', {}).get('tarball'), 'missing tarball URL'
+          print('  version :', pkg['version'])
+          print('  tarball :', pkg['dist']['tarball'])
+          print('  integrity:', pkg['dist'].get('integrity', 'n/a'))
+          "
+              exit 0
+            fi
+            echo "  Not yet visible — waiting ${DELAY}s..."
+            sleep $DELAY
+          done
+          echo "ERROR: edgeparse-wasm@$VERSION not found on npm after $((MAX * DELAY))s"
+          exit 1
+
+      # ── GitHub Packages — check via npm.pkg.github.com REST endpoint ──
+      - name: Check GitHub Packages
+        if: matrix.channel == 'github-packages'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MAX=8
+          DELAY=20
+          SCOPE="raphaelmansuy"
+          PKG="edgeparse-wasm"
+          for i in $(seq 1 $MAX); do
+            echo "Attempt $i/$MAX — checking GitHub Packages for @${SCOPE}/${PKG}@$VERSION"
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.npm.install-v1+json" \
+              "https://npm.pkg.github.com/@${SCOPE}%2F${PKG}")
+            if [[ "$HTTP" == "200" ]]; then
+              # Fetch full metadata and confirm the version exists.
+              META=$(curl -s \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.npm.install-v1+json" \
+                "https://npm.pkg.github.com/@${SCOPE}%2F${PKG}")
+              FOUND=$(echo "$META" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          vs = list(d.get('versions', {}).keys())
+          print('found' if '${VERSION}' in vs else 'missing')
+          " 2>/dev/null || echo "error")
+              if [[ "$FOUND" == "found" ]]; then
+                echo "✓ GitHub Packages: @${SCOPE}/${PKG}@$VERSION is live"
+                exit 0
+              fi
+            fi
+            echo "  HTTP $HTTP — waiting ${DELAY}s..."
+            sleep $DELAY
+          done
+          echo "ERROR: @${SCOPE}/${PKG}@$VERSION not found on GitHub Packages after $((MAX * DELAY))s"
+          exit 1
+
+      # ── jsDelivr — the package must be available once npm index has propagated ──
+      - name: Check jsDelivr CDN
+        if: matrix.channel == 'jsdelivr-cdn'
+        run: |
+          # jsDelivr mirrors npm; it may take a few minutes after npm publish.
+          MAX=10
+          DELAY=30
+          WASM_URL="https://cdn.jsdelivr.net/npm/edgeparse-wasm@${VERSION}/edgeparse_wasm_bg.wasm"
+          JS_URL="https://cdn.jsdelivr.net/npm/edgeparse-wasm@${VERSION}/edgeparse_wasm.js"
+          DTS_URL="https://cdn.jsdelivr.net/npm/edgeparse-wasm@${VERSION}/edgeparse_wasm.d.ts"
+          for i in $(seq 1 $MAX); do
+            echo "Attempt $i/$MAX — checking jsDelivr"
+            WASM_HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$WASM_URL")
+            JS_HTTP=$(curl   -s -o /dev/null -w "%{http_code}" --max-time 30 "$JS_URL")
+            DTS_HTTP=$(curl  -s -o /dev/null -w "%{http_code}" --max-time 30 "$DTS_URL")
+            echo "  .wasm=$WASM_HTTP  .js=$JS_HTTP  .d.ts=$DTS_HTTP"
+            if [[ "$WASM_HTTP" == "200" && "$JS_HTTP" == "200" && "$DTS_HTTP" == "200" ]]; then
+              echo "✓ jsDelivr: all three assets reachable for edgeparse-wasm@$VERSION"
+              exit 0
+            fi
+            echo "  Not yet available — waiting ${DELAY}s..."
+            sleep $DELAY
+          done
+          echo "ERROR: jsDelivr assets not reachable after $((MAX * DELAY))s"
+          echo "  WASM: $WASM_URL"
+          echo "  JS:   $JS_URL"
+          exit 1
+
+      # ── unpkg — same content, different CDN ──
+      - name: Check unpkg CDN
+        if: matrix.channel == 'unpkg-cdn'
+        run: |
+          MAX=10
+          DELAY=30
+          WASM_URL="https://unpkg.com/edgeparse-wasm@${VERSION}/edgeparse_wasm_bg.wasm"
+          JS_URL="https://unpkg.com/edgeparse-wasm@${VERSION}/edgeparse_wasm.js"
+          for i in $(seq 1 $MAX); do
+            echo "Attempt $i/$MAX — checking unpkg"
+            WASM_HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 -L "$WASM_URL")
+            JS_HTTP=$(curl   -s -o /dev/null -w "%{http_code}" --max-time 30 -L "$JS_URL")
+            echo "  .wasm=$WASM_HTTP  .js=$JS_HTTP"
+            if [[ "$WASM_HTTP" == "200" && "$JS_HTTP" == "200" ]]; then
+              echo "✓ unpkg: assets reachable for edgeparse-wasm@$VERSION"
+              exit 0
+            fi
+            echo "  Not yet available — waiting ${DELAY}s..."
+            sleep $DELAY
+          done
+          echo "ERROR: unpkg assets not reachable after $((MAX * DELAY))s"
+          exit 1
+
+      # ── GitHub Release — confirm the .tgz tarball is attached ──
+      - name: Check GitHub Release asset
+        if: matrix.channel == 'github-release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MAX=6
+          DELAY=15
+          for i in $(seq 1 $MAX); do
+            echo "Attempt $i/$MAX — checking GitHub Release $TAG_NAME for .tgz asset"
+            ASSET=$(gh release view "$TAG_NAME" \
+              --repo "${{ github.repository }}" \
+              --json assets \
+              --jq '.assets[].name' 2>/dev/null \
+              | grep '\.tgz$' || true)
+            if [[ -n "$ASSET" ]]; then
+              echo "✓ GitHub Release: found tarball — $ASSET"
+              # Also confirm the release is not a draft.
+              DRAFT=$(gh release view "$TAG_NAME" \
+                --repo "${{ github.repository }}" \
+                --json isDraft --jq '.isDraft')
+              echo "  isDraft: $DRAFT"
+              exit 0
+            fi
+            echo "  No .tgz yet — waiting ${DELAY}s..."
+            sleep $DELAY
+          done
+          echo "ERROR: no .tgz asset found on GitHub Release $TAG_NAME"
+          exit 1
+
