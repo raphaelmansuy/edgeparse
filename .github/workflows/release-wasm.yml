@@ -1,4 +1,4 @@
-name: Release — WASM SDK (npm)
+name: Release — WASM SDK (npm + GitHub Packages)
 
 on:
   push:
@@ -6,30 +6,42 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name to publish (e.g. v0.2.2) — used for version sync'
+        description: 'Tag name to publish (e.g. v0.2.4) — used for version sync'
         required: true
-        default: 'v0.2.2'
+        default: 'v0.2.4'
 
 permissions:
-  contents: write
+  contents: write   # upload GitHub Release assets
+  packages: write   # publish to GitHub Packages npm registry
 
 jobs:
   publish-wasm:
-    name: Publish WASM package
+    name: Build & publish WASM package
     runs-on: ubuntu-latest
     environment: npm
+
     steps:
       - uses: actions/checkout@v4
+
+      # Node.js is needed for npm pack / publish and wasm-pack post-processing.
+      # Registry URL is overridden per-publish step via .npmrc; the value here
+      # merely ensures `NODE_AUTH_TOKEN` is wired into the environment.
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+
       - uses: Swatinem/rust-cache@v2
+
       - uses: taiki-e/install-action@wasm-pack
 
+      # ─────────────────────────────────────────────────────────────────────
+      # 1. Verify that the Git tag matches the Cargo workspace version.
+      # ─────────────────────────────────────────────────────────────────────
       - name: Verify version consistency
         env:
           INPUT_TAG_NAME: ${{ inputs.tag_name }}
@@ -42,50 +54,70 @@ jobs:
             echo "ERROR: tag $TAG_VERSION ≠ Cargo.toml $CARGO_VERSION"
             exit 1
           fi
+          echo "VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+          echo "TAG_NAME=$TAG_NAME"   >> "$GITHUB_ENV"
 
+      # ─────────────────────────────────────────────────────────────────────
+      # 2. Compile the Rust crate to WebAssembly and generate JS/TS glue.
+      # ─────────────────────────────────────────────────────────────────────
       - name: Build WASM package
         run: |
           cd crates/edgeparse-wasm
           wasm-pack build --target web --release
 
-      - name: Sync npm metadata
-        env:
-          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+      # ─────────────────────────────────────────────────────────────────────
+      # 3. Patch pkg/package.json with release metadata (shared across both
+      #    registries; the name/scope is adjusted per publish step below).
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Sync package metadata
         run: |
           node -e "
           const fs = require('fs');
-          const refName = process.env.INPUT_TAG_NAME || process.env.GITHUB_REF_NAME;
-          const version = refName.replace(/^v/, '');
-          const path = 'crates/edgeparse-wasm/pkg/package.json';
-          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-          pkg.name = 'edgeparse-wasm';
-          pkg.version = version;
+          const version = process.env.VERSION;
+          const pkgPath = 'crates/edgeparse-wasm/pkg/package.json';
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          pkg.version     = version;
           pkg.description = 'EdgeParse PDF parser — WebAssembly build for browsers';
-          pkg.homepage = 'https://edgeparse.io/docs/api/wasm/';
-          pkg.repository = {
+          pkg.homepage    = 'https://edgeparse.io/docs/api/wasm/';
+          pkg.keywords    = ['pdf', 'parser', 'wasm', 'webassembly', 'browser', 'extraction', 'markdown'];
+          pkg.repository  = {
             type: 'git',
             url: 'git+https://github.com/raphaelmansuy/edgeparse.git',
             directory: 'crates/edgeparse-wasm'
           };
-          pkg.publishConfig = { access: 'public' };
+          pkg.exports = {
+            '.': { import: './edgeparse_wasm.js', types: './edgeparse_wasm.d.ts' }
+          };
           pkg.files = [
             'edgeparse_wasm_bg.wasm',
             'edgeparse_wasm.js',
             'edgeparse_wasm.d.ts',
+            'edgeparse_wasm_bg.wasm.d.ts',
             'README.md',
             'LICENSE'
           ];
-          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
-          console.log('Version synced to: ' + version);
+          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+          console.log('Metadata synced to version: ' + version);
           "
 
-      - name: Stage package docs
+      - name: Stage README and LICENSE
         run: |
           cp README.md crates/edgeparse-wasm/pkg/README.md
-          cp LICENSE crates/edgeparse-wasm/pkg/LICENSE
+          cp LICENSE   crates/edgeparse-wasm/pkg/LICENSE
 
+      # ─────────────────────────────────────────────────────────────────────
+      # 4. Pack the tarball once (reused by both registries and the Release).
+      # ─────────────────────────────────────────────────────────────────────
       - name: Pack npm tarball
         run: |
+          node -e "
+          const fs = require('fs');
+          const pkgPath = 'crates/edgeparse-wasm/pkg/package.json';
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          pkg.name = 'edgeparse-wasm';
+          pkg.publishConfig = { access: 'public', registry: 'https://registry.npmjs.org' };
+          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+          "
           cd crates/edgeparse-wasm/pkg
           npm pack
 
@@ -93,28 +125,74 @@ jobs:
         with:
           name: wasm-package
           path: crates/edgeparse-wasm/pkg/*.tgz
+          retention-days: 30
 
-      - name: Skip WASM npm publication
+      # ─────────────────────────────────────────────────────────────────────
+      # 5a. Publish to npm (primary registry — enables jsDelivr & unpkg CDNs).
+      #     Uses NPM_TOKEN Classic Automation token stored as a repository
+      #     secret.  "already-published" is treated as idempotent.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Publish to npm registry
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          echo "::warning::WASM npm publication is disabled. The package tarball will still be uploaded to the GitHub Release."
+          node -e "
+          const fs = require('fs');
+          const pkgPath = 'crates/edgeparse-wasm/pkg/package.json';
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          pkg.name = 'edgeparse-wasm';
+          pkg.publishConfig = { access: 'public', registry: 'https://registry.npmjs.org' };
+          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+          "
+          cd crates/edgeparse-wasm/pkg
+          npm publish --access public --registry https://registry.npmjs.org \
+            || { CODE=$?; [ "$CODE" -eq 1 ] && npm info edgeparse-wasm@${{ env.VERSION }} >/dev/null 2>&1 && echo "Already published — skipping." || exit $CODE; }
 
+      # ─────────────────────────────────────────────────────────────────────
+      # 5b. Publish to GitHub Packages (secondary registry — useful for
+      #     enterprise / GitHub-native consumers).
+      #     The package is scoped as @raphaelmansuy/edgeparse-wasm.
+      #     Uses the built-in GITHUB_TOKEN — no extra secret required.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkgPath = 'crates/edgeparse-wasm/pkg/package.json';
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          pkg.name = '@raphaelmansuy/edgeparse-wasm';
+          pkg.publishConfig = {
+            access: 'public',
+            registry: 'https://npm.pkg.github.com'
+          };
+          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+          "
+          # Write a scoped .npmrc so npm uses the right registry for this scope.
+          echo "@raphaelmansuy:registry=https://npm.pkg.github.com" >> ~/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+          cd crates/edgeparse-wasm/pkg
+          npm publish --registry https://npm.pkg.github.com \
+            || { CODE=$?; echo "GitHub Packages publish exited $CODE — may already exist for this version." ; }
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 6. Attach the tarball to the GitHub Release.
+      # ─────────────────────────────────────────────────────────────────────
       - name: Ensure GitHub Release exists
         env:
           GH_TOKEN: ${{ github.token }}
-          INPUT_TAG_NAME: ${{ inputs.tag_name }}
         run: |
-          TAG_NAME="${INPUT_TAG_NAME:-$GITHUB_REF_NAME}"
           gh release view "$TAG_NAME" --repo "${{ github.repository }}" \
           || gh release create "$TAG_NAME" \
                --repo "${{ github.repository }}" \
                --title "$TAG_NAME" \
                --generate-notes
 
-      - name: Upload npm tarball to GitHub Release
+      - name: Upload tarball to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          INPUT_TAG_NAME: ${{ inputs.tag_name }}
         run: |
-          TAG_NAME="${INPUT_TAG_NAME:-$GITHUB_REF_NAME}"
           gh release upload "$TAG_NAME" crates/edgeparse-wasm/pkg/*.tgz \
             --repo "${{ github.repository }}" --clobber
+

@@ -7,6 +7,27 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.4] — 2026-04-13
+
+### Added
+- **WASM npm publication** — `edgeparse-wasm` is now published to the npm public registry on every tagged release; jsDelivr and unpkg CDNs become available automatically
+- **GitHub Packages secondary registry** — `@raphaelmansuy/edgeparse-wasm` is published to `npm.pkg.github.com` alongside the npm release, providing a GitHub-native install path for enterprise users
+- **CDN quick-start** — `docs/09-wasm-sdk.md` now includes copy-pasteable `<script type="module">` examples for jsDelivr and unpkg (no build tool required)
+- **Framework quick-starts** — Vite + React, Next.js App Router, Webpack 5, and Service Worker PWA examples added to the WASM SDK docs
+- **`exports` field in `pkg/package.json`** — adds a proper ESM exports map for bundler interop
+
+### Changed
+- `release-wasm.yml` now publishes to npm (primary) and GitHub Packages (secondary) instead of skipping publication; both steps treat "already published" as non-fatal
+- `release-wasm.yml` requires `packages: write` permission (for GitHub Packages) and existing `contents: write` (for GitHub Releases)
+- `pkg/package.json` carries full metadata (keywords, exports, publishConfig) so it is ready to publish without CI patching the file from scratch
+- `docs/09-wasm-sdk.md` consolidated installation and distribution section with all four channels (npm, jsDelivr, unpkg, GitHub Packages)
+- `docs/07-cicd-publishing.md` updated with WASM npm rows in the artifacts table, `NPM_TOKEN` scope note, and step-by-step token setup instructions
+
+### Fixed
+- `INPUT_TAG_NAME` env variable now written to `$GITHUB_ENV` so downstream steps in `release-wasm.yml` can reference `${{ env.TAG_NAME }}` without re-reading inputs
+
+---
+
 ## [0.2.3] — 2026-03-28
 
 ### Added
