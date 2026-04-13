@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write   # upload GitHub Release assets
   packages: write   # publish to GitHub Packages npm registry
+  id-token: write   # required for npm Trusted Publisher (OIDC tokenless publish)
 
 jobs:
   publish-wasm:
@@ -96,6 +97,11 @@ jobs:
             'README.md',
             'LICENSE'
           ];
+          pkg.publishConfig = {
+            access: 'public',
+            registry: 'https://registry.npmjs.org',
+            provenance: true
+          };
           fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
           console.log('Metadata synced to version: ' + version);
           "
@@ -115,7 +121,7 @@ jobs:
           const pkgPath = 'crates/edgeparse-wasm/pkg/package.json';
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
           pkg.name = 'edgeparse-wasm';
-          pkg.publishConfig = { access: 'public', registry: 'https://registry.npmjs.org' };
+          pkg.publishConfig = { access: 'public', registry: 'https://registry.npmjs.org', provenance: true };
           fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
           "
           cd crates/edgeparse-wasm/pkg
@@ -128,25 +134,27 @@ jobs:
           retention-days: 30
 
       # ─────────────────────────────────────────────────────────────────────
-      # 5a. Publish to npm (primary registry — enables jsDelivr & unpkg CDNs).
-      #     Uses NPM_TOKEN Classic Automation token stored as a repository
-      #     secret.  "already-published" is treated as idempotent.
+      # 5a. Publish to npm via Trusted Publisher (OIDC — no access token).
+      #     Requires id-token:write permission (set at top of this file) and
+      #     the package configured at:
+      #       https://www.npmjs.com/package/edgeparse-wasm
+      #       → Settings → Trusted Publisher → workflow: release-wasm.yml
+      #     "already-published" is treated as idempotent.
       # ─────────────────────────────────────────────────────────────────────
       - name: Publish to npm registry
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node -e "
           const fs = require('fs');
           const pkgPath = 'crates/edgeparse-wasm/pkg/package.json';
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
           pkg.name = 'edgeparse-wasm';
-          pkg.publishConfig = { access: 'public', registry: 'https://registry.npmjs.org' };
+          pkg.publishConfig = { access: 'public', registry: 'https://registry.npmjs.org', provenance: true };
           fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
           "
           cd crates/edgeparse-wasm/pkg
-          npm publish --access public --registry https://registry.npmjs.org \
-            || { CODE=$?; [ "$CODE" -eq 1 ] && npm info edgeparse-wasm@${{ env.VERSION }} >/dev/null 2>&1 && echo "Already published — skipping." || exit $CODE; }
+          npm publish --provenance --access public --registry https://registry.npmjs.org \
+            || { CODE=$?; npm info edgeparse-wasm@${{ env.VERSION }} version >/dev/null 2>&1 \
+                 && echo "Already published — skipping." || exit $CODE; }
 
       # ─────────────────────────────────────────────────────────────────────
       # 5b. Publish to GitHub Packages (secondary registry — useful for

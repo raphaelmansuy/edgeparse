@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write   # required for npm Trusted Publisher (OIDC tokenless publish)
 
 jobs:
   build-native:
@@ -158,11 +159,9 @@ jobs:
             --repo "${{ github.repository }}" --clobber
 
       - name: Publish platform packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for dir in sdks/node/npm/*/; do
-            OUTPUT=$((cd "$dir" && npm publish --access public) 2>&1) && echo "$OUTPUT" || {
+            OUTPUT=$((cd "$dir" && npm publish --provenance --access public) 2>&1) && echo "$OUTPUT" || {
               echo "$OUTPUT"
               if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
                 echo "::warning::Package already published for $dir — skipping."
@@ -175,11 +174,9 @@ jobs:
           done
 
       - name: Publish edgeparse (main package)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd sdks/node
-          OUTPUT=$(npm publish --access public 2>&1) && echo "$OUTPUT" || {
+          OUTPUT=$(npm publish --provenance --access public 2>&1) && echo "$OUTPUT" || {
             echo "$OUTPUT"
             if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
               echo "edgeparse already published at this version — skipping."

@@ -90,7 +90,7 @@ Each GitHub Release includes:
 | Secret | Used by | Purpose |
 |--------|---------|---------|
 | `CARGO_REGISTRY_TOKEN` | `release-rust.yml` | Publish crates to crates.io |
-| `NPM_TOKEN` | `release-node.yml`, `release-wasm.yml` | Publish Node.js and WASM packages to npm |
+| `NPM_TOKEN` | `release-node.yml`, `release-wasm.yml` | Fallback token — **not needed** when Trusted Publisher (OIDC) is configured for the package |
 | `DOCKERHUB_TOKEN` | `release-docker.yml` | Push Docker images to Docker Hub |
 | `HOMEBREW_TAP_TOKEN` | `release-cli.yml` | Push `edgeparse.rb` to the Homebrew tap |
 
@@ -104,11 +104,30 @@ Each GitHub Release includes:
 ### External setup
 
 - crates.io: create a token with `publish-new` and `publish-update`
-- npm: use a Classic Automation token so the main package, platform packages, and
-  WASM package (`edgeparse-wasm`) can publish from CI. Store it as the `NPM_TOKEN`
-  repository secret. Granular tokens often miss package names — use Classic Automation.
-- PyPI: configure Trusted Publishing for `release-python.yml` in environment
-  `pypi`
+- **npm (Trusted Publisher — recommended):** configure via OIDC so CI publishes
+  without any token:
+  1. Go to the package settings page on npmjs.com
+  2. Under **Trusted Publisher**, set Publisher = GitHub Actions,
+     org/user = `raphaelmansuy`, repository = `edgeparse`,
+     workflow filename = the publishing workflow (see table below), environment = (leave blank)
+  3. Add `id-token: write` permission to the publishing job (already done in both
+     `release-node.yml` and `release-wasm.yml`)
+  4. Use `npm publish --provenance --access public` — no `NODE_AUTH_TOKEN` env var needed
+
+  | npm package | Workflow filename |
+  |-------------|-------------------|
+  | `edgeparse` | `release-node.yml` |
+  | `edgeparse-wasm` | `release-wasm.yml` |
+
+  > For `edgeparse-wasm`: the package must exist on npm before the Trusted Publisher
+  > entry can be saved. Publish the first version manually with `--otp`, then
+  > configure the Trusted Publisher entry — all subsequent releases use OIDC.
+
+- **npm (Classic token — fallback):** if Trusted Publisher is not yet configured,
+  create a Classic Automation token at
+  <https://www.npmjs.com/settings/raphaelmansuy/tokens> and store it as `NPM_TOKEN`.
+  Granular Access Tokens cannot create new packages and will fail with `E404`.
+- PyPI: configure Trusted Publishing for `release-python.yml` in environment `pypi`
 - Docker Hub: create a read/write access token for account `rmansuy`
 - Homebrew tap: create a PAT with `contents: write` on
   `raphaelmansuy/homebrew-edgeparse`
@@ -230,38 +249,48 @@ fast on mismatches.
 
 - Builds native `.node` binaries for five targets
 - Syncs the package version from the tag
-- Publishes five platform packages and the main `edgeparse` package
+- Publishes five platform packages and the main `edgeparse` package using **npm Trusted Publisher (OIDC)** — no `NPM_TOKEN` needed
+- Adds provenance attestation (`--provenance`) to every published package
 - Treats "already published" as idempotent rather than fatal
 
 ### `release-wasm.yml`
 
 - Builds the browser-targeted WASM package with `wasm-pack`
-- Syncs the npm package metadata (version, exports, files) from the tag
-- Publishes `edgeparse-wasm` to npm (primary) using `NPM_TOKEN`
+- Syncs the npm package metadata (version, exports, files, provenance) from the tag
+- Publishes `edgeparse-wasm` to npm using **npm Trusted Publisher (OIDC)** — no `NPM_TOKEN` needed
+- Adds provenance attestation (`--provenance`) so the package appears as verified on npmjs.com
 - Publishes `@raphaelmansuy/edgeparse-wasm` to GitHub Packages (secondary) using the built-in `GITHUB_TOKEN` — no extra secret required
 - Uploads the tarball to the GitHub Release (`--clobber` for idempotent re-runs)
 - Both publish steps treat "already published" as non-fatal
 
-#### Required secrets / permissions
+#### Required permissions (already in workflow)
 
-| What | Where | Notes |
-|------|-------|-------|
-| `NPM_TOKEN` | Repository secret | Classic Automation token; set scoped access to `edgeparse-wasm` or use an account-level token |
-| `packages: write` | Workflow permission (already in `release-wasm.yml`) | Allows push to GitHub Packages |
-| `contents: write` | Workflow permission (already in `release-wasm.yml`) | Allows creating / updating GitHub Releases |
+| Permission | Purpose |
+|------------|---------|
+| `id-token: write` | Mint OIDC token for npm Trusted Publisher |
+| `packages: write` | Push to GitHub Packages |
+| `contents: write` | Create / update GitHub Releases |
 
-#### Configuring `NPM_TOKEN`
+#### Configuring npm Trusted Publisher for `edgeparse-wasm`
+
+> **One-time setup** — after the first manual publish creates the package on npm:
+
+1. Go to <https://www.npmjs.com/package/edgeparse-wasm> → **Settings** → **Trusted Publisher**
+2. Publisher: `GitHub Actions`
+3. Organization or user: `raphaelmansuy`
+4. Repository: `edgeparse`
+5. Workflow filename: `release-wasm.yml`
+6. Environment name: *(leave blank)*
+7. Click **Save changes**
+
+All future tag releases will publish via OIDC with no token required.
+
+After updating, re-trigger without retagging:
 
 ```bash
-# 1. Go to https://www.npmjs.com/settings/<username>/tokens
-# 2. Generate → Classic Token → Automation
-# 3. Add to the repository:
-gh secret set NPM_TOKEN --body "<your-token>" --repo raphaelmansuy/edgeparse
+gh workflow run release-wasm.yml --repo raphaelmansuy/edgeparse \
+  --field tag_name=v0.2.4
 ```
-
-The `npm` GitHub environment (`environment: npm` in the workflow) can optionally
-be configured with required reviewers or deployment protection rules under
-**Settings → Environments** if you want a manual approval gate before publish.
 
 ### `release-cli.yml`
 
@@ -307,6 +336,28 @@ Crates.io versions are immutable. Bump the version and retag.
 
 Use a Classic Automation token for `NPM_TOKEN`. Granular tokens often miss one
 or more package names and produce `E403 Forbidden`.
+
+### `edgeparse-wasm` npm publish fails with `E404 Not Found`
+
+This happens when either:
+
+1. **Wrong token type** — A Granular Access Token was used instead of a Classic
+   Automation token. Granular tokens cannot create brand-new package names on npm.
+   Solution: replace `NPM_TOKEN` with a Classic Automation token (see
+   [Configuring NPM_TOKEN](#configuring-npm_token-step-by-step) above).
+
+2. **Package name not yet claimed** — `edgeparse-wasm` has never been published
+   before, so npm has no record of the package. This is normal on first release;
+   a Classic Automation token will create it automatically.
+
+After fixing the secret, re-trigger the workflow without retagging:
+
+```bash
+gh workflow run release-wasm.yml --repo raphaelmansuy/edgeparse \
+  --field tag_name=v0.2.4
+```
+
+The workflow treats "already published" as idempotent, so re-running is safe.
 
 ### PyPI publish fails with `invalid-publisher`
 
