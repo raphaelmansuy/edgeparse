@@ -178,8 +178,11 @@ jobs:
           fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
           "
           # Write a scoped .npmrc so npm uses the right registry for this scope.
-          echo "@raphaelmansuy:registry=https://npm.pkg.github.com" >> ~/.npmrc
-          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+          # actions/setup-node sets NPM_CONFIG_USERCONFIG to a temp file; append there,
+          # not to ~/.npmrc, so npm actually picks up the GitHub Packages token.
+          NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+          echo "@raphaelmansuy:registry=https://npm.pkg.github.com" >> "$NPMRC"
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> "$NPMRC"
           cd crates/edgeparse-wasm/pkg
           npm publish --registry https://npm.pkg.github.com \
             || { CODE=$?; echo "GitHub Packages publish exited $CODE — may already exist for this version." ; }
