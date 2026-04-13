@@ -1,21 +1,46 @@
 {
-  "name": "@edgeparse/edgeparse-wasm",
+  "name": "edgeparse-wasm",
   "type": "module",
   "description": "EdgeParse PDF parser — WebAssembly build for browsers",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "license": "Apache-2.0",
+  "homepage": "https://edgeparse.io/docs/api/wasm/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/raphaelmansuy/edgeparse"
+    "url": "git+https://github.com/raphaelmansuy/edgeparse.git",
+    "directory": "crates/edgeparse-wasm"
   },
+  "keywords": [
+    "pdf",
+    "parser",
+    "wasm",
+    "webassembly",
+    "browser",
+    "extraction",
+    "markdown"
+  ],
   "files": [
     "edgeparse_wasm_bg.wasm",
     "edgeparse_wasm.js",
-    "edgeparse_wasm.d.ts"
+    "edgeparse_wasm.d.ts",
+    "edgeparse_wasm_bg.wasm.d.ts",
+    "README.md",
+    "LICENSE"
   ],
   "main": "edgeparse_wasm.js",
+  "module": "edgeparse_wasm.js",
   "types": "edgeparse_wasm.d.ts",
+  "exports": {
+    ".": {
+      "import": "./edgeparse_wasm.js",
+      "types": "./edgeparse_wasm.d.ts"
+    }
+  },
   "sideEffects": [
     "./snippets/*"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  }
 }

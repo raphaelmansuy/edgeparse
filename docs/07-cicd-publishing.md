@@ -21,7 +21,7 @@ vX.Y.Z tag
   ├─ release-rust.yml    -> crates.io         (pdf-cos, edgeparse-core, edgeparse-cli)
   ├─ release-python.yml  -> PyPI              (edgeparse wheels + sdist)
   ├─ release-node.yml    -> npm               (edgeparse + 5 platform packages)
-  ├─ release-wasm.yml    -> GitHub Releases   (edgeparse-wasm tarball)
+  ├─ release-wasm.yml    -> npm + GitHub Packages + GitHub Releases  (edgeparse-wasm)
   ├─ release-cli.yml     -> GitHub Releases   (5 CLI archives) + Homebrew tap
   └─ release-docker.yml  -> GHCR + Docker Hub (linux/amd64, linux/arm64)
 ```
@@ -51,6 +51,8 @@ Shared verification happens in `ci.yml` on pushes and pull requests:
 | npm | `edgeparse-linux-arm64-gnu` | https://www.npmjs.com/package/edgeparse-linux-arm64-gnu |
 | npm | `edgeparse-linux-x64-gnu` | https://www.npmjs.com/package/edgeparse-linux-x64-gnu |
 | npm | `edgeparse-win32-x64-msvc` | https://www.npmjs.com/package/edgeparse-win32-x64-msvc |
+| npm | `edgeparse-wasm` | https://www.npmjs.com/package/edgeparse-wasm |
+| GitHub Packages | `@raphaelmansuy/edgeparse-wasm` | https://github.com/raphaelmansuy/edgeparse/pkgs/npm/edgeparse-wasm |
 | GitHub Releases | CLI archives + WASM npm tarball | https://github.com/raphaelmansuy/edgeparse/releases |
 | Homebrew | `raphaelmansuy/edgeparse` tap | https://github.com/raphaelmansuy/homebrew-edgeparse |
 | GHCR | `ghcr.io/raphaelmansuy/edgeparse` | https://github.com/raphaelmansuy/edgeparse/pkgs/container/edgeparse |
@@ -88,7 +90,7 @@ Each GitHub Release includes:
 | Secret | Used by | Purpose |
 |--------|---------|---------|
 | `CARGO_REGISTRY_TOKEN` | `release-rust.yml` | Publish crates to crates.io |
-| `NPM_TOKEN` | `release-node.yml` | Publish Node.js packages to npm |
+| `NPM_TOKEN` | `release-node.yml`, `release-wasm.yml` | Publish Node.js and WASM packages to npm |
 | `DOCKERHUB_TOKEN` | `release-docker.yml` | Push Docker images to Docker Hub |
 | `HOMEBREW_TAP_TOKEN` | `release-cli.yml` | Push `edgeparse.rb` to the Homebrew tap |
 
@@ -102,8 +104,9 @@ Each GitHub Release includes:
 ### External setup
 
 - crates.io: create a token with `publish-new` and `publish-update`
-- npm: use a Classic Automation token so the main package and platform packages
-  can publish from CI
+- npm: use a Classic Automation token so the main package, platform packages, and
+  WASM package (`edgeparse-wasm`) can publish from CI. Store it as the `NPM_TOKEN`
+  repository secret. Granular tokens often miss package names — use Classic Automation.
 - PyPI: configure Trusted Publishing for `release-python.yml` in environment
   `pypi`
 - Docker Hub: create a read/write access token for account `rmansuy`
@@ -177,18 +180,18 @@ make publish-brew-dry
 ```bash
 # 1. Commit and push the release-prep branch
 git add -A
-git commit -m "chore: prepare 0.2.2 release"
+git commit -m "chore: prepare 0.2.4 release"
 git push origin <branch>
 
-# 2. Open and merge the PR
-gh pr create --base main --head <branch>
-gh pr merge <pr-number> --merge --delete-branch=false
+# 2. Open and squash-merge the PR
+gh pr create --base main --head <branch> --title "chore: prepare 0.2.4 release"
+gh pr merge <pr-number> --squash --delete-branch
 
 # 3. Tag the merge commit on main
 git checkout main
 git pull --ff-only origin main
-git tag v0.2.2
-git push origin v0.2.2
+git tag v0.2.4
+git push origin v0.2.4
 ```
 
 The tag must match `v[0-9]+.[0-9]+.[0-9]+`. The Rust and WASM release
@@ -233,9 +236,32 @@ fast on mismatches.
 ### `release-wasm.yml`
 
 - Builds the browser-targeted WASM package with `wasm-pack`
-- Syncs the npm package version from the tag
-- npm publication is currently disabled
-- Uploads the generated npm tarball to the GitHub Release
+- Syncs the npm package metadata (version, exports, files) from the tag
+- Publishes `edgeparse-wasm` to npm (primary) using `NPM_TOKEN`
+- Publishes `@raphaelmansuy/edgeparse-wasm` to GitHub Packages (secondary) using the built-in `GITHUB_TOKEN` — no extra secret required
+- Uploads the tarball to the GitHub Release (`--clobber` for idempotent re-runs)
+- Both publish steps treat "already published" as non-fatal
+
+#### Required secrets / permissions
+
+| What | Where | Notes |
+|------|-------|-------|
+| `NPM_TOKEN` | Repository secret | Classic Automation token; set scoped access to `edgeparse-wasm` or use an account-level token |
+| `packages: write` | Workflow permission (already in `release-wasm.yml`) | Allows push to GitHub Packages |
+| `contents: write` | Workflow permission (already in `release-wasm.yml`) | Allows creating / updating GitHub Releases |
+
+#### Configuring `NPM_TOKEN`
+
+```bash
+# 1. Go to https://www.npmjs.com/settings/<username>/tokens
+# 2. Generate → Classic Token → Automation
+# 3. Add to the repository:
+gh secret set NPM_TOKEN --body "<your-token>" --repo raphaelmansuy/edgeparse
+```
+
+The `npm` GitHub environment (`environment: npm` in the workflow) can optionally
+be configured with required reviewers or deployment protection rules under
+**Settings → Environments** if you want a manual approval gate before publish.
 
 ### `release-cli.yml`
 
