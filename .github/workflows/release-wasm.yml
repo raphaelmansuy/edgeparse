@@ -79,7 +79,7 @@ jobs:
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
           pkg.version     = version;
           pkg.description = 'EdgeParse PDF parser — WebAssembly build for browsers';
-          pkg.homepage    = 'https://edgeparse.io/docs/api/wasm/';
+          pkg.homepage    = 'https://www.edgeparse.com';
           pkg.keywords    = ['pdf', 'parser', 'wasm', 'webassembly', 'browser', 'extraction', 'markdown'];
           pkg.repository  = {
             type: 'git',

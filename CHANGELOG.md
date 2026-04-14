@@ -7,6 +7,19 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.5] — 2026-04-14
+
+### Fixed
+- **Homepage URL updated to `https://www.edgeparse.com`** across all published packages (`edgeparse-wasm`, Node.js SDK platform packages, Python SDK) and crate metadata — previously some packages showed `edgeparse.elitizon.com` or stale GitHub URLs
+- **`release-wasm.yml` metadata** — `pkg.homepage` corrected to `https://www.edgeparse.com` so all future WASM npm publishes carry the right URL
+
+### Changed
+- Workspace `Cargo.toml` now declares `homepage = "https://www.edgeparse.com"` inherited by all crates
+- `sdks/node/package.json` and all five platform `package.json` files updated to hompage `https://www.edgeparse.com`
+- `sdks/python/pyproject.toml` `Homepage` updated to `https://www.edgeparse.com`
+
+---
+
 ## [0.2.4] — 2026-04-13
 
 ### Added
