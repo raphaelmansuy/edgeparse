@@ -154,9 +154,14 @@ if result is None:
     print('[]')
     raise SystemExit(0)
 
-boxes = getattr(result, 'boxes', []) or []
-txts = getattr(result, 'txts', []) or []
-scores = getattr(result, 'scores', []) or []
+# RapidOCR returns NumPy arrays for these fields; `arr or []` raises
+# "truth value of an array ... is ambiguous", so normalise explicitly.
+boxes = getattr(result, 'boxes', None)
+boxes = [] if boxes is None else list(boxes)
+txts = getattr(result, 'txts', None)
+txts = [] if txts is None else list(txts)
+scores = getattr(result, 'scores', None)
+scores = [] if scores is None else list(scores)
 out = []
 for box, text, score in zip(boxes, txts, scores):
     if not text or not str(text).strip():
