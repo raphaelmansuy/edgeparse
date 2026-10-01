@@ -24,8 +24,11 @@
 use crate::models::content::ContentElement;
 use crate::models::enums::SemanticType;
 use crate::models::semantic::{SemanticHeading, SemanticParagraph};
+use crate::pdf::bookmark_extractor::Bookmark;
 use crate::tagged::struct_tree::McidMap;
+use regex::Regex;
 use std::collections::{BTreeMap, HashSet};
+use std::sync::OnceLock;
 
 /// Probability threshold — a paragraph must score above this to become a heading.
 const HEADING_PROBABILITY: f64 = 0.75;
@@ -402,7 +405,24 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
         // whose font weight is above the document's mode weight.
         let weight_rarity = stats.font_weight_rarity_boost(font_weight);
 
-        let probability = base_prob + size_rarity + weight_rarity;
+        let mut probability = base_prob + size_rarity + weight_rarity;
+
+        // Typographic inventory: short labels at ≥1.15× body mode (or bold
+        // above the body weight mode) are heading candidates even when neighbor
+        // scoring is weak — same geometry as hybrid `heading_inventory_deficit`.
+        if probability < HEADING_PROBABILITY {
+            if let Some(mode) = stats.mode_size {
+                let size_hit = font_size >= mode * 1.15;
+                let weight_hit = font_weight >= 600.0
+                    && stats
+                        .higher_weights
+                        .first()
+                        .is_some_and(|&mw| font_weight >= mw);
+                if (size_hit || weight_hit) && lines <= 3 && text_len <= 120 {
+                    probability = HEADING_PROBABILITY;
+                }
+            }
+        }
 
         if probability >= HEADING_PROBABILITY {
             promoted.insert((page_idx, elem_idx));
@@ -469,6 +489,148 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
         }
         level += 1;
     }
+}
+
+/// Refine heading levels using outline bookmarks, then section numbering.
+///
+/// Priority:
+/// 1. Promote paragraphs whose title matches the PDF outline (structural)
+/// 2. Relevel existing headings from outline, else section-number depth
+/// 3. Keep font-style level when neither applies
+///
+/// Levels are always clamped to 1..=6.
+pub fn refine_heading_hierarchy(pages: &mut [Vec<ContentElement>], bookmarks: &[Bookmark]) {
+    let outline_levels = flatten_bookmark_levels(bookmarks);
+    // Promote paragraphs whose normalized title is in the PDF outline.
+    // Outline membership is structural evidence (PDF 32000 Dest/outline tree),
+    // not a text heuristic.
+    promote_outline_paragraphs(pages, &outline_levels);
+    // Captions are not outline nodes — demote any that Stage 12 still promoted.
+    demote_caption_headings(pages);
+
+    for page in pages.iter_mut() {
+        for elem in page.iter_mut() {
+            let ContentElement::Heading(heading) = elem else {
+                continue;
+            };
+            let text = heading.base.base.value();
+            let normalized = normalize_heading_key(&text);
+
+            if let Some(level) = outline_levels.get(&normalized).copied() {
+                heading.heading_level = Some(level.min(6).max(1));
+                continue;
+            }
+
+            if let Some(level) = section_number_level(&text) {
+                heading.heading_level = Some(level.min(6).max(1));
+            }
+        }
+    }
+}
+
+/// Demote figure/table caption headings back to paragraphs.
+///
+/// Document structure (PDF tagging / PubLayNet): captions label floats; they are
+/// not section-outline nodes. Leaving them as `#` invents false MHS tree nodes.
+fn demote_caption_headings(pages: &mut [Vec<ContentElement>]) {
+    for page in pages.iter_mut() {
+        for elem in page.iter_mut() {
+            let ContentElement::Heading(heading) = elem else {
+                continue;
+            };
+            let text = heading.base.base.value();
+            if !is_caption_prefix(text.trim()) {
+                continue;
+            }
+            *elem = ContentElement::Paragraph(heading.base.clone());
+        }
+    }
+}
+
+/// Promote body paragraphs that match PDF outline titles into headings.
+fn promote_outline_paragraphs(
+    pages: &mut [Vec<ContentElement>],
+    outline_levels: &BTreeMap<String, u32>,
+) {
+    if outline_levels.is_empty() {
+        return;
+    }
+    for page in pages.iter_mut() {
+        for elem in page.iter_mut() {
+            let ContentElement::Paragraph(para) = elem else {
+                continue;
+            };
+            if matches!(
+                para.base.semantic_type,
+                SemanticType::TableOfContent
+                    | SemanticType::Header
+                    | SemanticType::Footer
+                    | SemanticType::Note
+            ) {
+                continue;
+            }
+            let key = normalize_heading_key(&para.base.value());
+            let Some(&level) = outline_levels.get(&key) else {
+                continue;
+            };
+            let heading = SemanticHeading {
+                base: para.clone(),
+                heading_level: Some(level.min(6).max(1)),
+            };
+            *elem = ContentElement::Heading(heading);
+        }
+    }
+}
+
+fn flatten_bookmark_levels(bookmarks: &[Bookmark]) -> BTreeMap<String, u32> {
+    let mut map = BTreeMap::new();
+    fn walk(nodes: &[Bookmark], map: &mut BTreeMap<String, u32>) {
+        for node in nodes {
+            let key = normalize_heading_key(&node.title);
+            if !key.is_empty() {
+                // Outline level is 0-based; markdown heading levels are 1-based.
+                map.entry(key).or_insert((node.level + 1).min(6));
+            }
+            if !node.children.is_empty() {
+                walk(&node.children, map);
+            }
+        }
+    }
+    walk(bookmarks, &mut map);
+    map
+}
+
+fn normalize_heading_key(text: &str) -> String {
+    text.chars()
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else if c.is_whitespace() {
+                ' '
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn section_number_level(text: &str) -> Option<u32> {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        Regex::new(r"(?i)^\s*(\d+(?:\.\d+){0,5})(?:[\.\)]?\s+|\s+)").expect("section regex")
+    });
+    let caps = re.captures(text.trim())?;
+    let number = caps.get(1)?.as_str();
+    // Require a following title fragment so bare page numbers are ignored.
+    let rest = &text.trim()[caps.get(0)?.end()..];
+    if rest.chars().filter(|c| c.is_alphabetic()).count() < 2 {
+        return None;
+    }
+    let depth = number.split('.').filter(|p| !p.is_empty()).count() as u32;
+    Some(depth.clamp(1, 6))
 }
 
 /// Info about a neighbor paragraph for heading comparison.
@@ -1996,5 +2158,46 @@ mod tests {
 
         assert!(matches!(pages[0][0], ContentElement::Heading(_)));
         assert!(matches!(pages[0][1], ContentElement::Paragraph(_)));
+    }
+
+    #[test]
+    fn test_section_number_heading_levels() {
+        assert_eq!(section_number_level("1 Introduction"), Some(1));
+        assert_eq!(section_number_level("1.2 Methods"), Some(2));
+        assert_eq!(section_number_level("1.2.3 Details here"), Some(3));
+        assert_eq!(section_number_level("12"), None);
+        assert_eq!(section_number_level("Just a title"), None);
+    }
+
+    #[test]
+    fn test_refine_heading_from_section_numbers() {
+        let mut pages = vec![vec![
+            make_paragraph("1 Introduction", 1, 18.0, 700.0, 740.0),
+            make_paragraph("1.1 Background", 1, 14.0, 700.0, 700.0),
+            make_paragraph("Body text here", 1, 12.0, 400.0, 660.0),
+            make_paragraph("More body text", 1, 12.0, 400.0, 640.0),
+            make_paragraph("Even more body", 1, 12.0, 400.0, 620.0),
+        ]];
+        detect_headings(&mut pages, None);
+        refine_heading_hierarchy(&mut pages, &[]);
+        let levels: Vec<_> = pages[0]
+            .iter()
+            .filter_map(|e| match e {
+                ContentElement::Heading(h) => Some((h.base.base.value(), h.heading_level)),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            levels
+                .iter()
+                .any(|(t, l)| t.contains("Introduction") && *l == Some(1)),
+            "levels={levels:?}"
+        );
+        assert!(
+            levels
+                .iter()
+                .any(|(t, l)| t.contains("Background") && *l == Some(2)),
+            "levels={levels:?}"
+        );
     }
 }

@@ -43,15 +43,15 @@ pub fn detect_toc(pages: &mut [Vec<ContentElement>]) {
 }
 
 fn mark_mixed_toc_page(page: &mut [ContentElement]) -> bool {
-    let mut paragraph_indices = Vec::new();
+    let mut text_indices = Vec::new();
     let mut toc_entry_count = 0usize;
     let mut supported_count = 0usize;
 
     for (idx, elem) in page.iter().enumerate() {
-        let Some(text) = paragraph_text(elem) else {
+        let Some(text) = paragraph_or_heading_text(elem) else {
             continue;
         };
-        paragraph_indices.push(idx);
+        text_indices.push(idx);
         if looks_like_toc_line(&text) {
             toc_entry_count += 1;
             supported_count += 1;
@@ -60,19 +60,19 @@ fn mark_mixed_toc_page(page: &mut [ContentElement]) -> bool {
         }
     }
 
-    if toc_entry_count < MIN_TOC_ENTRIES || paragraph_indices.len() < MIN_TOC_ENTRIES + 2 {
+    if toc_entry_count < MIN_TOC_ENTRIES || text_indices.len() < MIN_TOC_ENTRIES + 2 {
         return false;
     }
-    if supported_count * 10 < paragraph_indices.len() * 8 {
+    if supported_count * 10 < text_indices.len() * 8 {
         return false;
     }
 
-    for idx in paragraph_indices {
-        if let ContentElement::Paragraph(p) = &mut page[idx] {
-            let text = p.base.value();
-            if looks_like_toc_line(&text) || looks_like_toc_support_heading(&text) {
-                p.base.semantic_type = SemanticType::TableOfContent;
-            }
+    for idx in text_indices {
+        let Some(text) = paragraph_or_heading_text(&page[idx]) else {
+            continue;
+        };
+        if looks_like_toc_line(&text) || looks_like_toc_support_heading(&text) {
+            demote_to_toc_paragraph(&mut page[idx]);
         }
     }
 
@@ -80,17 +80,28 @@ fn mark_mixed_toc_page(page: &mut [ContentElement]) -> bool {
 }
 
 /// Check if a content element looks like a TOC entry.
+///
+/// Heading detection (Stage 12) often promotes TOC lines to ``##`` headings
+/// before this stage runs. Treat those the same as TOC paragraphs so MHS
+/// does not invent a deep heading tree for a contents page.
 fn is_toc_entry(elem: &ContentElement) -> bool {
-    if let ContentElement::Paragraph(p) = elem {
-        if matches!(
-            p.base.semantic_type,
-            SemanticType::Header | SemanticType::Footer | SemanticType::Note
-        ) {
-            return false;
+    match elem {
+        ContentElement::Paragraph(p) => {
+            if matches!(
+                p.base.semantic_type,
+                SemanticType::Header | SemanticType::Footer | SemanticType::Note
+            ) {
+                return false;
+            }
+            looks_like_toc_line(&p.base.value())
         }
-        looks_like_toc_line(&p.base.value())
-    } else {
-        false
+        ContentElement::Heading(h) => {
+            if is_toc_title(&h.base.base.value()) {
+                return false;
+            }
+            looks_like_toc_line(&h.base.base.value())
+        }
+        _ => false,
     }
 }
 
@@ -110,7 +121,7 @@ fn looks_like_toc_line(text: &str) -> bool {
         None => return false,
     };
 
-    if !(1..=4).contains(&page.len()) || !page.chars().all(|c| c.is_ascii_digit()) {
+    if !is_page_marker(page) {
         return false;
     }
     if title.is_empty() {
@@ -118,6 +129,9 @@ fn looks_like_toc_line(text: &str) -> bool {
     }
 
     let word_count = title.split_whitespace().count();
+    // Allow single-word titles ("Introduction 7", "Bibliography 139") — common
+    // in published TOCs and a major MHS false-heading source when Stage 12
+    // promotes them before this detector runs.
     if word_count == 0 || word_count > 14 || trimmed.len() > 90 {
         return false;
     }
@@ -134,15 +148,31 @@ fn looks_like_toc_line(text: &str) -> bool {
         return false;
     }
 
-    // Accept plain-space TOC entries such as "Experiment #10: Pumps 84" while
-    // still rejecting long prose that merely ends in a number.
-    word_count >= 2
+    // Accept plain-space TOC entries such as "Introduction 7" / "Experiment #10: Pumps 84"
+    // while still rejecting long prose that merely ends in a number (word_count > 14 above).
+    true
 }
 
-fn paragraph_text(elem: &ContentElement) -> Option<String> {
+fn paragraph_or_heading_text(elem: &ContentElement) -> Option<String> {
     match elem {
         ContentElement::Paragraph(p) => Some(p.base.value()),
+        ContentElement::Heading(h) => Some(h.base.base.value()),
         _ => None,
+    }
+}
+
+/// Convert a TOC-like heading/paragraph into a plain TOC paragraph.
+fn demote_to_toc_paragraph(elem: &mut ContentElement) {
+    match elem {
+        ContentElement::Paragraph(p) => {
+            p.base.semantic_type = SemanticType::TableOfContent;
+        }
+        ContentElement::Heading(h) => {
+            let mut para = h.base.clone();
+            para.base.semantic_type = SemanticType::TableOfContent;
+            *elem = ContentElement::Paragraph(para);
+        }
+        _ => {}
     }
 }
 
@@ -171,8 +201,24 @@ fn looks_like_toc_support_heading(text: &str) -> bool {
 fn ends_with_page_marker(text: &str) -> bool {
     text.split_whitespace().last().is_some_and(|token| {
         let stripped = token.trim_matches(|c: char| matches!(c, '.' | ',' | ')' | '('));
-        (1..=4).contains(&stripped.len()) && stripped.chars().all(|c| c.is_ascii_digit())
+        is_page_marker(stripped)
     })
+}
+
+fn is_page_marker(token: &str) -> bool {
+    if token.is_empty() || token.len() > 6 {
+        return false;
+    }
+    if token.chars().all(|c| c.is_ascii_digit()) {
+        return (1..=4).contains(&token.len());
+    }
+    // Lowercase / uppercase Roman numerals used in front-matter TOCs.
+    let lower = token.to_ascii_lowercase();
+    !lower.is_empty()
+        && lower.len() <= 6
+        && lower
+            .chars()
+            .all(|c| matches!(c, 'i' | 'v' | 'x' | 'l' | 'c'))
 }
 
 /// Mark a run of elements as TOC if it's long enough.
@@ -184,9 +230,7 @@ fn mark_toc_run(page: &mut [ContentElement], start: usize, end: usize) {
     promote_preceding_toc_title(page, start);
 
     for elem in &mut page[start..end] {
-        if let ContentElement::Paragraph(p) = elem {
-            p.base.semantic_type = SemanticType::TableOfContent;
-        }
+        demote_to_toc_paragraph(elem);
     }
 }
 
@@ -221,18 +265,30 @@ fn is_toc_title(text: &str) -> bool {
 
 fn promote_explicit_toc_titles(page: &mut [ContentElement]) {
     for idx in 0..page.len().saturating_sub(1) {
-        let is_title =
-            matches!(&page[idx], ContentElement::Paragraph(p) if is_toc_title(&p.base.value()));
+        let is_title = match &page[idx] {
+            ContentElement::Paragraph(p) => is_toc_title(&p.base.value()),
+            ContentElement::Heading(h) => is_toc_title(&h.base.base.value()),
+            _ => false,
+        };
         if !is_title || !next_element_looks_like_toc(page, idx + 1) {
             continue;
         }
 
-        if let ContentElement::Paragraph(p) = &page[idx] {
-            let para = p.clone();
-            page[idx] = ContentElement::Heading(SemanticHeading {
-                base: para,
-                heading_level: Some(1),
-            });
+        match &page[idx] {
+            ContentElement::Paragraph(p) => {
+                let para = p.clone();
+                page[idx] = ContentElement::Heading(SemanticHeading {
+                    base: para,
+                    heading_level: Some(1),
+                });
+            }
+            ContentElement::Heading(h) => {
+                // Keep as H1 — do not leave Style-assigned ##/### on the title.
+                let mut heading = h.clone();
+                heading.heading_level = Some(1);
+                page[idx] = ContentElement::Heading(heading);
+            }
+            _ => {}
         }
     }
 }
@@ -245,7 +301,11 @@ fn next_element_looks_like_toc(page: &[ContentElement], mut idx: usize) -> bool 
                 return p.base.semantic_type == SemanticType::TableOfContent
                     || is_toc_entry(&page[idx]);
             }
-            ContentElement::Heading(_) => return false,
+            ContentElement::Heading(h) => {
+                // After Stage 12, TOC lines are often headings; still count them.
+                return is_toc_entry(&page[idx])
+                    || looks_like_toc_support_heading(&h.base.base.value());
+            }
             ContentElement::HeaderFooter(_) => idx += 1,
             _ => return false,
         }
@@ -550,5 +610,49 @@ mod tests {
         let mut pages = vec![vec![title, list]];
         detect_toc(&mut pages);
         assert!(matches!(pages[0][0], ContentElement::Heading(_)));
+    }
+
+    fn as_heading(elem: ContentElement, level: u32) -> ContentElement {
+        match elem {
+            ContentElement::Paragraph(p) => ContentElement::Heading(SemanticHeading {
+                base: p,
+                heading_level: Some(level),
+            }),
+            other => other,
+        }
+    }
+
+    #[test]
+    fn test_demotes_heading_promoted_toc_entries() {
+        // Stage 12 often promotes TOC lines to headings before Stage 14c.
+        let title = make_para("Table of contents", 720.0);
+        let e1 = as_heading(make_para("Introduction 7", 700.0), 2);
+        let e2 = as_heading(make_para("1. Changing Practices 12", 688.0), 2);
+        let e3 = as_heading(make_para("2. Core and Periphery 18", 676.0), 2);
+        let e4 = as_heading(make_para("Acknowledgment of Country v", 664.0), 2);
+        let mut pages = vec![vec![title, e1, e2, e3, e4]];
+
+        detect_toc(&mut pages);
+
+        // Title may stay a paragraph if promotion heuristics differ; the
+        // critical fix is demoting Stage-12 headings back to TOC paragraphs.
+        for (i, elem) in pages[0][1..].iter().enumerate() {
+            match elem {
+                ContentElement::Paragraph(p) => {
+                    assert_eq!(
+                        p.base.semantic_type,
+                        SemanticType::TableOfContent,
+                        "entry {i} should be TOC paragraph"
+                    );
+                }
+                other => panic!("entry {i}: expected demoted TOC paragraph, got {other:?}"),
+            }
+        }
+        assert!(
+            !pages[0][1..]
+                .iter()
+                .any(|e| matches!(e, ContentElement::Heading(_))),
+            "TOC entries must not remain headings"
+        );
     }
 }

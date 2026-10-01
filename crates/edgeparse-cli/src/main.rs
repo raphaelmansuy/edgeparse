@@ -180,6 +180,39 @@ fn write_outputs(
             .to_path_buf()
     };
 
+    let mut markdown_override: Option<String> = None;
+    if config.hybrid_enabled() {
+        match edgeparse_core::hybrid::apply_hybrid(input_path, doc, config) {
+            Ok(result) => {
+                // Per-document triage.json under out_dir/<stem>/ so batch runs
+                // do not clobber each other (evaluator globs **/triage.json).
+                let triage_dir = out_dir.join(stem);
+                let _ = std::fs::create_dir_all(&triage_dir);
+                if let Err(e) =
+                    edgeparse_core::hybrid::write_triage_report(&triage_dir, &result.triage)
+                {
+                    log::warn!("Failed to write triage.json: {e}");
+                }
+                if result.used_backend {
+                    log::info!(
+                        "Hybrid backend used for {} ({} BACKEND pages)",
+                        doc.file_name,
+                        result
+                            .triage
+                            .triage
+                            .iter()
+                            .filter(|e| e.decision == "BACKEND")
+                            .count()
+                    );
+                }
+                markdown_override = result.markdown_override;
+            }
+            Err(e) => {
+                return Err(Box::new(e));
+            }
+        }
+    }
+
     for fmt in &config.formats {
         let (ext, content) = match fmt {
             OutputFormat::Json => (
@@ -190,7 +223,14 @@ fn write_outputs(
             OutputFormat::Html => ("html", output::html::to_html(doc)?),
             OutputFormat::Markdown
             | OutputFormat::MarkdownWithHtml
-            | OutputFormat::MarkdownWithImages => ("md", output::markdown::to_markdown(doc)?),
+            | OutputFormat::MarkdownWithImages => {
+                let md = if let Some(ref override_md) = markdown_override {
+                    override_md.clone()
+                } else {
+                    output::markdown::to_markdown(doc)?
+                };
+                ("md", md)
+            }
             OutputFormat::Pdf => {
                 log::warn!("PDF output not yet implemented, skipping");
                 continue;

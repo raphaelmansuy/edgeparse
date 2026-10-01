@@ -10,9 +10,13 @@ pub mod form_extractor;
 pub mod graphics_state;
 pub mod hyperlink_extractor;
 pub mod image_extractor;
+/// In-memory Image-XObject → table lattice (WASM-safe; no pdfimages).
+pub mod inmem_raster;
 pub mod line_extractor;
 pub mod loader;
 pub mod metadata_writer;
+/// Pluggable raster OCR engines (Tesseract CLI / ocrs).
+pub mod ocr;
 pub mod page_info;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod raster_table_ocr;

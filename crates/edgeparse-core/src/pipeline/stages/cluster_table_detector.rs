@@ -110,6 +110,11 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
         return elements;
     }
 
+    // Ruling detectors sometimes emit header-only 1-row tables (letter-spaced
+    // glyphs) that steal the real grid's header tokens. Release them so
+    // projection/cluster can rebuild a complete lattice.
+    let elements = release_incomplete_header_only_tables(elements);
+
     // Collect every non-empty TextChunk from every TextLine in every TextBlock.
     let mut all_chunks: Vec<ChunkRef> = Vec::new();
     for (block_idx, el) in elements.iter().enumerate() {
@@ -130,6 +135,21 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
                     continue;
                 }
                 collect_line_chunks(&mut all_chunks, line, block_idx);
+            }
+            ContentElement::TextChunk(chunk) => {
+                let text = chunk.value.trim().to_string();
+                if text.is_empty() {
+                    continue;
+                }
+                all_chunks.push(ChunkRef {
+                    left_x: chunk.bbox.left_x,
+                    right_x: chunk.bbox.right_x,
+                    baseline: chunk.bbox.bottom_y,
+                    font_size: chunk.font_size.max(1.0),
+                    text,
+                    page_number: chunk.bbox.page_number,
+                    block_index: block_idx,
+                });
             }
             _ => {}
         }
@@ -152,6 +172,27 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
         .iter()
         .flat_map(|ct| ct.consumed_block_indices.iter().copied())
         .collect();
+    // Projection lattices on remaining free chunks. Skip image pages (OCR
+    // bordered tables own those) and pages that already have multi-row tables.
+    let has_image = elements
+        .iter()
+        .any(|e| matches!(e, ContentElement::Image(_)));
+    let has_multi_row_table = elements.iter().any(|e| {
+        matches!(
+            e,
+            ContentElement::TableBorder(t) if t.num_rows >= 2 && t.num_columns >= 2
+        )
+    });
+    if !has_image && !has_multi_row_table {
+        tables.extend(find_projection_lattice_tables(
+            &all_chunks,
+            &occupied_indices,
+        ));
+    }
+    let occupied_indices: HashSet<usize> = tables
+        .iter()
+        .flat_map(|ct| ct.consumed_block_indices.iter().copied())
+        .collect();
     tables.extend(find_flow_key_value_tables(&elements, &occupied_indices));
     let occupied_indices: HashSet<usize> = tables
         .iter()
@@ -169,6 +210,11 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
         &elements,
         &occupied_indices,
     ));
+    let occupied_indices: HashSet<usize> = tables
+        .iter()
+        .flat_map(|ct| ct.consumed_block_indices.iter().copied())
+        .collect();
+    tables.extend(find_blank_form_tables(&all_chunks, &occupied_indices));
     let tables = augment_panel_cluster_tables(&elements, tables);
     let tables = augment_grouped_header_cluster_tables(&elements, tables);
 
@@ -255,6 +301,7 @@ pub fn detect_cluster_tables(elements: Vec<ContentElement>) -> Vec<ContentElemen
 // ── Internal types ──────────────────────────────────────────────────────────
 
 /// A single text chunk extracted from a TextLine, with its source block index.
+#[derive(Clone)]
 struct ChunkRef {
     left_x: f64,
     right_x: f64,
@@ -904,6 +951,1152 @@ fn build_caption_compact_two_column_table(
             rows: border_rows,
             num_rows: rows.len(),
             num_columns: 2,
+            is_bad_table: false,
+            is_table_transformer: false,
+            previous_table: None,
+            next_table: None,
+        },
+    })
+}
+
+/// Recover worksheet-style blank forms: multi-column headers with left stub
+/// labels and empty body cells (projection lattice with sparse occupancy).
+///
+/// Example: Mitosis | Meiosis headers with "# chromosomes…" row labels and
+/// blank answer cells. Standard cluster matching fails because stubs are
+/// single-segment rows that never align under the header columns.
+fn find_blank_form_tables(
+    chunks: &[ChunkRef],
+    occupied_indices: &HashSet<usize>,
+) -> Vec<ClusterTable> {
+    let mut baseline_groups = group_chunks_all_baselines(chunks);
+    if baseline_groups.len() < 3 {
+        return Vec::new();
+    }
+    // Top-to-bottom in PDF coords (higher baseline first).
+    baseline_groups.sort_by(|a, b| {
+        b[0].baseline
+            .partial_cmp(&a[0].baseline)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut used_baselines: HashSet<usize> = HashSet::new();
+    let mut tables = Vec::new();
+
+    for header_gi in 0..baseline_groups.len() {
+        if used_baselines.contains(&header_gi) {
+            continue;
+        }
+        let header_chunks = &baseline_groups[header_gi];
+        let font_size = header_chunks
+            .iter()
+            .map(|c| c.font_size)
+            .fold(0.0_f64, f64::max)
+            .max(1.0);
+        let header_refs: Vec<&ChunkRef> = header_chunks.iter().collect();
+        let mut header_segs = split_into_segments(&header_refs, font_size);
+        if header_segs.len() < MIN_COLUMNS {
+            continue;
+        }
+        if !validate_header_alignment(&header_segs) {
+            continue;
+        }
+        // Headers should be short labels, not prose sentences.
+        if header_segs.iter().any(|s| {
+            let words = s.text.split_whitespace().count();
+            words > 12 || s.text.contains('.')
+        }) {
+            continue;
+        }
+        if header_segs
+            .iter()
+            .any(|s| s.block_indices.iter().any(|i| occupied_indices.contains(i)))
+        {
+            continue;
+        }
+
+        // Absorb wrapped header continuation lines (same column count, under headers).
+        let mut next_gi = header_gi + 1;
+        let mut absorbed_header_gis: Vec<usize> = Vec::new();
+        while next_gi < baseline_groups.len() {
+            if used_baselines.contains(&next_gi) {
+                break;
+            }
+            let cont = &baseline_groups[next_gi];
+            let cont_fs = cont
+                .iter()
+                .map(|c| c.font_size)
+                .fold(0.0_f64, f64::max)
+                .max(1.0);
+            let gap = header_chunks[0].baseline - cont[0].baseline;
+            if gap > cont_fs * 2.5 || gap < 0.0 {
+                break;
+            }
+            let cont_refs: Vec<&ChunkRef> = cont.iter().collect();
+            let cont_segs = split_into_segments(&cont_refs, cont_fs);
+            if cont_segs.len() != header_segs.len() {
+                break;
+            }
+            // Continuation cells should sit under header columns, not in stub gutter.
+            let header_left = header_segs
+                .iter()
+                .map(|s| s.left_x)
+                .fold(f64::MAX, f64::min);
+            if cont_segs.iter().any(|s| s.right_x < header_left - cont_fs) {
+                break;
+            }
+            for (h, c) in header_segs.iter_mut().zip(cont_segs.iter()) {
+                if !c.text.trim().is_empty() {
+                    if !h.text.is_empty() {
+                        h.text.push(' ');
+                    }
+                    h.text.push_str(c.text.trim());
+                    h.right_x = h.right_x.max(c.right_x);
+                    h.block_indices.extend(c.block_indices.iter().copied());
+                }
+            }
+            absorbed_header_gis.push(next_gi);
+            next_gi += 1;
+        }
+
+        let header_left = header_segs
+            .iter()
+            .map(|s| s.left_x)
+            .fold(f64::MAX, f64::min);
+        let mut stub_rows: Vec<Vec<ChunkRef>> = Vec::new();
+        let mut stub_indices: Vec<usize> = Vec::new();
+
+        for gi in next_gi..baseline_groups.len() {
+            if used_baselines.contains(&gi) {
+                break;
+            }
+            let row_chunks = &baseline_groups[gi];
+            let row_fs = row_chunks
+                .iter()
+                .map(|c| c.font_size)
+                .fold(0.0_f64, f64::max)
+                .max(1.0);
+            let prev_baseline = stub_rows
+                .last()
+                .map(|r| r[0].baseline)
+                .unwrap_or(header_chunks[0].baseline);
+            let gap = prev_baseline - row_chunks[0].baseline;
+            if gap > TABLE_GAP_FACTOR * row_fs * 1.5 {
+                break;
+            }
+            if gap < -ONE_LINE_TOLERANCE * row_fs {
+                continue;
+            }
+
+            let row_refs: Vec<&ChunkRef> = row_chunks.iter().collect();
+            let segs = split_into_segments(&row_refs, row_fs);
+            if segs.len() != 1 {
+                if segs.is_empty() || segs.iter().any(|s| s.left_x >= header_left - row_fs) {
+                    break;
+                }
+            }
+            let stub = &segs[0];
+            if stub.right_x > header_left - row_fs * 0.25 {
+                break;
+            }
+            let words = stub.text.split_whitespace().count();
+            if words == 0 || words > 14 {
+                break;
+            }
+            if stub
+                .block_indices
+                .iter()
+                .any(|i| occupied_indices.contains(i))
+            {
+                break;
+            }
+            // Merge short wrapped stub continuations into previous stub.
+            if words <= 2 && stub.text.chars().next().is_some_and(|c| c.is_lowercase()) {
+                if let Some(prev) = stub_rows.last_mut() {
+                    prev.extend(row_chunks.iter().cloned());
+                    stub_indices.push(gi);
+                    continue;
+                }
+            }
+            stub_rows.push(row_chunks.clone());
+            stub_indices.push(gi);
+        }
+
+        if stub_rows.len() < 2 {
+            continue;
+        }
+
+        let stub_refs: Vec<&[ChunkRef]> = stub_rows.iter().map(|r| r.as_slice()).collect();
+        if let Some(table) = build_blank_form_table(header_chunks, &header_segs, &stub_refs) {
+            used_baselines.insert(header_gi);
+            for gi in absorbed_header_gis {
+                used_baselines.insert(gi);
+            }
+            for gi in stub_indices {
+                used_baselines.insert(gi);
+            }
+            tables.push(table);
+        }
+    }
+
+    tables
+}
+
+fn release_incomplete_header_only_tables(elements: Vec<ContentElement>) -> Vec<ContentElement> {
+    let mut out = Vec::with_capacity(elements.len());
+    for elem in elements {
+        match elem {
+            ContentElement::TableBorder(ref table)
+                if table.num_rows <= 1
+                    && table.num_columns >= 3
+                    && table_looks_letter_spaced_or_empty(table) =>
+            {
+                for row in &table.rows {
+                    for cell in &row.cells {
+                        let raw = cell_text(cell);
+                        let text = coalesce_letter_spaced(raw.trim());
+                        if text.is_empty() {
+                            continue;
+                        }
+                        let mut chunk =
+                            cell.content.first().map(|t| t.base.clone()).or_else(|| {
+                                cell.contents.iter().find_map(|el| match el {
+                                    ContentElement::TextChunk(c) => Some(c.clone()),
+                                    _ => None,
+                                })
+                            });
+                        if let Some(ref mut c) = chunk {
+                            c.value = text;
+                            c.bbox = cell.bbox.clone();
+                            out.push(ContentElement::TextChunk(c.clone()));
+                        } else {
+                            out.push(ContentElement::TextChunk(
+                                crate::models::chunks::TextChunk {
+                                    value: text,
+                                    bbox: cell.bbox.clone(),
+                                    font_name: String::new(),
+                                    font_size: 10.0,
+                                    font_weight: 400.0,
+                                    italic_angle: 0.0,
+                                    font_color: "#000000".to_string(),
+                                    contrast_ratio: 21.0,
+                                    symbol_ends: Vec::new(),
+                                    text_format: crate::models::enums::TextFormat::Normal,
+                                    text_type: crate::models::enums::TextType::Regular,
+                                    pdf_layer: crate::models::enums::PdfLayer::Content,
+                                    ocg_visible: true,
+                                    index: None,
+                                    page_number: cell.bbox.page_number,
+                                    level: None,
+                                    mcid: None,
+                                },
+                            ));
+                        }
+                    }
+                }
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+fn table_looks_letter_spaced_or_empty(table: &TableBorder) -> bool {
+    let texts: Vec<String> = table
+        .rows
+        .iter()
+        .flat_map(|r| r.cells.iter())
+        .map(cell_text)
+        .filter(|t| !t.trim().is_empty())
+        .collect();
+    if texts.is_empty() {
+        return true;
+    }
+    // "Y e ar" / "Rec o v er y" — glyphs emitted as separate tokens.
+    let letter_spaced = texts
+        .iter()
+        .filter(|t| {
+            let parts: Vec<_> = t.split_whitespace().collect();
+            if parts.len() < 3 {
+                return false;
+            }
+            let short = parts.iter().filter(|p| p.chars().count() <= 2).count();
+            short * 2 >= parts.len()
+        })
+        .count();
+    letter_spaced * 2 >= texts.len()
+}
+
+fn coalesce_letter_spaced(text: &str) -> String {
+    let parts: Vec<_> = text.split_whitespace().collect();
+    // Glue single-char runs and common 2-char glyph fragments ("ar", "ed").
+    let is_glyph = |p: &str| {
+        let n = p.chars().count();
+        n == 1 || (n == 2 && p.chars().all(|c| c.is_alphabetic() && c.is_lowercase()))
+    };
+    if parts.len() >= 3 && parts.iter().all(|p| is_glyph(p)) {
+        return parts.concat();
+    }
+    let mut out = String::new();
+    let mut run = String::new();
+    let flush_run = |out: &mut String, run: &mut String| {
+        if run.is_empty() {
+            return;
+        }
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(run);
+        run.clear();
+    };
+    for p in parts {
+        if is_glyph(p) {
+            run.push_str(p);
+        } else {
+            flush_run(&mut out, &mut run);
+            if !out.is_empty() {
+                out.push(' ');
+            }
+            out.push_str(p);
+        }
+    }
+    flush_run(&mut out, &mut run);
+    if out.is_empty() {
+        text.to_string()
+    } else {
+        out
+    }
+}
+
+/// Recover borderless grids via 1D projection profiles (x-centers → columns,
+/// baselines → rows). Handles sparse cells and multi-line stubs that break
+/// header-driven `find_cluster_tables` matching.
+fn find_projection_lattice_tables(
+    chunks: &[ChunkRef],
+    occupied_indices: &HashSet<usize>,
+) -> Vec<ClusterTable> {
+    let free: Vec<&ChunkRef> = chunks
+        .iter()
+        .filter(|c| !occupied_indices.contains(&c.block_index))
+        .collect();
+    if free.len() < 8 {
+        return Vec::new();
+    }
+
+    let median_fs = {
+        let mut sizes: Vec<f64> = free.iter().map(|c| c.font_size).collect();
+        sizes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        sizes[sizes.len() / 2].max(1.0)
+    };
+
+    // Row grouping by baseline (top → bottom).
+    let mut rows_map: Vec<(f64, Vec<&ChunkRef>)> = Vec::new();
+    for c in &free {
+        let mut placed = false;
+        for (bl, grp) in &mut rows_map {
+            if (*bl - c.baseline).abs() < ONE_LINE_TOLERANCE * median_fs {
+                grp.push(c);
+                placed = true;
+                break;
+            }
+        }
+        if !placed {
+            rows_map.push((c.baseline, vec![c]));
+        }
+    }
+    rows_map.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    if rows_map.len() < 3 {
+        return Vec::new();
+    }
+
+    // Contiguous vertical bands so body prose below a table doesn't pollute peaks.
+    let mut bands: Vec<Vec<(f64, Vec<&ChunkRef>)>> = Vec::new();
+    let mut cur: Vec<(f64, Vec<&ChunkRef>)> = Vec::new();
+    let flush = |bands: &mut Vec<_>, cur: &mut Vec<_>| {
+        if cur.len() >= 3 {
+            bands.push(std::mem::take(cur));
+        } else {
+            cur.clear();
+        }
+    };
+    for (bl, grp) in rows_map {
+        let is_prose_row = {
+            let total_words: usize = grp.iter().map(|c| c.text.split_whitespace().count()).sum();
+            let max_width = grp
+                .iter()
+                .map(|c| c.right_x - c.left_x)
+                .fold(0.0_f64, f64::max);
+            let span = {
+                let lo = grp.iter().map(|c| c.left_x).fold(f64::MAX, f64::min);
+                let hi = grp.iter().map(|c| c.right_x).fold(f64::MIN, f64::max);
+                (hi - lo).max(1.0)
+            };
+            total_words >= 8 || (grp.len() <= 2 && max_width / span > 0.7 && total_words >= 5)
+        };
+        if let Some((prev_bl, _)) = cur.last() {
+            if *prev_bl - bl > TABLE_GAP_FACTOR * median_fs * 1.15 || is_prose_row {
+                flush(&mut bands, &mut cur);
+                if is_prose_row {
+                    continue; // drop prose row from lattice bands
+                }
+            }
+        } else if is_prose_row {
+            continue;
+        }
+        cur.push((bl, grp));
+    }
+    flush(&mut bands, &mut cur);
+
+    let mut tables = Vec::new();
+    for (bi, band) in bands.iter().enumerate() {
+        match build_projection_lattice_from_band(band, median_fs) {
+            Some(table) => {
+                if table
+                    .consumed_block_indices
+                    .iter()
+                    .any(|i| occupied_indices.contains(i))
+                {
+                    continue;
+                }
+                if cfg!(test) {
+                    eprintln!(
+                        "projection OK band {bi} rows={} cols={}",
+                        table.table_border.num_rows, table.table_border.num_columns
+                    );
+                }
+                tables.push(table);
+            }
+            None => {
+                if cfg!(test) {
+                    let nchunks: usize = band.iter().map(|(_, g)| g.len()).sum();
+                    eprintln!(
+                        "projection reject band {bi} rows={} chunks={}",
+                        band.len(),
+                        nchunks
+                    );
+                    for (ri, (bl, g)) in band.iter().enumerate().take(3) {
+                        let texts: Vec<_> = g
+                            .iter()
+                            .map(|c| format!("{}[{:.0}:{:.0}]", c.text.trim(), c.left_x, c.right_x))
+                            .collect();
+                        eprintln!("    row{ri} bl={bl:.1} {:?}", texts);
+                    }
+                }
+            }
+        }
+    }
+    tables
+}
+
+fn projection_column_centers(band: &[(f64, Vec<&ChunkRef>)], median_fs: f64) -> Option<Vec<f64>> {
+    let bin = (median_fs * 0.35).max(2.0);
+    let mut min_x = f64::MAX;
+    let mut max_x = f64::MIN;
+    let mut count = 0usize;
+    for (_, grp) in band {
+        for c in grp {
+            let cx = (c.left_x + c.right_x) / 2.0;
+            min_x = min_x.min(cx);
+            max_x = max_x.max(cx);
+            count += 1;
+        }
+    }
+    if count < 8 || max_x <= min_x + bin * 2.0 {
+        return None;
+    }
+    let n_bins = ((max_x - min_x) / bin).ceil() as usize + 1;
+    if n_bins < 4 || n_bins > 400 {
+        return None;
+    }
+    let mut hist = vec![0u32; n_bins];
+    // Ignore wide released header cells in the histogram — they bridge valleys
+    // between real columns. Still keep them for bbox extent / cell assignment.
+    let max_token_width = median_fs * 8.0;
+    let mut tight = 0usize;
+    for (_, grp) in band {
+        for c in grp {
+            if c.right_x - c.left_x > max_token_width {
+                continue;
+            }
+            let cx = (c.left_x + c.right_x) / 2.0;
+            let idx = ((cx - min_x) / bin).floor() as usize;
+            if let Some(slot) = hist.get_mut(idx.min(n_bins - 1)) {
+                *slot = slot.saturating_add(1);
+                tight += 1;
+            }
+        }
+    }
+    if tight < 8 {
+        // Fall back: all tokens.
+        hist.fill(0);
+        for (_, grp) in band {
+            for c in grp {
+                let cx = (c.left_x + c.right_x) / 2.0;
+                let idx = ((cx - min_x) / bin).floor() as usize;
+                if let Some(slot) = hist.get_mut(idx.min(n_bins - 1)) {
+                    *slot = slot.saturating_add(1);
+                }
+            }
+        }
+    }
+
+    let peak_floor = 2u32;
+    let mut peak_bins: Vec<usize> = Vec::new();
+    for i in 1..n_bins.saturating_sub(1) {
+        if hist[i] >= peak_floor && hist[i] >= hist[i - 1] && hist[i] >= hist[i + 1] {
+            if let Some(&last) = peak_bins.last() {
+                if (i - last) as f64 * bin < median_fs * 1.2 {
+                    if hist[i] > hist[last] {
+                        *peak_bins.last_mut().unwrap() = i;
+                    }
+                    continue;
+                }
+            }
+            peak_bins.push(i);
+        }
+    }
+    if peak_bins.len() < 3 || peak_bins.len() > 8 {
+        return None;
+    }
+    for w in peak_bins.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let mid_min = hist[a..=b].iter().copied().min().unwrap_or(0);
+        let peak_h = hist[a].max(hist[b]);
+        if peak_h > 0 && mid_min * 3 > peak_h {
+            return None;
+        }
+    }
+    if cfg!(test) {
+        eprintln!(
+            "  peaks={} centers={:?}",
+            peak_bins.len(),
+            peak_bins
+                .iter()
+                .map(|&i| min_x + (i as f64 + 0.5) * bin)
+                .collect::<Vec<_>>()
+        );
+    }
+    Some(
+        peak_bins
+            .iter()
+            .map(|&i| min_x + (i as f64 + 0.5) * bin)
+            .collect(),
+    )
+}
+
+fn build_projection_lattice_from_band(
+    band: &[(f64, Vec<&ChunkRef>)],
+    median_fs: f64,
+) -> Option<ClusterTable> {
+    let mut col_centers = match projection_column_centers(band, median_fs) {
+        Some(c) => c,
+        None => {
+            if cfg!(test) {
+                eprintln!("  reject: no column centers");
+            }
+            return None;
+        }
+    };
+    // If the densest header-like row has more short tokens than detected peaks,
+    // prefer those token centers (fixes Year/3-Year collapse when a wide cell
+    // bridges the first valley).
+    if let Some((_, grp)) = band.first() {
+        let mut xs: Vec<f64> = grp
+            .iter()
+            .filter(|c| c.text.split_whitespace().count() <= 4)
+            .map(|c| (c.left_x + c.right_x) / 2.0)
+            .collect();
+        xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        xs.dedup_by(|a, b| (*a - *b).abs() < median_fs * 0.8);
+        if xs.len() > col_centers.len() && xs.len() >= 3 && xs.len() <= 8 {
+            if cfg!(test) {
+                eprintln!("  header override cols {} -> {:?}", xs.len(), xs);
+            }
+            col_centers = xs;
+        }
+    }
+    let num_cols = col_centers.len();
+    if num_cols < 3 || band.len() < 3 {
+        return None;
+    }
+
+    let assign_col = |c: &ChunkRef| -> usize {
+        let cx = (c.left_x + c.right_x) / 2.0;
+        col_centers
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                (*a - cx)
+                    .abs()
+                    .partial_cmp(&(*b - cx).abs())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(0)
+    };
+
+    // Expand chunks that span multiple column centers (merged "1 33.0%" tokens).
+    let expand_chunk = |c: &ChunkRef| -> Vec<(usize, String)> {
+        let tol = median_fs * 0.5;
+        let spanned: Vec<usize> = col_centers
+            .iter()
+            .enumerate()
+            .filter(|(_, cx)| c.left_x - tol <= **cx && **cx <= c.right_x + tol)
+            .map(|(i, _)| i)
+            .collect();
+        let parts: Vec<&str> = c.text.split_whitespace().collect();
+        if spanned.len() >= 2 && parts.len() >= 2 {
+            if parts.len() == spanned.len() {
+                return spanned
+                    .into_iter()
+                    .zip(parts.into_iter())
+                    .map(|(ci, p)| (ci, p.to_string()))
+                    .collect();
+            }
+            // Distribute tokens left-to-right across spanned columns.
+            let mut out: Vec<(usize, String)> =
+                spanned.iter().map(|&ci| (ci, String::new())).collect();
+            for (i, p) in parts.iter().enumerate() {
+                let slot = (i * spanned.len()) / parts.len().max(1);
+                let slot = slot.min(spanned.len() - 1);
+                if !out[slot].1.is_empty() {
+                    out[slot].1.push(' ');
+                }
+                out[slot].1.push_str(p);
+            }
+            return out.into_iter().filter(|(_, t)| !t.is_empty()).collect();
+        }
+        vec![(assign_col(c), c.text.clone())]
+    };
+
+    // Merge stub-only continuation rows into the previous row (wrapped labels).
+    let mut merged: Vec<(f64, Vec<Vec<(String, usize)>>)> = Vec::new(); // text + block
+    for (bl, grp) in band {
+        // Full-width single segment ≈ flowing prose, not a grid row.
+        if grp.len() == 1 {
+            let c = grp[0];
+            let width = c.right_x - c.left_x;
+            let band_width = {
+                let mut lo = f64::MAX;
+                let mut hi = f64::MIN;
+                for (_, g) in band {
+                    for x in g {
+                        lo = lo.min(x.left_x);
+                        hi = hi.max(x.right_x);
+                    }
+                }
+                (hi - lo).max(1.0)
+            };
+            if width / band_width > 0.55 && c.text.split_whitespace().count() >= 8 {
+                break;
+            }
+        }
+        let mut cells: Vec<Vec<(String, usize)>> = vec![Vec::new(); num_cols];
+        for c in grp {
+            for (ci, text) in expand_chunk(c) {
+                if ci < num_cols {
+                    cells[ci].push((text, c.block_index));
+                }
+            }
+        }
+        let occupied: Vec<usize> = cells
+            .iter()
+            .enumerate()
+            .filter_map(|(i, v)| (!v.is_empty()).then_some(i))
+            .collect();
+        let stub_only = occupied.len() == 1 && occupied[0] == 0;
+        if stub_only {
+            if let Some((_, prev)) = merged.last_mut() {
+                prev[0].extend(cells[0].iter().cloned());
+                continue;
+            }
+        }
+        if occupied.len() < 2 {
+            if cfg!(test) {
+                eprintln!(
+                    "  break occupied={} texts={:?}",
+                    occupied.len(),
+                    cells
+                        .iter()
+                        .map(|c| {
+                            c.iter()
+                                .map(|(t, _)| t.as_str())
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        })
+                        .collect::<Vec<_>>()
+                );
+            }
+            break;
+        }
+        let row_word_count: usize = cells
+            .iter()
+            .map(|col| {
+                col.iter()
+                    .map(|(t, _)| t.split_whitespace().count())
+                    .sum::<usize>()
+            })
+            .sum();
+        let looks_like_sentence = |text: &str| -> bool {
+            if text.contains(['?', '!']) {
+                return true;
+            }
+            // Decimal/percentage dots are fine; sentence-ending ". " is not.
+            text.contains(". ") || text.ends_with('.')
+        };
+        if row_word_count > 12
+            || cells.iter().any(|col| {
+                let text = col
+                    .iter()
+                    .map(|(t, _)| t.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                text.split_whitespace().count() > 12 || looks_like_sentence(&text)
+            })
+        {
+            if cfg!(test) {
+                eprintln!("  break words={row_word_count}");
+            }
+            break;
+        }
+        merged.push((*bl, cells));
+    }
+    if merged.len() < 3 {
+        if cfg!(test) {
+            eprintln!("  reject: merged rows {} cols={}", merged.len(), num_cols);
+        }
+        return None;
+    }
+
+    let num_rows = merged.len();
+    let mut filled = 0usize;
+    let mut numericish = 0usize;
+    let mut shortish = 0usize;
+    let total_cells = num_rows * num_cols;
+    let mut cell_texts: Vec<Vec<String>> = Vec::with_capacity(num_rows);
+    let mut all_blocks: HashSet<usize> = HashSet::new();
+    let mut page_number: Option<u32> = None;
+    let mut min_x = f64::MAX;
+    let mut max_x = f64::MIN;
+    let mut min_y = f64::MAX;
+    let mut max_y = f64::MIN;
+
+    // Geometry from original band chunks.
+    for (_, grp) in band {
+        for c in grp {
+            min_x = min_x.min(c.left_x);
+            max_x = max_x.max(c.right_x);
+            min_y = min_y.min(c.baseline - c.font_size * 0.2);
+            max_y = max_y.max(c.baseline + c.font_size * 1.1);
+            if page_number.is_none() {
+                page_number = c.page_number;
+            }
+        }
+    }
+
+    for (_, cells) in &merged {
+        let mut row_texts = Vec::with_capacity(num_cols);
+        for col_parts in cells {
+            let text = col_parts
+                .iter()
+                .map(|(t, _)| t.as_str())
+                .collect::<Vec<_>>()
+                .join(" ");
+            for (_, bi) in col_parts {
+                all_blocks.insert(*bi);
+            }
+            if !text.trim().is_empty() {
+                filled += 1;
+                let words = text.split_whitespace().count();
+                if words <= 6 {
+                    shortish += 1;
+                }
+                if text.chars().any(|ch| ch.is_ascii_digit()) {
+                    numericish += 1;
+                }
+            }
+            row_texts.push(text);
+        }
+        cell_texts.push(row_texts);
+    }
+
+    if filled * 10 < total_cells * 3 {
+        if cfg!(test) {
+            eprintln!("  reject: occupancy filled={filled} total={total_cells}");
+        }
+        return None;
+    }
+    if shortish * 10 < filled * 6 {
+        if cfg!(test) {
+            eprintln!("  reject: shortish={shortish} filled={filled}");
+        }
+        return None;
+    }
+    if numericish * 5 < filled && num_cols >= 4 && shortish * 10 < filled * 8 {
+        if cfg!(test) {
+            eprintln!("  reject: numericish={numericish} filled={filled}");
+        }
+        return None;
+    }
+
+    let mut x_coords = Vec::with_capacity(num_cols + 1);
+    x_coords.push(min_x);
+    for i in 0..num_cols.saturating_sub(1) {
+        x_coords.push((col_centers[i] + col_centers[i + 1]) / 2.0);
+    }
+    x_coords.push(max_x);
+
+    let mut y_coords = Vec::with_capacity(num_rows + 1);
+    y_coords.push(max_y);
+    for i in 0..num_rows.saturating_sub(1) {
+        y_coords.push((merged[i].0 + merged[i + 1].0) / 2.0);
+    }
+    y_coords.push(min_y);
+
+    let mut border_rows = Vec::with_capacity(num_rows);
+    for (ri, ((bl, cells), texts)) in merged.iter().zip(cell_texts.iter()).enumerate() {
+        let row_top = y_coords[ri];
+        let row_bottom = y_coords[ri + 1];
+        let mut border_cells = Vec::with_capacity(num_cols);
+        for ci in 0..num_cols {
+            let bbox = BoundingBox::new(
+                page_number,
+                x_coords[ci],
+                row_bottom,
+                x_coords[ci + 1],
+                row_top,
+            );
+            let text = texts[ci].trim();
+            let content = if text.is_empty() {
+                Vec::new()
+            } else {
+                let seg = CellSegment {
+                    left_x: x_coords[ci],
+                    right_x: x_coords[ci + 1],
+                    baseline: *bl,
+                    font_size: median_fs,
+                    text: text.to_string(),
+                    page_number,
+                    block_indices: cells[ci].iter().map(|(_, bi)| *bi).collect(),
+                };
+                vec![make_token(&seg)]
+            };
+            let contents = content
+                .iter()
+                .map(|tok| ContentElement::TextChunk(tok.base.clone()))
+                .collect();
+            border_cells.push(TableBorderCell {
+                bbox,
+                index: None,
+                level: None,
+                row_number: ri,
+                col_number: ci,
+                row_span: 1,
+                col_span: 1,
+                content,
+                contents,
+                semantic_type: None,
+            });
+        }
+        border_rows.push(TableBorderRow {
+            bbox: BoundingBox::new(page_number, min_x, row_bottom, max_x, row_top),
+            index: None,
+            level: None,
+            row_number: ri,
+            cells: border_cells,
+            semantic_type: None,
+        });
+    }
+
+    let mut consumed: Vec<usize> = all_blocks.into_iter().collect();
+    consumed.sort_unstable();
+
+    Some(ClusterTable {
+        consumed_block_indices: consumed,
+        table_border: TableBorder {
+            bbox: BoundingBox::new(page_number, min_x, min_y, max_x, max_y),
+            index: None,
+            level: Some("1".to_string()),
+            x_coordinates: x_coords.clone(),
+            x_widths: vec![0.0; x_coords.len()],
+            y_coordinates: y_coords.clone(),
+            y_widths: vec![0.0; y_coords.len()],
+            rows: border_rows,
+            num_rows,
+            num_columns: num_cols,
+            is_bad_table: false,
+            is_table_transformer: false,
+            previous_table: None,
+            next_table: None,
+        },
+    })
+}
+
+/// Group chunks by baseline without dropping single-segment rows.
+fn group_chunks_all_baselines(chunks: &[ChunkRef]) -> Vec<Vec<ChunkRef>> {
+    if chunks.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted: Vec<&ChunkRef> = chunks.iter().collect();
+    sorted.sort_by(|a, b| {
+        b.baseline
+            .partial_cmp(&a.baseline)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                a.left_x
+                    .partial_cmp(&b.left_x)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    });
+
+    let mut groups: Vec<Vec<ChunkRef>> = Vec::new();
+    let mut group_baselines: Vec<f64> = Vec::new();
+    let mut group_font_sizes: Vec<f64> = Vec::new();
+
+    for chunk in sorted {
+        let mut placed = false;
+        for (gi, grp) in groups.iter_mut().enumerate() {
+            let tol = ONE_LINE_TOLERANCE * chunk.font_size.min(group_font_sizes[gi]);
+            if (group_baselines[gi] - chunk.baseline).abs() < tol {
+                grp.push(ChunkRef {
+                    left_x: chunk.left_x,
+                    right_x: chunk.right_x,
+                    baseline: chunk.baseline,
+                    font_size: chunk.font_size,
+                    text: chunk.text.clone(),
+                    page_number: chunk.page_number,
+                    block_index: chunk.block_index,
+                });
+                placed = true;
+                break;
+            }
+        }
+        if !placed {
+            groups.push(vec![ChunkRef {
+                left_x: chunk.left_x,
+                right_x: chunk.right_x,
+                baseline: chunk.baseline,
+                font_size: chunk.font_size,
+                text: chunk.text.clone(),
+                page_number: chunk.page_number,
+                block_index: chunk.block_index,
+            }]);
+            group_baselines.push(chunk.baseline);
+            group_font_sizes.push(chunk.font_size);
+        }
+    }
+    groups
+}
+
+fn build_blank_form_table(
+    header_chunks: &[ChunkRef],
+    header_segs: &[CellSegment],
+    stub_rows: &[&[ChunkRef]],
+) -> Option<ClusterTable> {
+    let num_cols = header_segs.len() + 1; // stub + headers
+    let num_rows = stub_rows.len() + 1;
+    let page_number = header_segs.first().and_then(|s| s.page_number).or_else(|| {
+        stub_rows
+            .first()
+            .and_then(|r| r.first().map(|c| c.page_number))
+            .flatten()
+    });
+
+    let stub_left = stub_rows
+        .iter()
+        .flat_map(|r| r.iter().map(|c| c.left_x))
+        .fold(f64::MAX, f64::min);
+    let stub_right = stub_rows
+        .iter()
+        .flat_map(|r| r.iter().map(|c| c.right_x))
+        .fold(f64::MIN, f64::max);
+    let header_left = header_segs
+        .iter()
+        .map(|s| s.left_x)
+        .fold(f64::MAX, f64::min);
+    let header_right = header_segs
+        .iter()
+        .map(|s| s.right_x)
+        .fold(f64::MIN, f64::max);
+
+    let mut x_coords = Vec::with_capacity(num_cols + 1);
+    x_coords.push(stub_left);
+    x_coords.push((stub_right + header_left) / 2.0);
+    for i in 0..header_segs.len().saturating_sub(1) {
+        x_coords.push((header_segs[i].right_x + header_segs[i + 1].left_x) / 2.0);
+    }
+    x_coords.push(header_right);
+
+    let header_fs = header_chunks
+        .iter()
+        .map(|c| c.font_size)
+        .fold(0.0_f64, f64::max)
+        .max(1.0);
+    let header_baseline = header_chunks[0].baseline;
+    let top_y = header_baseline + header_fs * 1.2;
+    let mut y_coords = vec![top_y];
+    let mut row_baselines = vec![header_baseline];
+    for row in stub_rows {
+        row_baselines.push(row[0].baseline);
+    }
+    for i in 0..row_baselines.len().saturating_sub(1) {
+        y_coords.push((row_baselines[i] + row_baselines[i + 1]) / 2.0);
+    }
+    let last_fs = stub_rows
+        .last()
+        .and_then(|r| r.first())
+        .map(|c| c.font_size)
+        .unwrap_or(header_fs)
+        .max(1.0);
+    y_coords.push(row_baselines.last().copied()? - last_fs * 0.3);
+
+    let mut consumed: HashSet<usize> = HashSet::new();
+    for c in header_chunks {
+        consumed.insert(c.block_index);
+    }
+    for row in stub_rows {
+        for c in *row {
+            consumed.insert(c.block_index);
+        }
+    }
+
+    let mut border_rows = Vec::with_capacity(num_rows);
+    // Header row: empty stub + header labels
+    {
+        let row_top = y_coords[0];
+        let row_bottom = y_coords[1];
+        let mut cells = Vec::with_capacity(num_cols);
+        for ci in 0..num_cols {
+            let bbox = BoundingBox::new(
+                page_number,
+                x_coords[ci],
+                row_bottom,
+                x_coords[ci + 1],
+                row_top,
+            );
+            let content = if ci == 0 {
+                Vec::new()
+            } else {
+                let seg = &header_segs[ci - 1];
+                vec![make_token(seg)]
+            };
+            let contents = content
+                .iter()
+                .map(|token| ContentElement::TextChunk(token.base.clone()))
+                .collect();
+            cells.push(TableBorderCell {
+                bbox,
+                index: None,
+                level: None,
+                row_number: 0,
+                col_number: ci,
+                row_span: 1,
+                col_span: 1,
+                content,
+                contents,
+                semantic_type: None,
+            });
+        }
+        border_rows.push(TableBorderRow {
+            bbox: BoundingBox::new(
+                page_number,
+                x_coords[0],
+                row_bottom,
+                *x_coords.last()?,
+                row_top,
+            ),
+            index: None,
+            level: None,
+            row_number: 0,
+            cells,
+            semantic_type: None,
+        });
+    }
+    // Stub rows with empty body cells
+    for (ri, row) in stub_rows.iter().enumerate() {
+        let row_top = y_coords[ri + 1];
+        let row_bottom = y_coords[ri + 2];
+        let row_fs = row
+            .iter()
+            .map(|c| c.font_size)
+            .fold(0.0_f64, f64::max)
+            .max(1.0);
+        let row_refs: Vec<&ChunkRef> = row.iter().collect();
+        let stub_seg = split_into_segments(&row_refs, row_fs);
+        let stub_text = stub_seg.first().map(|s| s.text.as_str()).unwrap_or("");
+        let mut cells = Vec::with_capacity(num_cols);
+        for ci in 0..num_cols {
+            let bbox = BoundingBox::new(
+                page_number,
+                x_coords[ci],
+                row_bottom,
+                x_coords[ci + 1],
+                row_top,
+            );
+            let content = if ci == 0 && !stub_text.is_empty() {
+                if let Some(seg) = stub_seg.first() {
+                    vec![make_token(seg)]
+                } else {
+                    vec![make_text_token(stub_text, &bbox)]
+                }
+            } else {
+                Vec::new()
+            };
+            let contents = content
+                .iter()
+                .map(|token| ContentElement::TextChunk(token.base.clone()))
+                .collect();
+            cells.push(TableBorderCell {
+                bbox,
+                index: None,
+                level: None,
+                row_number: ri + 1,
+                col_number: ci,
+                row_span: 1,
+                col_span: 1,
+                content,
+                contents,
+                semantic_type: None,
+            });
+        }
+        border_rows.push(TableBorderRow {
+            bbox: BoundingBox::new(
+                page_number,
+                x_coords[0],
+                row_bottom,
+                *x_coords.last()?,
+                row_top,
+            ),
+            index: None,
+            level: None,
+            row_number: ri + 1,
+            cells,
+            semantic_type: None,
+        });
+    }
+
+    let mut consumed_indices: Vec<usize> = consumed.into_iter().collect();
+    consumed_indices.sort_unstable();
+
+    Some(ClusterTable {
+        consumed_block_indices: consumed_indices,
+        table_border: TableBorder {
+            bbox: BoundingBox::new(
+                page_number,
+                x_coords[0],
+                *y_coords.last()?,
+                *x_coords.last()?,
+                y_coords[0],
+            ),
+            index: None,
+            level: Some("1".to_string()),
+            x_coordinates: x_coords.clone(),
+            x_widths: vec![0.0; x_coords.len()],
+            y_coordinates: y_coords.clone(),
+            y_widths: vec![0.0; y_coords.len()],
+            rows: border_rows,
+            num_rows,
+            num_columns: num_cols,
             is_bad_table: false,
             is_table_transformer: false,
             previous_table: None,
@@ -1672,8 +2865,12 @@ fn find_cluster_tables(row_candidates: &[RowCandidate]) -> Vec<ClusterTable> {
             if matches >= MIN_CELLS_PER_ROW {
                 table_rows.push(row);
                 table_indices.push(ri);
+            } else if header.segments.len() >= 4 && matches >= 1 {
+                // Sparse cells in wide numeric lattices — keep scanning.
+                table_rows.push(row);
+                table_indices.push(ri);
             } else {
-                break; // Gap in alignment — stop.
+                break; // Gap in alignment — end of table.
             }
         }
 
@@ -3101,6 +4298,341 @@ mod tests {
                 next_table: None,
             },
         }
+    }
+
+    #[test]
+    fn debug_odl_127_pre_cluster_lines() {
+        use std::path::Path;
+
+        use crate::api::config::ProcessingConfig;
+        use crate::pdf::chunk_parser::extract_page_chunks;
+        use crate::pdf::loader::load_pdf;
+        use crate::pdf::page_info;
+        use crate::pipeline::stages::column_detector;
+        use crate::pipeline::stages::content_filter;
+        use crate::pipeline::stages::table_content_assigner;
+        use crate::pipeline::stages::table_detector;
+        use crate::pipeline::stages::text_line_grouper;
+
+        let pdf_path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../odl-bench/pdfs/01030000000127.pdf");
+        if !pdf_path.exists() {
+            return;
+        }
+        let config = ProcessingConfig::default();
+        let raw_doc = load_pdf(&pdf_path, None).unwrap();
+        let page_info_list = page_info::extract_page_info(&raw_doc.document);
+        let (&page_num, &page_id) = raw_doc.document.get_pages().iter().next().unwrap();
+        let page_chunks = extract_page_chunks(&raw_doc.document, page_num, page_id).unwrap();
+        let mut elements: Vec<ContentElement> = page_chunks
+            .text_chunks
+            .into_iter()
+            .map(ContentElement::TextChunk)
+            .collect();
+        elements.extend(
+            page_chunks
+                .image_chunks
+                .into_iter()
+                .map(ContentElement::Image),
+        );
+        elements.extend(
+            page_chunks
+                .line_chunks
+                .into_iter()
+                .map(ContentElement::Line),
+        );
+        elements = content_filter::filter_content(
+            elements,
+            &config.filter_config,
+            &page_info_list[0].crop_box,
+        );
+        elements = table_detector::detect_table_borders(elements);
+        elements = table_content_assigner::assign_content_to_tables(elements);
+        elements = table_detector::filter_empty_tables(elements);
+        let mut pages = vec![elements];
+        let layouts = column_detector::detect_columns(&mut pages);
+        let elements = text_line_grouper::group_text_lines(pages.remove(0), layouts.first());
+
+        for (i, el) in elements.iter().take(35).enumerate() {
+            match el {
+                ContentElement::TextLine(line) => {
+                    let parts: Vec<_> = line
+                        .text_chunks
+                        .iter()
+                        .map(|c| {
+                            format!("[{:.0}:{:.0} '{}']", c.bbox.left_x, c.bbox.right_x, c.value)
+                        })
+                        .collect();
+                    eprintln!("L{i} bl={:.1} {}", line.base_line, parts.join(" "));
+                }
+                other => {
+                    let t = element_text(other).unwrap_or_default();
+                    eprintln!(
+                        "E{i} {:?} '{}'",
+                        std::mem::discriminant(other),
+                        t.chars().take(60).collect::<String>()
+                    );
+                }
+            }
+        }
+
+        let result = detect_cluster_tables(elements.clone());
+        for el in &result {
+            if let ContentElement::TableBorder(tb) = el {
+                eprintln!(
+                    "TABLE {}x{} {:?}",
+                    tb.num_rows,
+                    tb.num_columns,
+                    tb.rows
+                        .iter()
+                        .map(|r| {
+                            r.cells
+                                .iter()
+                                .map(cell_text)
+                                .collect::<Vec<_>>()
+                                .join(" | ")
+                        })
+                        .collect::<Vec<_>>()
+                );
+            }
+        }
+        // Dump any line containing Year / 3-Year
+        for (i, el) in elements.iter().enumerate() {
+            if let ContentElement::TextLine(line) = el {
+                let t: String = line.text_chunks.iter().map(|c| c.value.as_str()).collect();
+                if t.contains("Year") || t.contains("Y") && t.contains("e") && t.len() < 20 {
+                    let parts: Vec<_> = line
+                        .text_chunks
+                        .iter()
+                        .map(|c| {
+                            format!("[{:.0}:{:.0} '{}']", c.bbox.left_x, c.bbox.right_x, c.value)
+                        })
+                        .collect();
+                    eprintln!("YEAR-LINE {i} bl={:.1} {}", line.base_line, parts.join(" "));
+                }
+            }
+            if let ContentElement::TableBorder(tb) = el {
+                let flat: String = tb
+                    .rows
+                    .iter()
+                    .flat_map(|r| r.cells.iter())
+                    .map(cell_text)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                if flat.contains("Y") {
+                    eprintln!("PRE-TABLE {i} {}x{} '{flat}'", tb.num_rows, tb.num_columns);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_projection_lattice_column_split_textlines() {
+        // Real pdfium/line-grouper output for 127: one baseline is split into
+        // multiple TextLine elements (left pair, then each right cell).
+        let page = 1u32;
+        let fs = 10.0;
+        let mut elements = vec![
+            // Pre-existing empty ruling tables (Discriminant TableBorder) that
+            // currently appear above the Year grid on doc 127.
+            ContentElement::TableBorder(TableBorder {
+                bbox: BoundingBox::new(Some(page), 50.0, 720.0, 560.0, 740.0),
+                index: None,
+                level: None,
+                x_coordinates: vec![50.0, 200.0, 350.0, 560.0],
+                x_widths: vec![0.0; 4],
+                y_coordinates: vec![740.0, 720.0],
+                y_widths: vec![0.0; 2],
+                rows: vec![],
+                num_rows: 0,
+                num_columns: 3,
+                is_bad_table: false,
+                is_table_transformer: false,
+                previous_table: None,
+                next_table: None,
+            }),
+        ];
+        let rows: &[(f64, &[&[(f64, f64, &str)]])] = &[
+            (
+                705.5,
+                &[
+                    &[(58.0, 64.0, "1"), (151.0, 179.0, "33.0%")],
+                    &[(285.0, 320.0, "20.00%")],
+                    &[(426.0, 458.0, "14.29%")],
+                ],
+            ),
+            (
+                687.5,
+                &[
+                    &[(58.0, 66.0, "2"), (151.0, 186.0, "44.45%")],
+                    &[(285.0, 319.0, "32.00%")],
+                    &[(426.0, 460.0, "24.49%")],
+                ],
+            ),
+            (
+                669.5,
+                &[
+                    &[(58.0, 65.0, "3"), (151.0, 181.0, "14.81%")],
+                    &[(285.0, 317.0, "19.20%")],
+                    &[(426.0, 457.0, "17.49%")],
+                ],
+            ),
+            (
+                651.5,
+                &[
+                    &[(58.0, 66.0, "4"), (151.0, 176.0, "7.41%")],
+                    &[(285.0, 314.0, "11.52%")],
+                    &[(426.0, 458.0, "12.49%")],
+                ],
+            ),
+        ];
+        for (bl, line_groups) in rows {
+            for cols in *line_groups {
+                elements.push(ContentElement::TextLine(make_line(page, *bl, fs, cols)));
+            }
+        }
+        elements.push(make_context_block(
+            page,
+            520.0,
+            "Suppose your business just purchased a very long prose sentence below",
+        ));
+
+        let result = detect_cluster_tables(elements);
+        let hit = result.iter().find_map(|e| match e {
+            ContentElement::TableBorder(tb)
+                if tb.num_columns >= 4
+                    && tb
+                        .rows
+                        .iter()
+                        .flat_map(|r| r.cells.iter())
+                        .any(|c| cell_text(c).contains("33.0%")) =>
+            {
+                Some(tb)
+            }
+            _ => None,
+        });
+        assert!(
+            hit.is_some(),
+            "column-split TextLines should still form a projection lattice"
+        );
+    }
+
+    #[test]
+    fn test_projection_lattice_macrs_rate_grid() {
+        // Mirrors odl-bench 127 top grid: 4 columns, sparse lower rows.
+        let page = 1u32;
+        let fs = 10.0;
+        let header = make_line(
+            page,
+            700.0,
+            fs,
+            &[
+                (58.0, 78.0, "Year"),
+                (151.0, 179.0, "3-Year"),
+                (285.0, 313.0, "5-Year"),
+                (426.0, 454.0, "7-Year"),
+            ],
+        );
+        let mut lines = vec![header];
+        let data: &[(f64, &[(f64, f64, &str)])] = &[
+            (
+                682.0,
+                &[
+                    (58.0, 61.0, "1"),
+                    (151.0, 176.0, "33.0%"),
+                    (285.0, 317.0, "20.00%"),
+                    (426.0, 455.0, "14.29%"),
+                ],
+            ),
+            (
+                664.0,
+                &[
+                    (58.0, 63.0, "2"),
+                    (151.0, 183.0, "44.45%"),
+                    (285.0, 316.0, "32.00%"),
+                    (426.0, 458.0, "24.49%"),
+                ],
+            ),
+            (
+                646.0,
+                &[
+                    (58.0, 63.0, "3"),
+                    (151.0, 178.0, "14.81%"),
+                    (285.0, 314.0, "19.20%"),
+                    (426.0, 455.0, "17.49%"),
+                ],
+            ),
+            (
+                628.0,
+                &[
+                    (58.0, 64.0, "4"),
+                    (151.0, 174.0, "7.41%"),
+                    (285.0, 311.0, "11.52%"),
+                    (426.0, 455.0, "12.49%"),
+                ],
+            ),
+            (
+                610.0,
+                &[
+                    (58.0, 63.0, "5"),
+                    (285.0, 311.0, "11.52%"),
+                    (426.0, 452.0, "8.93%"),
+                ],
+            ),
+            (
+                592.0,
+                &[
+                    (58.0, 63.0, "6"),
+                    (285.0, 310.0, "5.76%"),
+                    (426.0, 452.0, "8.93%"),
+                ],
+            ),
+        ];
+        for (bl, cols) in data {
+            lines.push(make_line(page, *bl, fs, cols));
+        }
+
+        let mut elements: Vec<ContentElement> = vec![make_context_block(
+            page,
+            740.0,
+            "Context above the table to simulate a real page width",
+        )];
+        elements.extend(lines.into_iter().map(make_block_with_line));
+        elements.push(make_context_block(
+            page,
+            520.0,
+            "Suppose your business just purchased a very long prose sentence below the table",
+        ));
+
+        let result = detect_cluster_tables(elements);
+        let tables: Vec<_> = result
+            .iter()
+            .filter_map(|e| match e {
+                ContentElement::TableBorder(tb) => Some(tb),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            !tables.is_empty(),
+            "expected projection/cluster table for MACRS rate grid"
+        );
+        let tb = tables
+            .iter()
+            .find(|t| t.num_columns >= 4 && t.num_rows >= 5)
+            .expect("expected 4-col rate table");
+        let flat: String = tb
+            .rows
+            .iter()
+            .flat_map(|r| r.cells.iter())
+            .map(cell_text)
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(flat.contains("33.0%"), "body cell missing: {flat}");
+        assert!(flat.contains("Year"), "header missing: {flat}");
+        assert!(
+            !flat.to_lowercase().contains("suppose"),
+            "prose leaked into table: {flat}"
+        );
     }
 
     #[test]

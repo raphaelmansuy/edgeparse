@@ -14,6 +14,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 edgeparse-core = { path = "../edgeparse-core", default-features = false, features = ["wasm"] }
+# Optional: enable with `--features ocr-ocrs` once models are loaded from JS.
+# edgeparse-core ocr-ocrs pulls ocrs+rten (wasm32-ok).
 wasm-bindgen = "0.2"
 serde-wasm-bindgen = "0.6"
 serde = { version = "1.0", features = ["derive"] }
@@ -23,6 +25,11 @@ console_log = { version = "1", features = ["color"] }
 log = "0.4"
 js-sys = "0.3"
 web-sys = { version = "0.3", features = ["console"] }
+image = { workspace = true }
+
+[features]
+default = []
+ocr-ocrs = ["edgeparse-core/ocr-ocrs"]
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

@@ -172,10 +172,11 @@ impl ProcessingConfig {
 
     /// Returns true when local OCR recovery should run.
     ///
-    /// OCR is only active in hybrid mode and can still be disabled explicitly
-    /// via `raster_table_ocr`.
+    /// Classical raster OCR (Tesseract / RapidOCR) recovers tables that exist
+    /// only as page images — required for local TEDS on figure-embedded grids.
+    /// Independent of Docling hybrid; disabled only via `raster_table_ocr`.
     pub fn raster_table_ocr_enabled(&self) -> bool {
-        self.raster_table_ocr && self.hybrid_enabled()
+        self.raster_table_ocr
     }
 }
 
@@ -199,10 +200,10 @@ mod tests {
     }
 
     #[test]
-    fn test_raster_table_ocr_requires_hybrid_mode() {
+    fn test_raster_table_ocr_independent_of_hybrid() {
         let mut config = ProcessingConfig::default();
         assert!(!config.hybrid_enabled());
-        assert!(!config.raster_table_ocr_enabled());
+        assert!(config.raster_table_ocr_enabled());
 
         config.hybrid = HybridBackend::DoclingFast;
         assert!(config.hybrid_enabled());
