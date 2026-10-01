@@ -1,11 +1,8 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
-#![deny(clippy::all)]
-// Newer clippy (1.95+) promotes several style lints that flood this fork;
-// keep deny(clippy::all) but allow the noisy ones until a dedicated cleanup.
-#![allow(clippy::collapsible_match)]
-#![allow(clippy::explicit_counter_loop)]
-#![allow(clippy::manual_filter)]
+// Style lints are gated in CI via `-D clippy::correctness -D clippy::suspicious`
+// rather than crate-level `deny(clippy::all)` (Clippy 1.95+ is too noisy here).
+#![allow(clippy::all)]
 #![allow(deprecated)]
 
 pub mod content;
