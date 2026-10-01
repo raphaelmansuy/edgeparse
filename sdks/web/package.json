@@ -1,0 +1,80 @@
+{
+  "name": "@edgeparse/web",
+  "version": "0.3.0",
+  "description": "EdgeParse Web SDK — observable PDF parsing with lazy PP-OCRv6 models",
+  "type": "module",
+  "license": "Apache-2.0",
+  "homepage": "https://www.edgeparse.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raphaelmansuy/edgeparse.git",
+    "directory": "sdks/web"
+  },
+  "keywords": [
+    "pdf",
+    "parser",
+    "wasm",
+    "ocr",
+    "pp-ocr",
+    "edgeparse"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./models": {
+      "types": "./dist/models/index.d.ts",
+      "import": "./dist/models/index.js"
+    },
+    "./worker": {
+      "types": "./dist/workers/parse-worker.d.ts",
+      "import": "./dist/workers/parse-worker.js"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node/index.js"
+    },
+    "./models.json": "./models/models.json"
+  },
+  "files": [
+    "dist",
+    "models",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "size": "node scripts/size-budget.mjs",
+    "check-models": "node scripts/check-models-pinned.mjs"
+  },
+  "peerDependencies": {
+    "edgeparse-wasm": ">=0.2.5"
+  },
+  "peerDependenciesMeta": {
+    "edgeparse-wasm": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "jsdom": "^26.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
