@@ -74,11 +74,18 @@ jobs:
           DEST="sdks/node/npm/${{ matrix.node-platform }}/edgeparse-node.${{ matrix.node-platform }}.node"
           mkdir -p "sdks/node/npm/${{ matrix.node-platform }}"
           cp "$SRC" "$DEST"
+          ls -la "$DEST"
+          # upload-artifact respects .gitignore (*.node) — stage outside the repo tree
+          STAGE="/tmp/edgeparse-node-artifact/${{ matrix.node-platform }}"
+          mkdir -p "$STAGE"
+          cp "$DEST" "$STAGE/"
+          cp "sdks/node/npm/${{ matrix.node-platform }}/package.json" "$STAGE/"
 
       - uses: actions/upload-artifact@v4
         with:
           name: node-${{ matrix.node-platform }}
-          path: sdks/node/npm/${{ matrix.node-platform }}/
+          path: /tmp/edgeparse-node-artifact/${{ matrix.node-platform }}/
+          if-no-files-found: error
 
   publish-npm:
     name: Publish to npm
@@ -94,8 +101,22 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          merge-multiple: true
-          path: sdks/node/npm/
+          pattern: node-*
+          path: /tmp/node-artifacts
+          merge-multiple: false
+
+      - name: Place platform binaries into npm package dirs
+        run: |
+          set -euo pipefail
+          for d in /tmp/node-artifacts/node-*/; do
+            platform=$(basename "$d" | sed 's/^node-//')
+            dest="sdks/node/npm/${platform}"
+            mkdir -p "$dest"
+            cp "$d"/*.node "$dest/"
+            # Keep checked-out package.json (version sync happens next); binary must be present
+            ls -la "$dest"
+            test -f "$dest/edgeparse-node.${platform}.node"
+          done
 
       - name: Sync version
         env:
@@ -143,11 +164,16 @@ jobs:
 
       - name: Pack npm tarballs
         run: |
+          set -euo pipefail
           mkdir -p release-assets/node
           for dir in sdks/node/npm/*/; do
+            platform=$(basename "$dir")
+            test -f "$dir/edgeparse-node.${platform}.node" \
+              || { echo "Missing binary in $dir"; ls -la "$dir"; exit 1; }
             (cd "$dir" && npm pack --pack-destination "$GITHUB_WORKSPACE/release-assets/node")
           done
           (cd sdks/node && npm pack --pack-destination "$GITHUB_WORKSPACE/release-assets/node")
+          ls -la release-assets/node/
 
       - name: Upload npm tarballs to GitHub Release
         env:
@@ -159,6 +185,8 @@ jobs:
             --repo "${{ github.repository }}" --clobber
 
       - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for dir in sdks/node/npm/*/; do
             OUTPUT=$((cd "$dir" && npm publish --provenance --access public) 2>&1) && echo "$OUTPUT" || {
@@ -174,6 +202,8 @@ jobs:
           done
 
       - name: Publish edgeparse (main package)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd sdks/node
           OUTPUT=$(npm publish --provenance --access public 2>&1) && echo "$OUTPUT" || {

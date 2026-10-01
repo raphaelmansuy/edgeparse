@@ -36,10 +36,10 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      # Use taiki-e installer (same as release-wasm) — jetli's "latest" is too
+      # old to parse Cargo.toml workspace inheritance (license.workspace = true).
       - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: 'latest'
+        uses: taiki-e/install-action@wasm-pack
 
       - name: Build edgeparse-wasm (web target)
         run: |

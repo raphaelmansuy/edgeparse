@@ -142,6 +142,10 @@ jobs:
       #     "already-published" is treated as idempotent.
       # ─────────────────────────────────────────────────────────────────────
       - name: Publish to npm registry
+        env:
+          # Prefer classic token when OIDC Trusted Publisher is misconfigured
+          # (E404 on PUT). Provenance still works with id-token:write.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node -e "
           const fs = require('fs');
@@ -211,6 +215,8 @@ jobs:
           "
 
       - name: Publish @edgeparse/web to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd sdks/web
           npm run check-models
