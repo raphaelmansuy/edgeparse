@@ -1,11 +1,26 @@
 ---
 title: "Benchmark Results"
-description: "EdgeParse vs 6 PDF parsers on 200 documents. NID, TEDS, MHS, overall, and speed."
+description: "EdgeParse vs PDF parsers on two boards: EdgeParse harness and official odl-bench. NID, TEDS, MHS, overall, and speed."
 ---
 
-import { benchmarkSnapshot, formatSpeed, getBenchmarkTool } from '../../../data/benchmark';
+import {
+  benchmarkSnapshot,
+  claims,
+  formatSpeed,
+  odlBenchSnapshot,
+  speedMultipleVs,
+} from '../../../data/benchmark';
 
-## Results Summary
+EdgeParse publishes **two** scoreboards. They use different overall formulas — do not mix numbers across boards.
+
+| Board | Export | Formula | Role |
+|-------|--------|---------|------|
+| **{claims.harness.boardName}** | `benchmarkSnapshot` | Product overall (quality + structure) | Regression / product score |
+| **{claims.odl.boardName}** | `odlBenchSnapshot` | `mean(NID, TEDS, MHS)` | Match public OpenDataLoader leaderboard |
+
+## Board A — EdgeParse harness
+
+Updated {claims.harness.lastUpdated} · {claims.harness.hardware} · {claims.harness.documentCount} docs · overall **{claims.harness.overall}** · **{claims.harness.speedPerDoc}**
 
 <table>
   <thead>
@@ -26,35 +41,71 @@ import { benchmarkSnapshot, formatSpeed, getBenchmarkTool } from '../../../data/
         <td>{tool.isHighlight ? <strong>{tool.teds.toFixed(3)}</strong> : tool.teds.toFixed(3)}</td>
         <td>{tool.isHighlight ? <strong>{tool.mhs.toFixed(3)}</strong> : tool.mhs.toFixed(3)}</td>
         <td>{tool.isHighlight ? <strong>{tool.overall.toFixed(3)}</strong> : tool.overall.toFixed(3)}</td>
-        <td>{tool.isHighlight ? <strong>{formatSpeed(tool.speedSeconds)}</strong> : formatSpeed(tool.speedSeconds)}</td>
+        <td>{tool.speedSeconds != null ? (tool.isHighlight ? <strong>{formatSpeed(tool.speedSeconds)}</strong> : formatSpeed(tool.speedSeconds)) : '—'}</td>
       </tr>
     ))}
   </tbody>
 </table>
 
-## Key Takeaways
+### Harness takeaways
 
-- **Latest published snapshot:** updated {benchmarkSnapshot.lastUpdated} on {benchmarkSnapshot.hardware} across {benchmarkSnapshot.documentCount} documents
-- **EdgeParse is the fastest** — {formatSpeed(getBenchmarkTool('EdgeParse').speedSeconds)} per document, 83× faster than Docling
-- **Highest overall score** — {getBenchmarkTool('EdgeParse').overall.toFixed(3)} across the current six-engine comparison
-- **Best structure metrics** — leading NID ({getBenchmarkTool('EdgeParse').nid.toFixed(3)}), TEDS ({getBenchmarkTool('EdgeParse').teds.toFixed(3)}), and MHS ({getBenchmarkTool('EdgeParse').mhs.toFixed(3)})
-- **Best text metrics** — also leads paragraph boundaries, text quality, and table-detection F1 in the full benchmark report
-- **No ML stack required** — the top score comes from a pure Rust CPU pipeline
+- Deterministic EdgeParse leads this board at overall **{claims.harness.overall}** and **{claims.harness.speedPerDoc}**
+- **{claims.harness.vsDocling}** faster than Docling · **{claims.harness.vsPyMuPDF4LLM}** faster than PyMuPDF4LLM · **{claims.harness.vsOpenDataLoader}** faster than OpenDataLoader
+- {claims.copy.noMlStack}
 
-## Speed Comparison
+## Board B — Official odl-bench
+
+Updated {claims.odl.lastUpdated} · {claims.odl.hardware} · {claims.odl.documentCount} docs · formula `{claims.odl.formula}`
+
+**EdgeParse [hybrid] leads NID, TEDS, MHS, and overall** ({claims.odl.hybridOverallShort}).
+
+<table>
+  <thead>
+    <tr>
+      <th>Tool</th>
+      <th>NID</th>
+      <th>TEDS</th>
+      <th>MHS</th>
+      <th>Overall</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {odlBenchSnapshot.tools.map((tool) => (
+      <tr>
+        <td>{tool.isHighlight ? <strong>{tool.name}</strong> : tool.name}</td>
+        <td>{tool.isHighlight ? <strong>{tool.nid.toFixed(3)}</strong> : tool.nid.toFixed(3)}</td>
+        <td>{tool.isHighlight ? <strong>{tool.teds.toFixed(3)}</strong> : tool.teds.toFixed(3)}</td>
+        <td>{tool.isHighlight ? <strong>{tool.mhs.toFixed(3)}</strong> : tool.mhs.toFixed(3)}</td>
+        <td>{tool.isHighlight ? <strong>{tool.overall.toFixed(3)}</strong> : tool.overall.toFixed(3)}</td>
+        <td>{tool.status ?? 'finished'}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+### odl-bench takeaways
+
+- **EdgeParse [hybrid]** — overall {claims.odl.hybridOverall} (leads every metric)
+- **EdgeParse** (deterministic) — overall {claims.odl.deterministicOverall}
+- **EdgeParse [wasm]** — overall {claims.odl.wasmOverall} (TEDS {claims.odl.wasmTeds})
+- Unstructured is **partial** (not a finished competitor); Marker / MinerU / Nutrient were not run
+
+## Speed Comparison (harness)
 
 | Comparison | Factor |
 |-----------|--------|
-| EdgeParse vs Docling | **{(getBenchmarkTool('Docling (IBM)').speedSeconds / getBenchmarkTool('EdgeParse').speedSeconds).toFixed(1)}× faster** |
-| EdgeParse vs PyMuPDF4LLM | **{(getBenchmarkTool('PyMuPDF4LLM').speedSeconds / getBenchmarkTool('EdgeParse').speedSeconds).toFixed(1)}× faster** |
-| EdgeParse vs OpenDataLoader | **{(getBenchmarkTool('OpenDataLoader').speedSeconds / getBenchmarkTool('EdgeParse').speedSeconds).toFixed(1)}× faster** |
-| EdgeParse vs MarkItDown | **{(getBenchmarkTool('MarkItDown').speedSeconds / getBenchmarkTool('EdgeParse').speedSeconds).toFixed(1)}× faster** |
+| EdgeParse vs Docling | **{(speedMultipleVs('Docling (IBM)')).toFixed(1)}× faster** |
+| EdgeParse vs PyMuPDF4LLM | **{(speedMultipleVs('PyMuPDF4LLM')).toFixed(1)}× faster** |
+| EdgeParse vs OpenDataLoader | **{(speedMultipleVs('OpenDataLoader')).toFixed(1)}× faster** |
+| EdgeParse vs MarkItDown | **{(speedMultipleVs('MarkItDown')).toFixed(1)}× faster** |
 
 ## Test Environment
 
-- **Hardware:** {benchmarkSnapshot.hardware}
-- **Corpus:** {benchmarkSnapshot.documentCount} diverse PDF documents
-- **Mode:** Single-threaded
+- **Hardware:** {claims.harness.hardware}
+- **Corpus:** {claims.harness.documentCount} diverse PDF documents
+- **Harness path:** `benchmark/`
+- **Official board path:** `odl-bench/`
 - **Categories:** Academic papers, financial reports, invoices, government forms, books, manuals
 
 ## See It in Action

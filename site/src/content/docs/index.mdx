@@ -1,12 +1,12 @@
 ---
 title: EdgeParse — Fast PDF Parser. Zero ML. Best Benchmark Score.
-description: EdgeParse extracts structured Markdown, JSON, and HTML from born-digital PDFs. 0.781 overall and 0.007 s/doc on the current 200-document benchmark. Python, Node.js, Rust, CLI, WebAssembly. Zero GPU. Zero OCR.
+description: EdgeParse extracts structured Markdown, JSON, and HTML from born-digital PDFs. Leads the EdgeParse harness and official odl-bench boards. Python, Node.js, Rust, CLI, WebAssembly. No ML stack required for born-digital PDFs.
 template: splash
 hero:
   title: |
     PDF parsing for <span class="font-black text-transparent bg-clip-text bg-gradient-to-b from-accent-700 to-accent-400">AI Agents</span>
   tagline: |
-    The PDF-to-Markdown engine that leads the current benchmark without ML. 83× faster than Docling · 2× faster than OpenDataLoader · best reported scores across reading order, tables, headings, paragraphs, text quality, and speed. Python · Node.js · WebAssembly · Rust · CLI.
+    The PDF-to-Markdown engine that leads the current harness without ML. Faster than Docling and OpenDataLoader · best reported scores across reading order, tables, headings, paragraphs, text quality, and speed. Python · Node.js · WebAssembly · Rust · CLI.
   actions:
     - text: Get Started Free
       link: /getting-started/quick-start-python/
@@ -32,7 +32,7 @@ import BenchmarkSection from '../../components/landing/BenchmarkSection.astro';
 import ShowcaseSection from '../../components/landing/ShowcaseSection.astro';
 import AIIntegrationSection from '../../components/landing/AIIntegrationSection.astro';
 import ComparisonSection from '../../components/landing/ComparisonSection.astro';
-import { benchmarkSnapshot, formatSpeed, getBenchmarkTool } from '../../data/benchmark';
+import { benchmarkSnapshot, claims, formatSpeed } from '../../data/benchmark';
 
 <QuickStart
   title="One Command. Instant PDF Intelligence."
@@ -139,23 +139,23 @@ const html = convert_to_string(bytes, 'html');
   title="Everything Your AI Stack Needs From a PDF"
   subtitle="EdgeParse is the only PDF parser with ML-level accuracy that runs without ML — in Python, Node.js, the browser, and Rust."
   features={[
-    { icon: 'zap', title: '83× Faster Than Docling', description: `${formatSpeed(getBenchmarkTool('EdgeParse').speedSeconds)} on ${benchmarkSnapshot.hardware}. 49× faster than PyMuPDF4LLM and 2× faster than OpenDataLoader. Parallel per-page processing via Rayon — CPU only.` },
-    { icon: 'table', title: 'Best-in-Class Table Extraction', description: `TEDS score of ${getBenchmarkTool('EdgeParse').teds.toFixed(3)} — best in the current published comparison and 73% better than OpenDataLoader heuristic mode (${getBenchmarkTool('OpenDataLoader').teds.toFixed(3)}). Ruling-line + borderless cluster detection with merged cell support.` },
-    { icon: 'target', title: 'Multi-Column Reading Order', description: `XY-Cut++ reads multi-column layouts, sidebars, and mixed content in the correct logical order. NID score of ${getBenchmarkTool('EdgeParse').nid.toFixed(3)} — highest in the current benchmark snapshot.` },
-    { icon: 'layers', title: 'Full Document Hierarchy', description: `Headings, paragraphs, lists, figures — all classified with nesting. MHS score of ${getBenchmarkTool('EdgeParse').mhs.toFixed(3)}, best among the compared engines in the current release snapshot.` },
-    { icon: 'globe', title: 'WebAssembly: Runs in the Browser', description: 'The only PDF parser with a WebAssembly build. Full Rust engine in the browser — PDF data never leaves the device. No server, no uploads, offline-capable.' },
+    { icon: 'zap', title: `${claims.harness.vsDocling} Faster Than Docling`, description: `${claims.harness.speedPerDoc} on ${claims.harness.hardware}. ${claims.harness.vsPyMuPDF4LLM} faster than PyMuPDF4LLM and ${claims.harness.vsOpenDataLoader} faster than OpenDataLoader. Parallel per-page processing via Rayon — CPU only.` },
+    { icon: 'table', title: 'Best-in-Class Table Extraction', description: `TEDS score of ${claims.harness.teds} on the EdgeParse harness. On the official odl-bench board, EdgeParse hybrid leads TEDS at ${claims.odl.hybridTeds}. Ruling-line + borderless cluster detection with merged cell support.` },
+    { icon: 'target', title: 'Multi-Column Reading Order', description: `XY-Cut++ reads multi-column layouts, sidebars, and mixed content in the correct logical order. NID score of ${claims.harness.nid} on the EdgeParse harness.` },
+    { icon: 'layers', title: 'Full Document Hierarchy', description: `Headings, paragraphs, lists, figures — all classified with nesting. MHS score of ${claims.harness.mhs} on the EdgeParse harness; hybrid leads official odl-bench MHS at ${claims.odl.hybridMhs}.` },
+    { icon: 'globe', title: 'WebAssembly: Runs in the Browser', description: 'The only PDF parser with a WebAssembly build and @edgeparse/web SDK. Full Rust engine in the browser — PDF data never leaves the device. Optional in-browser OCR for image tables.' },
     { icon: 'shield', title: 'AI Safety Built-In', description: 'Filters hidden text, off-page content, tiny-text, and invisible layers — blocks prompt injection payloads embedded in PDFs before they reach your LLM.' },
-    { icon: 'cpu', title: 'Zero Dependencies', description: 'No GPU, no JVM, no OCR models, no Python runtime for the CLI. A single 15 MB binary. Deploy everywhere: Lambda, containers, edge functions, browsers.' },
-    { icon: 'box', title: '5 SDK Languages', description: 'Native packages for Python (PyO3), Node.js (NAPI-RS), Rust, CLI binary via Homebrew/Cargo, and WebAssembly. Pre-built wheels and addons — no compilation needed.' },
+    { icon: 'cpu', title: 'Zero Dependencies', description: `${claims.copy.noMlStack}. No GPU, no JVM, no Python runtime for the CLI. A single 15 MB binary. Deploy everywhere: Lambda, containers, edge functions, browsers.` },
+    { icon: 'box', title: '5 SDK Languages', description: 'Native packages for Python (PyO3), Node.js (NAPI-RS), Rust, CLI binary via Homebrew/Cargo, and WebAssembly (@edgeparse/web). Pre-built wheels and addons — no compilation needed.' },
     { icon: 'target', title: 'Bounding Boxes for Citations', description: 'Every element — paragraph, heading, table, image — includes [left, bottom, right, top] coordinates in PDF points. Cite exact sources in your RAG answers.' },
   ]}
 />
 
 <BenchmarkSection
   title="#1 Non-ML PDF Parser in Independent Benchmarks"
-  subtitle={`Tested on ${benchmarkSnapshot.documentCount} real-world PDFs — academic papers, financial reports, multi-column layouts, and complex tables. Running on ${benchmarkSnapshot.hardware}.`}
-  tools={benchmarkSnapshot.tools.map(tool => ({ ...tool, speed: formatSpeed(tool.speedSeconds), isHighlight: !!tool.isHighlight }))}
-  note={`Benchmark snapshot updated ${benchmarkSnapshot.lastUpdated}. EdgeParse leads the current benchmark on every reported quality metric while remaining CPU-only: no OCR models, no GPU, no JVM.`}
+  subtitle={`Tested on ${claims.harness.documentCount} real-world PDFs — academic papers, financial reports, multi-column layouts, and complex tables. Running on ${claims.harness.hardware}.`}
+  tools={benchmarkSnapshot.tools.map(tool => ({ ...tool, speed: tool.speedSeconds != null ? formatSpeed(tool.speedSeconds) : '—', isHighlight: !!tool.isHighlight }))}
+  note={`${claims.harness.boardName} snapshot updated ${claims.harness.lastUpdated} (overall ${claims.harness.overall}, ${claims.harness.speedPerDoc}). Official odl-bench: EdgeParse hybrid leads at ${claims.odl.hybridOverallShort} overall. ${claims.copy.noMlStack}.`}
 />
 
 <ComparisonSection />
@@ -182,19 +182,19 @@ const html = convert_to_string(bytes, 'html');
     {
       icon: 'finance',
       title: 'Financial Reports',
-      description: `Parse earnings reports, balance sheets, and SEC filings with accurate table extraction (TEDS ${getBenchmarkTool('EdgeParse').teds.toFixed(3)}) — columns, merged cells, and nested headers intact.`,
+      description: `Parse earnings reports, balance sheets, and SEC filings with accurate table extraction (TEDS ${claims.harness.teds} on harness; hybrid ${claims.odl.hybridTeds} on odl-bench) — columns, merged cells, and nested headers intact.`,
       tags: ['SEC Filings', 'Earnings', 'Tables', 'JSON'],
     },
     {
       icon: 'academic',
       title: 'Research & Academic',
-      description: `Extract papers with correct multi-column reading order (NID ${getBenchmarkTool('EdgeParse').nid.toFixed(3)}) — figures, citations, and section hierarchy preserved for downstream analysis.`,
+      description: `Extract papers with correct multi-column reading order (NID ${claims.harness.nid}) — figures, citations, and section hierarchy preserved for downstream analysis.`,
       tags: ['arXiv', 'Multi-column', 'Citations'],
     },
     {
       icon: 'etl',
       title: 'In-Browser Apps (WASM)',
-      description: 'The only PDF parser with WebAssembly support. Full extraction in the browser — no server, no uploads, privacy by design. Works offline after first load.',
+      description: 'Full extraction in the browser via @edgeparse/web — no server, no uploads, privacy by design. Optional in-browser OCR for image tables. Works offline after first load.',
       tags: ['WebAssembly', 'Privacy', 'Offline', 'React/Vue'],
     },
     {

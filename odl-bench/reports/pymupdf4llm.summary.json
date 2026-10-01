@@ -1,0 +1,8 @@
+{
+  "engine": "pymupdf4llm",
+  "nid": 0.9164657486721844,
+  "teds": 0.8028337411297525,
+  "mhs": 0.7722124830147264,
+  "overall": 0.8729054737165388,
+  "source": "odl-bench/prediction/pymupdf4llm/evaluation.json"
+}

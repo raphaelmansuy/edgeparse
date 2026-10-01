@@ -1,6 +1,9 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
-#![deny(clippy::all)]
+// Style lints are gated in CI via `-D clippy::correctness -D clippy::suspicious`
+// rather than crate-level `deny(clippy::all)` (Clippy 1.95+ is too noisy here).
+#![allow(clippy::all)]
+#![allow(deprecated)]
 
 pub mod content;
 pub mod encryption;

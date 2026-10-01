@@ -1,7 +1,9 @@
 ---
 title: "Quick Start: WebAssembly"
-description: "Use EdgeParse directly in the browser via WebAssembly — no server required."
+description: "Use EdgeParse directly in the browser via WebAssembly — low-level edgeparse-wasm or the @edgeparse/web product SDK."
 ---
+
+import { claims } from '../../../data/benchmark';
 
 ## Overview
 
@@ -10,10 +12,25 @@ EdgeParse compiles to WebAssembly, enabling **client-side PDF extraction in any 
 **Key properties:**
 - PDF data never leaves the user's device
 - Works offline after initial WASM load (~4 MB)
-- Same accuracy as the native CLI
+- Same accuracy as the native CLI for born-digital PDFs
+- Optional in-browser OCR for image tables via [`@edgeparse/web`](/getting-started/quick-start-web-sdk/)
 - Zero backend infrastructure
 
-## Build the WASM package
+On the official odl-bench board, EdgeParse WASM scores **{claims.odl.wasmOverall}** overall (TEDS {claims.odl.wasmTeds}).
+
+:::tip[Prefer the Web SDK]
+For apps with progress UI, model consent, and OCR, use **[`@edgeparse/web`](/getting-started/quick-start-web-sdk/)** (product path). This page covers the low-level `edgeparse-wasm` package.
+:::
+
+## Install (npm)
+
+```bash
+npm install edgeparse-wasm
+# or with the product SDK
+npm install @edgeparse/web edgeparse-wasm
+```
+
+## Build from source
 
 ```bash
 # Install wasm-pack (one-time)
@@ -26,17 +43,7 @@ wasm-pack build --target web --release
 
 Output goes to `crates/edgeparse-wasm/pkg/`.
 
-## Install in your project
-
-```bash
-# Option 1: Link locally
-npm install ./path-to/crates/edgeparse-wasm/pkg
-
-# Option 2: Copy pkg/ into your project
-cp -r crates/edgeparse-wasm/pkg/ src/edgeparse-wasm/
-```
-
-## Basic usage
+## Basic usage (`convert_to_string`)
 
 ```typescript
 import init, { convert_to_string } from 'edgeparse-wasm';
@@ -60,6 +67,32 @@ const html = convert_to_string(bytes, 'html');
 
 // Extract plain text
 const text = convert_to_string(bytes, 'text');
+```
+
+## Two-phase `ParseSession` (OCR-ready)
+
+For async host OCR (used by `@edgeparse/web`):
+
+```typescript
+import init, { ParseSession } from 'edgeparse-wasm';
+
+await init();
+
+const session = ParseSession.open(bytes, {
+  tableMethod: 'cluster',
+  fileName: 'report.pdf',
+}, (phase, done, total) => {
+  console.log(phase, done, total);
+});
+
+const candidates = session.candidates(); // [{id, page, width, height, hash}]
+for (const c of candidates) {
+  const gray = session.candidate_gray(c.id);
+  // Run OCR on gray, then:
+  // session.provide_ocr(c.id, words);
+}
+
+const markdown = session.finish('markdown');
 ```
 
 ## Handle user file uploads
@@ -93,10 +126,8 @@ await init();
 
 const bytes = new Uint8Array(await file.arrayBuffer());
 
-// Parse JSON string — same schema as Python/Node.js SDK
 const doc = JSON.parse(convert_to_string(bytes, 'json'));
 
-// Access structured data
 for (const el of doc.kids) {
   console.log(`[${el.type}] page ${el['page number']}: ${el.content ?? ''}`);
 }
@@ -157,5 +188,7 @@ Upload any PDF and see extracted Markdown, JSON, HTML, or text — all processin
 
 ## Next steps
 
-- [WASM API Reference](/api/wasm/) — full function signatures and parameter details
+- [Web SDK Quick Start](/getting-started/quick-start-web-sdk/) — recommended product path
+- [Web SDK API](/api/web-sdk/) — state, consent, CSP, capabilities
+- [WASM API Reference](/api/wasm/) — full function signatures
 - [WASM Use Cases](/guides/wasm-use-cases/) — client-side RAG, offline apps, privacy-first processing

@@ -7,6 +7,29 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.0] — 2026-10-01
+
+### Added
+- **Two-phase `ParseSession`** (WASM) — open → OCR candidates → finish, so browsers can OCR image tables without blocking the UI thread
+- **`@edgeparse/web`** — observable Web SDK with model manager (IndexedDB + SHA-256), consent hooks, progress events, and WebGPU/WASM OCR workers
+- **Real PP-OCRv6 pipeline** in the Web SDK — detect → recognize → CTC decode, models pinned with sha256 from Hugging Face `snowfluke/ppu-paddle-ocr-models` (tiny/small/medium + dictionaries)
+- **In-memory raster OCR** for Image XObjects (no Poppler/pdftoppm required on the WASM path)
+- **Host OCR callback** on wasm32 for PP-OCR / custom engines, with ocrs fallback when enabled
+- **odl-bench SDK gate** — `npm run gate:wasm-sdk` (TEDS ≥ 0.776, overall ≥ 0.854) and score snapshots under `odl-bench/reports/`
+- **Demo** — accessible OCR consent dialog, quality badge (`full` / `degraded`), live model download progress, retry wiring
+- **Docs** — Web SDK quick-start and API reference; both benchmark boards labeled (official odl-bench + EdgeParse harness)
+
+### Changed
+- WASM package build is `--target web` for the browser demo/site; Node bench uses separate `pkg-node/` (gitignored)
+- Site copy: born-digital PDFs need no ML stack; optional in-browser OCR for image tables
+- CI: `deploy-site.yml` builds wasm + `@edgeparse/web` before the demo; `release-wasm.yml` fails closed on placeholder model hashes
+
+### Fixed
+- Stale committed Node-target `pkg/` lacking `ParseSession` (rebuild required for browser)
+- OCR stub that returned empty word lists — replaced with real PP-OCR
+
+---
+
 ## [0.2.5] — 2026-04-14
 
 ### Fixed

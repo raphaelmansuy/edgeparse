@@ -1,79 +1,155 @@
 /**
- * WASM bridge — PDF parsing via a dedicated Web Worker.
+ * WASM bridge — EdgeParse Web SDK (`@edgeparse/web`).
  *
- * Running convert() in a worker keeps the main thread fully responsive;
- * the synchronous WASM calls can take several seconds on large PDFs.
+ * Observable engine / model / job state; two-phase OCR with consent.
  */
 
+import { EdgeParse, type ParseResult, type Snapshot } from '@edgeparse/web';
 import type { PdfDocument, OutputFormat } from '../types';
 import { store } from '../state';
+import { showModelConsent } from '../components/consent-dialog';
 
 export type FormatCache = Record<OutputFormat, string>;
 
-type WorkerResponse =
-  | { type: 'ready' }
-  | { type: 'result'; id: string; ok: true; document: PdfDocument; cache: FormatCache }
-  | { type: 'result'; id: string; ok: false; error: string };
+let client: EdgeParse | null = null;
+let clientPromise: Promise<EdgeParse> | null = null;
+let lastSnapshot: Snapshot | null = null;
+let lastResult: ParseResult | null = null;
 
-// Singleton worker — created once, reused for every parse request.
-const worker = new Worker(
-  new URL('../workers/parse-worker.ts', import.meta.url),
-  { type: 'module' },
-);
-
-// Pending parse calls keyed by request ID.
-const pending = new Map<string, { resolve: (v: { document: PdfDocument; cache: FormatCache }) => void; reject: (e: unknown) => void }>();
-
-worker.addEventListener('message', (e: MessageEvent<WorkerResponse>) => {
-  const msg = e.data;
-  if (msg.type === 'ready') {
-    store.set('wasmStatus', 'ready');
-    return;
-  }
-  if (msg.type === 'result') {
-    const p = pending.get(msg.id);
-    if (!p) return;
-    pending.delete(msg.id);
-    if (msg.ok) {
-      store.set('parseStatus', 'done');
-      p.resolve({ document: msg.document, cache: msg.cache });
-    } else {
-      store.set('parseStatus', 'error');
-      store.set('errorMessage', `Parse error: ${msg.error}`);
-      p.reject(new Error(msg.error));
-    }
-  }
-});
-
-worker.addEventListener('error', (e) => {
-  store.set('wasmStatus', 'error');
-  store.set('errorMessage', `Worker error: ${e.message}`);
-});
-
-// Signal that WASM is initialising (worker pre-warms on creation).
-store.set('wasmStatus', 'loading');
-
-/** Pre-warm: call once at app start so WASM is ready before first upload. */
-export function ensureWasm(): void {
-  // Worker initialises on creation; nothing extra needed here.
-  // This function is kept for backwards-compat call sites.
+/** Consent: accessible dialog before downloading OCR models. */
+async function onBeforeDownload(model: {
+  id: string;
+  bytes: number;
+}): Promise<boolean> {
+  const mb = (model.bytes / (1024 * 1024)).toFixed(1);
+  const detail = { id: model.id, mb, accepted: false as boolean };
+  window.dispatchEvent(new CustomEvent('edgeparse:model-consent', { detail }));
+  if (detail.accepted) return true;
+  return showModelConsent({ id: model.id, mb });
 }
 
-let _nextId = 0;
+async function getClient(): Promise<EdgeParse> {
+  if (client) return client;
+  if (!clientPromise) {
+    store.set('wasmStatus', 'loading');
+    clientPromise = EdgeParse.create({
+      models: 'lazy',
+      ocr: 'small',
+      onBeforeDownload,
+      parseWorkerUrl: new URL(
+        '../../../sdks/web/src/workers/parse-worker.ts',
+        import.meta.url,
+      ),
+      ocrWorkerUrl: new URL(
+        '../../../sdks/web/src/workers/ocr-worker.ts',
+        import.meta.url,
+      ),
+    })
+      .then((ep) => {
+        client = ep;
+        ep.subscribe(() => {
+          lastSnapshot = ep.getSnapshot();
+          const snap = lastSnapshot;
+          if (snap.engine.state === 'ready') store.set('wasmStatus', 'ready');
+          if (snap.engine.state === 'error' || snap.engine.state === 'unsupported') {
+            store.set('wasmStatus', 'error');
+            store.set(
+              'errorMessage',
+              snap.engine.error ?? 'WASM engine unavailable',
+            );
+          }
+          window.dispatchEvent(
+            new CustomEvent('edgeparse:snapshot', { detail: snap }),
+          );
+        });
+        window.addEventListener('edgeparse:model-retry', ((e: CustomEvent<{ id: string }>) => {
+          void ep.models.ensure(e.detail.id).catch(() => {
+            /* surfaced via snapshot failed state */
+          });
+        }) as EventListener);
+        store.set('wasmStatus', 'ready');
+        return ep;
+      })
+      .catch((err) => {
+        store.set('wasmStatus', 'error');
+        store.set(
+          'errorMessage',
+          `WASM init failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        throw err;
+      });
+  }
+  return clientPromise;
+}
+
+/** Pre-warm WASM so it is ready before the first upload. */
+export function ensureWasm(): void {
+  void getClient();
+}
+
+export function getLastSnapshot(): Snapshot | null {
+  return lastSnapshot;
+}
 
 /**
- * Parse a PDF in the worker thread and return all format outputs.
- * The main thread remains fully responsive during this call.
+ * Parse a PDF via the SDK (parse worker + optional OCR worker).
  */
-export function parsePdf(
+export async function parsePdf(
   bytes: Uint8Array,
-): Promise<{ document: PdfDocument; cache: FormatCache }> {
+): Promise<{ document: PdfDocument; cache: FormatCache; result: ParseResult }> {
+  const ep = await getClient();
   store.set('parseStatus', 'parsing');
-  const id = String(_nextId++);
-  const promise = new Promise<{ document: PdfDocument; cache: FormatCache }>((resolve, reject) => {
-    pending.set(id, { resolve, reject });
+
+  const job = ep.parse(bytes, {
+    format: 'all',
+    wantAllFormats: true,
+    tableMethod: 'cluster',
+    fileName: store.get('fileName') || 'uploaded.pdf',
   });
-  // Transfer a *copy* so the store's pdfBytes is not detached.
-  worker.postMessage({ type: 'parse', id, bytes });
-  return promise;
+
+  job.on('progress', (p) => {
+    window.dispatchEvent(
+      new CustomEvent('edgeparse:job-progress', { detail: p }),
+    );
+  });
+
+  const result = await job.result;
+  const cache: FormatCache = {
+    json: result.json ?? '',
+    markdown: result.markdown ?? '',
+    html: result.html ?? '',
+    text: result.text ?? '',
+  };
+
+  let document: PdfDocument;
+  try {
+    document = (result.document as PdfDocument) ?? (JSON.parse(cache.json) as PdfDocument);
+  } catch {
+    document = {
+      file_name: store.get('fileName') || 'uploaded.pdf',
+      number_of_pages: 0,
+      kids: [],
+    } as unknown as PdfDocument;
+  }
+
+  if (result.quality === 'degraded') {
+    store.set(
+      'errorMessage',
+      `Parsed with degraded OCR quality. ${result.warnings.join(' ')}`.trim(),
+    );
+  }
+
+  lastResult = result;
+  window.dispatchEvent(
+    new CustomEvent('edgeparse:parse-result', {
+      detail: { quality: result.quality, warnings: result.warnings },
+    }),
+  );
+
+  store.set('parseStatus', 'done');
+  return { document, cache, result };
+}
+
+export function getLastResult(): ParseResult | null {
+  return lastResult;
 }

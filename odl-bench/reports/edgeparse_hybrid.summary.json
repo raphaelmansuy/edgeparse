@@ -1,0 +1,8 @@
+{
+  "engine": "edgeparse_hybrid",
+  "nid": 0.917152726498581,
+  "teds": 0.9276209182697027,
+  "mhs": 0.8357796338234134,
+  "overall": 0.8995222916707335,
+  "source": "odl-bench/prediction/edgeparse_hybrid/evaluation.json"
+}

@@ -3,10 +3,14 @@ title: "Hybrid Mode"
 description: "Combine EdgeParse with ML-based backends for maximum accuracy."
 ---
 
+import { claims } from '../../../data/benchmark';
+
 ## What Is Hybrid Mode?
 
 Hybrid mode is the switch that enables EdgeParse's OCR recovery path for raster-backed tables.
 In the current runtime, the local rule-based pipeline remains the main extractor and the OCR recovery path only activates when a hybrid backend is configured.
+
+On the official odl-bench board, **EdgeParse [hybrid]** leads NID, TEDS, MHS, and overall ({claims.odl.hybridOverallShort}).
 
 ## Usage
 
@@ -28,9 +32,9 @@ result = edgeparse.convert("document.pdf",
 
 | Scenario | Recommendation |
 |----------|---------------|
-| Speed-critical production | Standard mode (0.064s/doc) |
-| Maximum table accuracy | Hybrid mode with docling-fast |
-| No GPU available | Standard mode |
+| Speed-critical production | Standard mode ({claims.harness.speedPerDoc}) |
+| Maximum table accuracy | Hybrid mode with docling-fast (odl-bench overall {claims.odl.hybridOverallShort}) |
+| No GPU available | Standard mode — {claims.copy.noMlStack} |
 | Complex academic papers | Hybrid mode |
 
 ## Supported Backends
@@ -42,5 +46,5 @@ result = edgeparse.convert("document.pdf",
 ## Trade-offs
 
 - **Speed**: Hybrid mode is slower because OCR recovery is enabled on qualifying pages
-- **Accuracy**: Better recovery on image-backed tables and scanned table regions
+- **Accuracy**: Better recovery on image-backed tables and scanned table regions; leads the official odl-bench board
 - **Dependencies**: Requires the backend to be installed

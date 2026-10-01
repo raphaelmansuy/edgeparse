@@ -1,0 +1,198 @@
+---
+title: "Web SDK API"
+description: "API reference for @edgeparse/web — EdgeParse client, ParseJob, state/events, models policies, consent, errors, CSP, and capabilities."
+---
+
+import { claims } from '../../../data/benchmark';
+
+## Package
+
+**npm:** [`@edgeparse/web`](https://www.npmjs.com/package/@edgeparse/web) · **Peer:** [`edgeparse-wasm`](https://www.npmjs.com/package/edgeparse-wasm) · **Version:** {claims.version}
+
+Source: [`sdks/web/`](https://github.com/raphaelmansuy/edgeparse/tree/main/sdks/web)
+
+## `EdgeParse.create(options?)`
+
+```typescript
+import { EdgeParse } from '@edgeparse/web';
+
+const ep = await EdgeParse.create({
+  models?: 'lazy' | 'preload' | 'manual' | 'off',
+  ocr?: 'tiny' | 'small' | 'medium' | 'off',
+  wasmUrl?: string,
+  manifest?: ModelManifest,
+  onBeforeDownload?: (model: ModelManifestEntry) => boolean | Promise<boolean>,
+  onTelemetry?: (event: string, data: Record<string, unknown>) => void,
+  signal?: AbortSignal,
+  parseWorkerUrl?: string | URL,
+  ocrWorkerUrl?: string | URL,
+});
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `models` | `'lazy'` | When OCR artifacts are fetched |
+| `ocr` | `'small'` | PP-OCR tier (or `'off'`) |
+| `onBeforeDownload` | — | Consent gate before each model download; return `false` to skip |
+| `wasmUrl` | bundled | Override WASM binary URL |
+| `manifest` | shipped `models.json` | Pinned model URLs + sha256 |
+
+### Instance methods
+
+| Method | Description |
+|--------|-------------|
+| `parse(input, options?)` | Start a `ParseJob` from `File` / `Blob` / `Uint8Array` |
+| `subscribe(listener)` | Notify on any snapshot change; returns unsubscribe |
+| `getSnapshot()` | Current `Snapshot` (engine / models / jobs / capabilities) |
+| `on(event, handler)` | Typed client events (see below) |
+| `models.preload(tier?)` | Ensure an OCR tier is cached |
+| `models.ensure(id)` | Ensure a single model id is cached |
+| `EdgeParse.capabilities()` | Static probe of browser capabilities |
+
+### `ParseOptions`
+
+```typescript
+{
+  format?: 'markdown' | 'json' | 'html' | 'text' | 'all';
+  wantAllFormats?: boolean;
+  tableMethod?: 'default' | 'cluster';
+  readingOrder?: 'auto' | 'off';
+  pages?: string;
+  fileName?: string;
+  signal?: AbortSignal;
+  backendMarkdown?: string | null;
+}
+```
+
+## `ParseJob`
+
+Returned by `ep.parse(...)`:
+
+```typescript
+const job = ep.parse(file, { format: 'markdown' });
+job.on('progress', (p) => {
+  // p.fraction, p.label, p.state, p.ocrDone / p.ocrTotal
+});
+const result = await job.result;
+job.abort();
+```
+
+### `ParseResult`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `markdown` / `html` / `text` / `json` | `string?` | Requested formats |
+| `document` | `unknown?` | Structured object when available |
+| `quality` | `'full' \| 'degraded' \| 'skipped'` | OCR completeness |
+| `warnings` | `string[]` | Non-fatal issues |
+| `meta` | `ResultMeta` | Versions, timings, backend, tier |
+
+## State & events
+
+### Snapshot
+
+```typescript
+type Snapshot = {
+  engine: { state: EngineState; error?: string };
+  models: Record<string, ModelProgress>;
+  jobs: Record<string, JobProgress>;
+  capabilities: Capabilities | null;
+  online: boolean;
+};
+```
+
+`EngineState`: `'idle' | 'loading-wasm' | 'ready' | 'unsupported' | 'error'`
+
+### Client events
+
+| Event | Payload |
+|-------|---------|
+| `engine:state` | `{ state, error? }` |
+| `model:progress` | `ModelProgress` |
+| `model:ready` | `{ id }` |
+| `model:failed` | `{ id, code, message }` |
+| `job:progress` | `JobProgress` |
+| `job:done` | `{ jobId, result }` |
+| `job:failed` | `{ jobId, code, message }` |
+| `offline` | `{ online }` |
+
+### React pattern
+
+```typescript
+function useEdgeParse(ep: EdgeParse) {
+  return useSyncExternalStore(ep.subscribe.bind(ep), ep.getSnapshot.bind(ep));
+}
+```
+
+## Models policies & consent
+
+- **`lazy`** — download on first OCR need after `onBeforeDownload` approves
+- **`preload`** — fetch at create time (still consent-gated when `onBeforeDownload` is set)
+- **`manual`** — you call `models.preload` / `ensure`
+- **`off`** — no downloads; image-table cells use PDF text (`quality: 'degraded'`)
+
+Every artifact is sha256-verified before the cache `.done` marker is written.
+
+## Errors
+
+Closed error codes via `EdgeParseError`:
+
+| Code | Meaning |
+|------|---------|
+| `WASM_UNSUPPORTED` | Browser lacks required WASM features |
+| `PDF_ENCRYPTED` | Encrypted PDF without password support in this path |
+| `PDF_INVALID` | Corrupt or unreadable PDF |
+| `MODEL_DOWNLOAD_FAILED` | Network / CDN failure |
+| `MODEL_INTEGRITY_FAILED` | sha256 mismatch |
+| `QUOTA_EXCEEDED` | Storage quota |
+| `OFFLINE` | Offline and model not cached |
+| `ABORTED` | `AbortSignal` / `job.abort()` |
+| `OCR_FAILED` | OCR worker failure (parse may still degrade) |
+| `UNKNOWN` | Fallback |
+
+## Capabilities
+
+```typescript
+const caps = await EdgeParse.capabilities();
+// { wasm, simd, threads, crossOriginIsolated, webgpu,
+//   deviceMemoryGb, opfs, webLocks, saveData, offline }
+```
+
+The SDK picks WebGPU when available, otherwise WASM+SIMD, otherwise plain WASM. **COOP/COEP is not required** — the two-phase OCR path avoids `Atomics.wait`.
+
+## CSP
+
+Suggested Content-Security-Policy:
+
+```http
+Content-Security-Policy:
+  default-src 'self';
+  script-src 'self' 'wasm-unsafe-eval';
+  worker-src 'self' blob:;
+  connect-src 'self' https://cdn.jsdelivr.net https://cdn.jsdelivr.net/gh/;
+  img-src 'self' data: blob:;
+  style-src 'self' 'unsafe-inline';
+```
+
+- **`script-src 'wasm-unsafe-eval'`** — required for WebAssembly instantiate
+- **`worker-src`** — parse + OCR module workers (`blob:` if the bundler inlines workers)
+- **`connect-src`** — allowlist hosts from `models/models.json` only
+- The SDK never calls `eval` / `new Function`
+
+Full notes: [`sdks/web/docs/CSP.md`](https://github.com/raphaelmansuy/edgeparse/blob/main/sdks/web/docs/CSP.md)
+
+## Node adapter
+
+```typescript
+import { parsePdfFile } from '@edgeparse/web/node';
+
+const result = await parsePdfFile('./doc.pdf', { format: 'markdown' });
+```
+
+Uses the same `ParseSession` path with host PP-OCR when available.
+
+## See also
+
+- [Quick Start: Web SDK](/getting-started/quick-start-web-sdk/)
+- [WebAssembly API](/api/wasm/) — `ParseSession`, `convert_to_string`, `version`
+- [WASM Use Cases](/guides/wasm-use-cases/)

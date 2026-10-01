@@ -48,3 +48,17 @@ logs/
 
 # Root-level screenshots (use site/public/ or docs/ for committed images)
 /*.png
+
+# Cloned competitor sources for reading only
+benchmark/.inspiration/
+
+# Official OpenDataLoader board harness (separate formula from benchmark/)
+odl-bench/.upstream/
+odl-bench/prediction/
+odl-bench/.venv/
+odl-bench/.venvs/
+crates/edgeparse-wasm/pkg/
+crates/edgeparse-wasm/pkg-node/
+sdks/web/dist/
+odl-bench/node_modules/
+odl-bench/_*.png

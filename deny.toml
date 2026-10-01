@@ -8,7 +8,13 @@ yanked = "warn"
 unmaintained = "workspace"
 # RUSTSEC-2025-0020: Risk of buffer overflow in pyo3's PyString::from_object.
 # edgeparse-python does not call PyString::from_object so we are not affected.
-ignore = ["RUSTSEC-2025-0020"]
+ignore = [
+    "RUSTSEC-2025-0020",
+    # Missing Sync bound on PyCFunction::new_closure — upgrade pyo3 in a follow-up.
+    "RUSTSEC-2026-0177",
+    # ttf-parser unmaintained advisory (transitive via pdf-cos).
+    "RUSTSEC-2026-0192",
+]
 unused-ignored-advisory = "allow"
 
 [licenses]
@@ -27,6 +33,7 @@ allow = [
     "CC0-1.0",
     "OpenSSL",
     "NCSA",
+    "CDLA-Permissive-2.0",
 ]
 
 [bans]

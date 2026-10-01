@@ -1,0 +1,20 @@
+{
+  "name": "odl-bench-js",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench:wasm": "node scripts/run_wasm_bench.mjs",
+    "bench:wasm-sdk": "node scripts/run_wasm_sdk_bench.mjs",
+    "gate:wasm-sdk": "node scripts/check_wasm_sdk_gate.mjs"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.30.0",
+    "pngjs": "^7.0.0",
+    "ppu-paddle-ocr": "^6.6.0"
+  },
+  "optionalDependencies": {
+    "@paddleocr/paddleocr-js": "0.4.2",
+    "onnxruntime-web": "^1.22.0"
+  },
+  "description": "JS helpers for odl-bench WASM scoring. Host OCR uses ppu-paddle-ocr PP-OCRv6_small (Node). Optional paddleocr-js is for browser demos."
+}

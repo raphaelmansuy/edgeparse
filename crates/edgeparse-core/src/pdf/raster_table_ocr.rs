@@ -1,15 +1,12 @@
 //! Recover text signal from raster table images using local OCR.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use image::{GenericImageView, GrayImage, Luma};
-use serde::Deserialize;
 
 use crate::models::bbox::BoundingBox;
 use crate::models::chunks::{ImageChunk, TextChunk};
@@ -18,6 +15,7 @@ use crate::models::enums::{PdfLayer, TextFormat, TextType};
 use crate::models::table::{
     TableBorder, TableBorderCell, TableBorderRow, TableToken, TableTokenType,
 };
+use crate::pdf::ocr::{parse_tesseract_tsv, OcrEngine, OcrWord, TesseractCliEngine};
 
 // Broaden image eligibility so moderately cropped tables are considered.
 const MIN_IMAGE_WIDTH_RATIO: f64 = 0.40;
@@ -26,9 +24,7 @@ const MAX_NATIVE_TEXT_CHARS_IN_IMAGE: usize = 250;
 const MAX_NATIVE_TEXT_CHUNKS_IN_IMAGE: usize = 12;
 // Accuracy-first: accept degraded glyphs at lower confidence —
 // dual-OEM consensus and spatial coherence filtering will eliminate noise.
-const MIN_OCR_WORD_CONFIDENCE: f64 = 6.0;
 // Reject artificially-high confidence noise (Tesseract artefacts above 100).
-const MAX_OCR_WORD_CONFIDENCE: f64 = 101.0;
 const RASTER_DARK_THRESHOLD: u8 = 180;
 const RASTER_CHART_INK_THRESHOLD: u8 = 240;
 const MIN_BORDERED_VERTICAL_LINES: usize = 3;
@@ -45,6 +41,7 @@ const TABLE_RASTER_OCR_BORDER_PX: u32 = 14;
 const PDFTOPPM_DPI: u32 = 150;
 const OCR_SCALE_FACTOR: u32 = 2;
 /// Effective DPI seen by Tesseract = PDFTOPPM_DPI × OCR_SCALE_FACTOR.
+#[allow(dead_code)] // documentation of effective DPI used by pdftoppm + OCR scale
 const TESSERACT_EFFECTIVE_DPI: u32 = PDFTOPPM_DPI * OCR_SCALE_FACTOR;
 const MIN_DOMINANT_IMAGE_WIDTH_RATIO: f64 = 0.65;
 const MIN_DOMINANT_IMAGE_AREA_RATIO: f64 = 0.40;
@@ -67,21 +64,11 @@ const MIN_NUMERIC_TABLE_MEDIAN_FILL_RATIO: f64 = 0.40;
 const MIN_BORDERED_CELL_DARK_RATIO: f64 = 0.03;
 const MIN_BORDERED_INKED_CELL_RATIO: f64 = 0.18;
 const MIN_BORDERED_ROWS_WITH_INK: usize = 2;
-const MAX_BORDERED_TABLE_PER_CELL_FALLBACK_CELLS: usize = 24;
+// Allow per-cell OCR fallback on mid-size ruled grids (e.g. 7×4 worksheets).
+const MAX_BORDERED_TABLE_PER_CELL_FALLBACK_CELLS: usize = 48;
 const MIN_BRIGHT_PHOTO_MID_TONE_RATIO: f64 = 0.24;
 const MIN_BRIGHT_PHOTO_HISTOGRAM_BINS: usize = 8;
 const MIN_BRIGHT_PHOTO_ENTROPY: f64 = 1.6;
-
-#[derive(Debug, Clone)]
-struct OcrWord {
-    line_key: (u32, u32, u32),
-    left: u32,
-    top: u32,
-    width: u32,
-    height: u32,
-    text: String,
-    confidence: f64,
-}
 
 #[derive(Debug, Clone)]
 struct XCluster {
@@ -122,172 +109,6 @@ struct OcrCandidateScore {
 #[derive(Debug, Clone)]
 struct PdfImagesListEntry {
     image_type: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OcrEngine {
-    Tesseract,
-    RapidOcr,
-}
-
-#[derive(Debug, Deserialize)]
-struct RapidOcrLine {
-    left: u32,
-    top: u32,
-    width: u32,
-    height: u32,
-    text: String,
-    confidence: f64,
-}
-
-static OCR_ENGINE: OnceLock<OcrEngine> = OnceLock::new();
-static RAPIDOCR_PYTHON: OnceLock<Option<String>> = OnceLock::new();
-
-const RAPIDOCR_RUNNER: &str = r#"
-import json, sys
-from rapidocr import RapidOCR
-
-engine = RapidOCR()
-result = engine(sys.argv[1], use_det=True, use_cls=True, use_rec=True)
-
-if result is None:
-    print('[]')
-    raise SystemExit(0)
-
-boxes = getattr(result, 'boxes', []) or []
-txts = getattr(result, 'txts', []) or []
-scores = getattr(result, 'scores', []) or []
-out = []
-for box, text, score in zip(boxes, txts, scores):
-    if not text or not str(text).strip():
-        continue
-    xs = [pt[0] for pt in box]
-    ys = [pt[1] for pt in box]
-    out.append({
-        'left': int(min(xs)),
-        'top': int(min(ys)),
-        'width': max(1, int(max(xs) - min(xs))),
-        'height': max(1, int(max(ys) - min(ys))),
-        'text': str(text),
-        'confidence': float(score),
-    })
-print(json.dumps(out, ensure_ascii=False))
-"#;
-
-fn selected_ocr_engine() -> OcrEngine {
-    *OCR_ENGINE.get_or_init(|| match env::var("EDGEPARSE_OCR_ENGINE") {
-        Ok(value) => match value.to_ascii_lowercase().as_str() {
-            "rapidocr" if rapidocr_python_command().is_some() => OcrEngine::RapidOcr,
-            "rapidocr" => OcrEngine::Tesseract,
-            _ => OcrEngine::Tesseract,
-        },
-        Err(_) => OcrEngine::Tesseract,
-    })
-}
-
-fn rapidocr_python_command() -> Option<&'static str> {
-    RAPIDOCR_PYTHON
-        .get_or_init(|| {
-            let preferred = env::var("EDGEPARSE_OCR_PYTHON").ok();
-            let mut candidates = Vec::new();
-            if let Some(cmd) = preferred {
-                candidates.push(cmd);
-            }
-            candidates.push("python3".to_string());
-            candidates.push("python".to_string());
-
-            for candidate in candidates {
-                let ok = Command::new(&candidate)
-                    .arg("-c")
-                    .arg("import rapidocr")
-                    .output()
-                    .ok()
-                    .is_some_and(|out| out.status.success());
-                if ok {
-                    return Some(candidate);
-                }
-            }
-            None
-        })
-        .as_deref()
-}
-
-fn rapidocr_lines_to_words(lines: Vec<RapidOcrLine>) -> Vec<OcrWord> {
-    let mut words = Vec::new();
-
-    for (line_idx, line) in lines.into_iter().enumerate() {
-        let tokens: Vec<&str> = line.text.split_whitespace().collect();
-        if tokens.is_empty() {
-            continue;
-        }
-
-        let total_chars: u32 = tokens
-            .iter()
-            .map(|token| token.chars().count() as u32)
-            .sum();
-        if total_chars == 0 {
-            continue;
-        }
-
-        let mut cursor = line.left;
-        let mut remaining_width = line.width.max(tokens.len() as u32);
-        let mut remaining_chars = total_chars;
-
-        for (token_idx, token) in tokens.iter().enumerate() {
-            let token_chars = token.chars().count() as u32;
-            let width = if token_idx == tokens.len() - 1 || remaining_chars <= token_chars {
-                remaining_width.max(1)
-            } else {
-                let proportional = ((remaining_width as f64) * (token_chars as f64)
-                    / (remaining_chars as f64))
-                    .round() as u32;
-                proportional.max(1).min(remaining_width)
-            };
-
-            words.push(OcrWord {
-                line_key: (0, line_idx as u32, 0),
-                left: cursor,
-                top: line.top,
-                width,
-                height: line.height.max(1),
-                text: (*token).to_string(),
-                confidence: line.confidence,
-            });
-
-            cursor = cursor.saturating_add(width);
-            remaining_width = remaining_width.saturating_sub(width);
-            remaining_chars = remaining_chars.saturating_sub(token_chars);
-        }
-    }
-
-    words
-}
-
-fn run_rapidocr_words(image: &GrayImage) -> Option<Vec<OcrWord>> {
-    let python = rapidocr_python_command()?;
-    let temp_dir = create_temp_dir(0).ok()?;
-    let image_path = temp_dir.join("ocr.png");
-    if image.save(&image_path).is_err() {
-        let _ = fs::remove_dir_all(&temp_dir);
-        return None;
-    }
-
-    let output = Command::new(python)
-        .current_dir(&temp_dir)
-        .arg("-c")
-        .arg(RAPIDOCR_RUNNER)
-        .arg("ocr.png")
-        .output()
-        .ok()?;
-    let _ = fs::remove_dir_all(&temp_dir);
-    if !output.status.success() {
-        return None;
-    }
-
-    let json = String::from_utf8_lossy(&output.stdout);
-    let lines: Vec<RapidOcrLine> = serde_json::from_str(&json).ok()?;
-    let words = rapidocr_lines_to_words(lines);
-    (!words.is_empty()).then_some(words)
 }
 
 /// Recover OCR text chunks for image-backed table regions on a single page.
@@ -433,30 +254,22 @@ pub fn recover_raster_table_borders(
 
     let mut tables = Vec::new();
     for image in candidates {
-        let Some(image_index) = image.index else {
-            continue;
+        let gray = match resolve_candidate_gray(image, &image_files) {
+            Some(g) => g,
+            None => continue,
         };
-        let Some(image_path) = image_files.get(image_index.saturating_sub(1) as usize) else {
-            continue;
-        };
-        let Ok(gray) = image::open(image_path).map(|img| img.to_luma8()) else {
-            continue;
-        };
+        // Ruled lattices are tables, not charts — do not discard via the
+        // axis-label OCR heuristic (columnar worksheet text shares that pattern).
+        if let Some(table) = recover_bordered_raster_table_from_gray(&gray, image) {
+            if bordered_raster_table_is_plausible(&table) {
+                tables.push(table);
+                continue;
+            }
+        }
         if is_obvious_bar_chart_raster(&gray)
             || is_natural_photograph_raster(&gray)
             || is_dark_ui_screenshot_raster(&gray)
         {
-            continue;
-        }
-        if let Some(table) = recover_bordered_raster_table_from_gray(&gray, image) {
-            let chart_words = run_tesseract_tsv_words_best(&gray, &["6", "11"], |_| true);
-            if chart_words
-                .as_deref()
-                .is_some_and(looks_like_chart_label_ocr)
-            {
-                continue;
-            }
-            tables.push(table);
             continue;
         }
         let Some(words) = run_tesseract_tsv_words_best(&gray, &["6", "11"], |candidate| {
@@ -597,7 +410,10 @@ fn table_candidate_mut(elem: &mut ContentElement) -> Option<&mut TableBorder> {
 }
 
 fn page_native_text_chars(elements: &[ContentElement]) -> usize {
-    native_text_chars_in_region(elements, &BoundingBox::new(None, f64::MIN, f64::MIN, f64::MAX, f64::MAX))
+    native_text_chars_in_region(
+        elements,
+        &BoundingBox::new(None, f64::MIN, f64::MIN, f64::MAX, f64::MAX),
+    )
 }
 
 fn native_text_chars_in_region(elements: &[ContentElement], region: &BoundingBox) -> usize {
@@ -1114,49 +930,6 @@ fn is_dominant_image_text_candidate(
         .sum();
 
     native_text_chars <= MAX_NATIVE_TEXT_CHARS_IN_DOMINANT_IMAGE
-}
-
-fn parse_tesseract_tsv(tsv: &str) -> Vec<OcrWord> {
-    let mut words = Vec::new();
-    for line in tsv.lines().skip(1) {
-        let mut cols = line.splitn(12, '\t');
-        let level = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        if level != 5 {
-            continue;
-        }
-        let _page_num = cols.next();
-        let block_num = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        let par_num = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        let line_num = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        let _word_num = cols.next();
-        let left = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        let top = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        let width = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        let height = cols.next().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        let confidence = cols
-            .next()
-            .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(-1.0);
-        let text = cols.next().unwrap_or("").trim().to_string();
-        if !(MIN_OCR_WORD_CONFIDENCE..=MAX_OCR_WORD_CONFIDENCE).contains(&confidence)
-            || text.is_empty()
-            || width == 0
-            || height == 0
-            || !text.chars().any(|ch| ch.is_alphanumeric())
-        {
-            continue;
-        }
-        words.push(OcrWord {
-            line_key: (block_num, par_num, line_num),
-            left,
-            top,
-            width,
-            height,
-            text,
-            confidence,
-        });
-    }
-    words
 }
 
 fn looks_like_chart_label_ocr(words: &[OcrWord]) -> bool {
@@ -1862,12 +1635,8 @@ fn build_numeric_table_border(words: &[OcrWord], image: &ImageChunk) -> Option<T
             .partial_cmp(&a.top_y)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    let x_coordinates = build_boundaries_from_centers(
-        &centers,
-        image.bbox.left_x,
-        image.bbox.right_x,
-        image_width,
-    );
+    let x_coordinates =
+        build_boundaries_from_centers(&centers, image.bbox.left_x, image.bbox.right_x, image_width);
     let row_bounds: Vec<(f64, f64)> = built_rows
         .iter()
         .map(|row| (row.top_y, row.bottom_y))
@@ -2120,12 +1889,8 @@ fn build_structured_ocr_table_border(words: &[OcrWord], image: &ImageChunk) -> O
             .partial_cmp(&a.top_y)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    let x_coordinates = build_boundaries_from_centers(
-        &centers,
-        image.bbox.left_x,
-        image.bbox.right_x,
-        image_width,
-    );
+    let x_coordinates =
+        build_boundaries_from_centers(&centers, image.bbox.left_x, image.bbox.right_x, image_width);
     let row_bounds: Vec<(f64, f64)> = built_rows
         .iter()
         .map(|row| (row.top_y, row.bottom_y))
@@ -2354,6 +2119,40 @@ fn recover_bordered_raster_caption_from_gray(
     })
 }
 
+fn bordered_raster_table_is_plausible(table: &TableBorder) -> bool {
+    if table.num_rows < 2 || table.num_columns < 2 {
+        return false;
+    }
+    // Reject when a single cell absorbed a whole column of values (OCR
+    // mis-bucketed into one header cell) — typical symptom: one cell has
+    // many more tokens than the median.
+    let mut token_counts: Vec<usize> = Vec::new();
+    for row in &table.rows {
+        for cell in &row.cells {
+            let n = cell
+                .content
+                .iter()
+                .map(|t| t.base.value.split_whitespace().count())
+                .sum::<usize>();
+            if n > 0 {
+                token_counts.push(n);
+            }
+        }
+    }
+    if token_counts.is_empty() {
+        return false;
+    }
+    let mut sorted = token_counts.clone();
+    sorted.sort_unstable();
+    let median = sorted[sorted.len() / 2].max(1);
+    let max = *token_counts.iter().max().unwrap_or(&0);
+    // A cell with ≥8× the median token count is almost certainly a dump.
+    if max >= 8 && max >= median.saturating_mul(8) {
+        return false;
+    }
+    true
+}
+
 fn recover_bordered_raster_table(image_path: &Path, image: &ImageChunk) -> Option<TableBorder> {
     let gray = image::open(image_path).ok()?.to_luma8();
     recover_bordered_raster_table_from_gray(&gray, image)
@@ -2553,7 +2352,9 @@ fn collect_bordered_table_ocr_buckets(
         image::imageops::FilterType::Lanczos3,
     );
     let words = run_tesseract_tsv_words_best(&scaled, &["6", "11"], |_| true)?;
-    if words.is_empty() || looks_like_chart_label_ocr(&words) {
+    // Already inside a detected H/V lattice — keep OCR even if the chart-label
+    // heuristic fires (columnar tables share stable X centers with axis ticks).
+    if words.is_empty() {
         return None;
     }
 
@@ -2602,6 +2403,12 @@ fn is_obvious_bar_chart_raster(gray: &GrayImage) -> bool {
     let width = gray.width();
     let height = gray.height();
     if width < 160 || height < 120 {
+        return false;
+    }
+
+    // Ruled tables with filled column blocks share the "aligned baselines"
+    // signature of bar charts — exempt a clear H/V lattice.
+    if detect_bordered_raster_grid_single(gray).is_some() {
         return false;
     }
 
@@ -2714,6 +2521,12 @@ fn is_obvious_vertical_bar_chart_raster(gray: &GrayImage) -> bool {
 fn is_natural_photograph_raster(gray: &GrayImage) -> bool {
     let total = (gray.width() * gray.height()) as usize;
     if total < 400 {
+        return false;
+    }
+
+    // Ruled tables with anti-aliased ink create mid-tone pixels; do not treat
+    // a clear H/V lattice as a photograph.
+    if detect_bordered_raster_grid_single(gray).is_some() {
         return false;
     }
 
@@ -2839,6 +2652,28 @@ fn detect_bordered_raster_grid(gray: &GrayImage) -> Option<RasterTableGrid> {
         match &best_grid {
             Some((_, best_score)) if *best_score >= score => {}
             _ => best_grid = Some((grid, score)),
+        }
+    }
+    // Worksheets often put a title band in the same raster above the grid.
+    // Detect on a top-cropped view, then shift Y lines back into full-image space.
+    let h = gray.height();
+    for crop_frac in [0.12_f64, 0.18, 0.25] {
+        let top = ((h as f64) * crop_frac).round() as u32;
+        if top + 80 >= h {
+            continue;
+        }
+        let cropped = image::imageops::crop_imm(gray, 0, top, gray.width(), h - top).to_image();
+        for variant in build_ocr_variants(&cropped) {
+            let Some((mut grid, score)) = detect_bordered_raster_grid_single(&variant) else {
+                continue;
+            };
+            for y in &mut grid.horizontal_lines {
+                *y = y.saturating_add(top);
+            }
+            match &best_grid {
+                Some((_, best_score)) if *best_score >= score => {}
+                _ => best_grid = Some((grid, score)),
+            }
         }
     }
     best_grid.map(|(grid, _)| grid)
@@ -3056,8 +2891,7 @@ fn build_boundaries_from_centers(
     let mut previous = left_edge;
     for pair in centers.windows(2) {
         let midpoint_px = ((pair[0] + pair[1]) / 2.0).clamp(0.0, f64::from(image_width));
-        let boundary =
-            left_edge + midpoint_px / f64::from(image_width) * page_width;
+        let boundary = left_edge + midpoint_px / f64::from(image_width) * page_width;
         let boundary = boundary.clamp(previous, right_edge);
         boundaries.push(boundary);
         previous = boundary;
@@ -3191,10 +3025,8 @@ fn expand_white_border(image: &GrayImage, border: u32) -> GrayImage {
 }
 
 fn run_tesseract_tsv_words(image: &GrayImage, psm: &str) -> Option<Vec<OcrWord>> {
-    match selected_ocr_engine() {
-        OcrEngine::RapidOcr => run_rapidocr_words(image),
-        OcrEngine::Tesseract => run_tesseract_tsv_words_with_oem(image, psm, "3"),
-    }
+    let words = TesseractCliEngine::with_psm(psm).recognize_psm(image, psm);
+    (!words.is_empty()).then_some(words)
 }
 
 fn run_tesseract_tsv_words_with_oem(
@@ -3202,57 +3034,24 @@ fn run_tesseract_tsv_words_with_oem(
     psm: &str,
     oem: &str,
 ) -> Option<Vec<OcrWord>> {
-    let temp_dir = create_temp_dir(0).ok()?;
-    let image_path = temp_dir.join("ocr.png");
-    if image.save(&image_path).is_err() {
-        let _ = fs::remove_dir_all(&temp_dir);
-        return None;
-    }
-
-    let dpi = TESSERACT_EFFECTIVE_DPI.to_string();
-    let output = Command::new("tesseract")
-        .current_dir(&temp_dir)
-        .arg("ocr.png")
-        .arg("stdout")
-        // Tell Tesseract the actual DPI of the scaled image so its character-size
-        // models are correctly calibrated (avoids ~72 DPI guess).
-        .arg("--dpi")
-        .arg(&dpi)
-        .arg("--oem")
-        .arg(oem)
-        .arg("--psm")
-        .arg(psm)
-        // Disable word-frequency and system dictionaries: table cells contain
-        // numeric codes, abbreviations, and domain-specific tokens that the
-        // dictionary would "correct" into wrong English words.
-        .arg("-c")
-        .arg("load_system_dawg=0")
-        .arg("-c")
-        .arg("load_freq_dawg=0")
-        .arg("tsv")
-        .output()
-        .ok()?;
-    let _ = fs::remove_dir_all(&temp_dir);
-    if !output.status.success() {
-        return None;
-    }
-
-    let tsv = String::from_utf8_lossy(&output.stdout);
-    Some(parse_tesseract_tsv(&tsv))
+    let engine = TesseractCliEngine {
+        psm: psm.to_string(),
+        oem: oem.to_string(),
+    };
+    let words = engine.recognize_psm(image, psm);
+    (!words.is_empty()).then_some(words)
 }
 
 fn run_tesseract_cell_text_best(image: &GrayImage, psm_modes: &[&str]) -> Option<String> {
     let mut best: Option<(String, f64)> = None;
 
-    if matches!(selected_ocr_engine(), OcrEngine::Tesseract) {
-        // First pass: collect consensus words across Tesseract perspectives.
-        let consensus_words = collect_consensus_words(image, psm_modes);
-        if !consensus_words.is_empty() {
-            let text = words_to_plain_line_text(&consensus_words);
-            if !text.is_empty() {
-                let score = score_ocr_words(&consensus_words, image.width(), image.height());
-                best = Some((text, score));
-            }
+    // First pass: collect consensus words across Tesseract perspectives.
+    let consensus_words = collect_consensus_words(image, psm_modes);
+    if !consensus_words.is_empty() {
+        let text = words_to_plain_line_text(&consensus_words);
+        if !text.is_empty() {
+            let score = score_ocr_words(&consensus_words, image.width(), image.height());
+            best = Some((text, score));
         }
     }
 
@@ -3283,21 +3082,6 @@ fn run_tesseract_cell_text_best(image: &GrayImage, psm_modes: &[&str]) -> Option
                             Some((_, best_score)) if *best_score >= norm_len => {}
                             _ => best = Some((text, norm_len)),
                         }
-                    }
-                }
-            }
-
-            // Docling-inspired multi-engine path: when RapidOCR is available,
-            // treat it as an additional OCR engine candidate rather than a hard
-            // replacement. This keeps Tesseract's stronger word-level geometry
-            // while allowing a modern detector/recognizer to win on difficult cells.
-            if let Some(words) = run_rapidocr_words(&variant) {
-                let text = words_to_plain_line_text(&words);
-                if !text.is_empty() {
-                    let score = score_ocr_words(&words, variant.width(), variant.height());
-                    match &best {
-                        Some((_, best_score)) if *best_score >= score => {}
-                        _ => best = Some((text, score)),
                     }
                 }
             }
@@ -3909,46 +3693,9 @@ fn run_tesseract_plain_text(image: &GrayImage, psm: &str) -> Option<String> {
 }
 
 fn run_tesseract_plain_text_with_variant(image: &GrayImage, psm: &str) -> Option<String> {
-    if matches!(selected_ocr_engine(), OcrEngine::RapidOcr) {
-        return run_rapidocr_words(image).map(|words| words_to_plain_line_text(&words));
-    }
-
-    let temp_dir = create_temp_dir(0).ok()?;
-    let image_path = temp_dir.join("ocr.png");
-    if image.save(&image_path).is_err() {
-        let _ = fs::remove_dir_all(&temp_dir);
-        return None;
-    }
-
-    let dpi = TESSERACT_EFFECTIVE_DPI.to_string();
-    let output = Command::new("tesseract")
-        .current_dir(&temp_dir)
-        .arg("ocr.png")
-        .arg("stdout")
-        .arg("--dpi")
-        .arg(&dpi)
-        .arg("--oem")
-        .arg("3")
-        .arg("--psm")
-        .arg(psm)
-        .arg("-c")
-        .arg("load_system_dawg=0")
-        .arg("-c")
-        .arg("load_freq_dawg=0")
-        .output()
-        .ok()?;
-    let _ = fs::remove_dir_all(&temp_dir);
-    if !output.status.success() {
-        return None;
-    }
-
-    Some(
-        String::from_utf8_lossy(&output.stdout)
-            .replace('\n', " ")
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" "),
-    )
+    let words = TesseractCliEngine::with_psm(psm).recognize_psm(image, psm);
+    let text = words_to_plain_line_text(&words);
+    (!text.is_empty()).then_some(text)
 }
 
 fn words_to_text_chunks(
@@ -4313,6 +4060,32 @@ fn create_temp_dir(page_number: u32) -> std::io::Result<PathBuf> {
     Ok(dir)
 }
 
+fn resolve_candidate_gray(image: &ImageChunk, image_files: &[PathBuf]) -> Option<image::GrayImage> {
+    if let Some(image_index) = image.index {
+        if let Some(image_path) = image_files.get(image_index.saturating_sub(1) as usize) {
+            if let Ok(gray) = image::open(image_path).map(|img| img.to_luma8()) {
+                if gray.width() >= 80 && gray.height() >= 40 {
+                    return Some(gray);
+                }
+            }
+        }
+    }
+    // Fall back: largest extracted raster (index can drift vs pdfimages smask rows).
+    let mut best: Option<image::GrayImage> = None;
+    let mut best_area = 0u64;
+    for path in image_files {
+        let Ok(gray) = image::open(path).map(|img| img.to_luma8()) else {
+            continue;
+        };
+        let area = u64::from(gray.width()) * u64::from(gray.height());
+        if area > best_area {
+            best_area = area;
+            best = Some(gray);
+        }
+    }
+    best
+}
+
 fn extract_visible_page_image_files(
     input_path: &Path,
     page_number: u32,
@@ -4409,8 +4182,8 @@ fn parse_pdfimages_list(output: &str) -> Vec<PdfImagesListEntry> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::GrayImage;
     use crate::models::enums::{PdfLayer, TextFormat, TextType};
+    use image::GrayImage;
 
     fn image_chunk() -> ImageChunk {
         ImageChunk {
@@ -4520,6 +4293,20 @@ mod tests {
         assert_eq!(test_cell_text(&table.rows[0].cells[0]), "Tube");
         assert_eq!(test_cell_text(&table.rows[1].cells[1]), "BamHI");
         assert_eq!(test_cell_text(&table.rows[3].cells[2]), "control");
+
+        // Trait-shaped words → lattice → markdown with ≥2 columns (pipe or HTML).
+        let engine: &dyn crate::pdf::ocr::OcrEngine =
+            &crate::pdf::ocr::TesseractCliEngine::default();
+        let _ = engine; // documents the OcrEngine surface used by production path
+        let mut doc = crate::models::document::PdfDocument::new("fixture.pdf".into());
+        doc.number_of_pages = 1;
+        doc.kids
+            .push(crate::models::content::ContentElement::TableBorder(table));
+        let md = crate::output::markdown::to_markdown(&doc).expect("md");
+        assert!(
+            md.contains('|') || md.contains("<table"),
+            "expected table markdown, got: {md}"
+        );
     }
 
     #[test]
@@ -4549,7 +4336,10 @@ mod tests {
         assert_eq!(table.num_columns, 4);
         assert_eq!(table.num_rows, 3);
         assert_eq!(test_cell_text(&table.rows[1].cells[1]), "1.793E-06");
-        assert!(table.x_coordinates.windows(2).all(|pair| pair[1] >= pair[0]));
+        assert!(table
+            .x_coordinates
+            .windows(2)
+            .all(|pair| pair[1] >= pair[0]));
         assert!(table
             .x_coordinates
             .iter()

@@ -1,0 +1,8 @@
+{
+  "engine": "opendataloader",
+  "nid": 0.9116801780432633,
+  "teds": 0.4831169282847324,
+  "mhs": 0.7569177875400251,
+  "overall": 0.8420649312094909,
+  "source": "odl-bench/prediction/opendataloader/evaluation.json"
+}

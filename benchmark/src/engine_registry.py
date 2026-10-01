@@ -38,6 +38,7 @@ NON_OCR_ENGINES: List[str] = [
     "pymupdf4llm",
     "markitdown",
     "liteparse",
+    "unstructured",
 ]
 
 HYBRID_ENGINES: List[str] = [
@@ -53,6 +54,7 @@ OCR_ENGINES: List[str] = [
     "docling",
     "marker",
     "mineru",
+    "unstructured_hi_res",
 ]
 
 # Engine name → version/source label
@@ -76,11 +78,13 @@ ENGINE_META: Dict[str, tuple] = {
     "pymupdf4llm":    ("PyMuPDF4LLM",                         "pymupdf4llm",           "PyMuPDF for LLM/RAG"),
     "markitdown":     ("MarkItDown",                           "markitdown[all]",       "Microsoft multi-format converter"),
     "liteparse":      ("LiteParse",                            "@llamaindex/liteparse", "LlamaIndex local PDF parser"),
+    "unstructured":   ("Unstructured",                         "unstructured[pdf]",     "Unstructured fast strategy"),
     # OCR / ML engines
     "chandra":        ("Chandra OCR",                          "chandra-ocr",           "Chandra OCR model (CLI) [OCR/ML]"),
     "docling":        ("Docling",                              "docling",               "IBM Research document parser [OCR/ML]"),
     "marker":         ("Marker",                               "marker-pdf",            "Marker PDF — Surya OCR [isolated venv]"),
     "mineru":         ("MinerU",                               "mineru[all]",           "OpenDataLab PDF extractor [isolated venv]"),
+    "unstructured_hi_res": ("Unstructured [hi_res]",           "unstructured[pdf]",     "Unstructured hi_res strategy [OCR/ML]"),
 }
 
 # ── Auto-register external engines ───────────────────────────────────────────
@@ -103,6 +107,8 @@ _try_register("docling",        "pdf_parser_docling",        "installed")
 _try_register("pymupdf4llm",    "pdf_parser_pymupdf4llm",    "installed")
 _try_register("markitdown",     "pdf_parser_markitdown",     "installed")
 _try_register("liteparse",      "pdf_parser_liteparse",      "installed")
+_try_register("unstructured",   "pdf_parser_unstructured",   "installed")
+_try_register("unstructured_hi_res", "pdf_parser_unstructured_hi_res", "installed")
 # marker and mineru run in isolated venvs — not auto-registered here
 
 

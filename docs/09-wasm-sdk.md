@@ -43,8 +43,8 @@ sandboxes, and static sites.
 
 <!-- Pin to a specific version -->
 <script type="module">
-  import init, { convert_to_string } from 'https://cdn.jsdelivr.net/npm/edgeparse-wasm@0.2.4/edgeparse_wasm.js';
-  await init('https://cdn.jsdelivr.net/npm/edgeparse-wasm@0.2.4/edgeparse_wasm_bg.wasm');
+  import init, { convert_to_string } from 'https://cdn.jsdelivr.net/npm/edgeparse-wasm@0.3.0/edgeparse_wasm.js';
+  await init('https://cdn.jsdelivr.net/npm/edgeparse-wasm@0.3.0/edgeparse_wasm_bg.wasm');
 </script>
 ```
 
@@ -54,8 +54,8 @@ Alternative CDN also served directly from npm.
 
 ```html
 <script type="module">
-  import init, { convert_to_string } from 'https://unpkg.com/edgeparse-wasm@0.2.4/edgeparse_wasm.js';
-  await init('https://unpkg.com/edgeparse-wasm@0.2.4/edgeparse_wasm_bg.wasm');
+  import init, { convert_to_string } from 'https://unpkg.com/edgeparse-wasm@0.3.0/edgeparse_wasm.js';
+  await init('https://unpkg.com/edgeparse-wasm@0.3.0/edgeparse_wasm_bg.wasm');
 </script>
 ```
 
@@ -126,14 +126,30 @@ Package page: <https://github.com/raphaelmansuy/edgeparse/pkgs/npm/edgeparse-was
 
 - **Same engine** — identical Rust code runs in WASM and native; same accuracy, same output
 - **~4 MB** — compressed WASM binary, loaded once and cached by the browser
-- **No dependencies** — no Java, no Python, no ML models, no GPU
+- **No ML stack required for born-digital PDFs** — optional in-browser OCR for image tables via `@edgeparse/web`
 - **TypeScript types** — full `.d.ts` definitions for IDE autocomplete
 
 ---
 
 ## API Reference
 
-The WASM package exports three functions:
+The low-level WASM package exports `convert`, `convert_to_string`, `version`, and **`ParseSession`** (two-phase plan → host OCR → finish). For apps, prefer the product SDK **`@edgeparse/web`** (`sdks/web/`), which wraps `ParseSession` with workers, consent-gated PP-OCR models, and observable state.
+
+### `ParseSession` (OCR-ready)
+
+```typescript
+import init, { ParseSession } from 'edgeparse-wasm';
+
+await init();
+const session = ParseSession.open(bytes, { tableMethod: 'cluster' }, (phase, done, total) => {
+  console.log(phase, done, total);
+});
+for (const c of session.candidates()) {
+  const gray = session.candidate_gray(c.id);
+  // host OCR → session.provide_ocr(c.id, words)
+}
+const markdown = session.finish('markdown');
+```
 
 ### `convert(pdfBytes, format?, pages?, readingOrder?, tableMethod?)`
 
@@ -181,7 +197,7 @@ Returns the EdgeParse version string.
 
 ```typescript
 import { version } from 'edgeparse-wasm';
-console.log(version()); // "0.2.4"
+console.log(version()); // "0.3.0"
 ```
 
 ### Parameters
@@ -303,10 +319,10 @@ module.exports = {
 
   <script type="module">
     import init, { convert_to_string, version }
-      from 'https://cdn.jsdelivr.net/npm/edgeparse-wasm@0.2.4/edgeparse_wasm.js';
+      from 'https://cdn.jsdelivr.net/npm/edgeparse-wasm@0.3.0/edgeparse_wasm.js';
 
     // Pass the .wasm binary URL explicitly when loading from a CDN.
-    await init('https://cdn.jsdelivr.net/npm/edgeparse-wasm@0.2.4/edgeparse_wasm_bg.wasm');
+    await init('https://cdn.jsdelivr.net/npm/edgeparse-wasm@0.3.0/edgeparse_wasm_bg.wasm');
 
     console.log('EdgeParse', version());
 

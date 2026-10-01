@@ -137,6 +137,11 @@ fn build_table_borders(h_lines: &[LineChunk], v_lines: &[LineChunk]) -> Vec<Tabl
 
     // Convert valid groups to TableBorders, then merge gutter columns and
     // reject full-page layout artifacts.
+    //
+    // Span inference from absent rulings is available (`infer_spans_from_rulings`)
+    // but only applied when the lattice is ruling-complete enough; incorrect
+    // merges destroy TEDS more than missing colspan. HTML emission already
+    // honours spans when they are set (grouped-header / future TSR).
     groups
         .into_iter()
         .filter(|g| {
@@ -407,6 +412,139 @@ fn merge_gutter_columns(mut table: TableBorder) -> TableBorder {
     table.num_columns = new_num_cols;
 
     table
+}
+
+/// Infer `row_span` / `col_span` from absent internal rulings.
+///
+/// Lattice cells are initially 1×1. A vertical divider between columns `c` and
+/// `c+1` in row `r` exists iff a vertical line segment lies near
+/// `x_coordinates[c+1]` and overlaps the row's y-interval. Missing that
+/// divider means the cell continues horizontally (PubTabNet / classical
+/// ruling-line table structure recognition). Covered slots are marked with
+/// `row_span = 0, col_span = 0` so HTML emission can skip them.
+#[allow(dead_code)]
+fn infer_spans_from_rulings(table: &mut TableBorder, h_lines: &[LineChunk], v_lines: &[LineChunk]) {
+    let num_rows = table.num_rows;
+    let num_cols = table.num_columns;
+    if num_rows == 0 || num_cols == 0 {
+        return;
+    }
+    if table.x_coordinates.len() != num_cols + 1 || table.y_coordinates.len() != num_rows + 1 {
+        return;
+    }
+
+    let mut claimed = vec![vec![false; num_cols]; num_rows];
+
+    for r in 0..num_rows {
+        for c in 0..num_cols {
+            if claimed[r][c] {
+                continue;
+            }
+
+            let y_top = table.y_coordinates[r];
+            let y_bottom = table.y_coordinates[r + 1];
+
+            // Grow col_span while the internal vertical ruling is absent.
+            let mut col_span = 1usize;
+            while c + col_span < num_cols {
+                let x_div = table.x_coordinates[c + col_span];
+                if vertical_ruling_covers(v_lines, x_div, y_bottom, y_top) {
+                    break;
+                }
+                col_span += 1;
+            }
+
+            // Grow row_span while the internal horizontal ruling is absent
+            // across the full width of the (possibly multi-column) cell.
+            let x_left = table.x_coordinates[c];
+            let x_right = table.x_coordinates[c + col_span];
+            let mut row_span = 1usize;
+            while r + row_span < num_rows {
+                let y_div = table.y_coordinates[r + row_span];
+                if horizontal_ruling_covers(h_lines, y_div, x_left, x_right) {
+                    break;
+                }
+                // Extending downward also requires no vertical dividers inside
+                // the span on the new row band.
+                let next_top = table.y_coordinates[r + row_span];
+                let next_bottom = table.y_coordinates[r + row_span + 1];
+                let blocked = (1..col_span).any(|dc| {
+                    vertical_ruling_covers(
+                        v_lines,
+                        table.x_coordinates[c + dc],
+                        next_bottom,
+                        next_top,
+                    )
+                });
+                if blocked {
+                    break;
+                }
+                row_span += 1;
+            }
+
+            // Apply spans to the origin cell; blank out covered slots.
+            for dr in 0..row_span {
+                for dc in 0..col_span {
+                    claimed[r + dr][c + dc] = true;
+                    if let Some(cell) = table
+                        .rows
+                        .get_mut(r + dr)
+                        .and_then(|row| row.cells.iter_mut().find(|cell| cell.col_number == c + dc))
+                    {
+                        if dr == 0 && dc == 0 {
+                            cell.row_span = row_span;
+                            cell.col_span = col_span;
+                            cell.bbox = BoundingBox::new(
+                                cell.bbox.page_number,
+                                x_left,
+                                table.y_coordinates[r + row_span],
+                                x_right,
+                                y_top,
+                            );
+                        } else {
+                            // Sentinel: covered by the origin cell above/left.
+                            cell.row_span = 0;
+                            cell.col_span = 0;
+                            cell.content.clear();
+                            cell.contents.clear();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[allow(dead_code)]
+fn vertical_ruling_covers(v_lines: &[LineChunk], x: f64, y_bottom: f64, y_top: f64) -> bool {
+    let band = (y_top - y_bottom).abs();
+    if band < LINE_EPSILON {
+        return false;
+    }
+    v_lines.iter().any(|line| {
+        if (line.bbox.center_x() - x).abs() > LINE_EPSILON * 2.0 {
+            return false;
+        }
+        let overlap = (line.bbox.top_y.min(y_top) - line.bbox.bottom_y.max(y_bottom)).max(0.0);
+        // Require the ruling to cover a majority of the cell height so short
+        // stubs (partial borders) do not block legitimate merges.
+        overlap >= band * 0.5
+    })
+}
+
+#[allow(dead_code)]
+fn horizontal_ruling_covers(h_lines: &[LineChunk], y: f64, x_left: f64, x_right: f64) -> bool {
+    let band = (x_right - x_left).abs();
+    if band < LINE_EPSILON {
+        return false;
+    }
+    h_lines.iter().any(|line| {
+        if (line.bbox.center_y() - y).abs() > LINE_EPSILON * 2.0 {
+            return false;
+        }
+        let overlap = (line.bbox.right_x.min(x_right) - line.bbox.left_x.max(x_left)).max(0.0);
+        overlap >= band * 0.5
+    })
 }
 
 /// Merge groups that share intersecting lines.

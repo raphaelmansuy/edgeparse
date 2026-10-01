@@ -9,20 +9,46 @@ from typing import List
 def _find_edgeparse_binary() -> Path:
     """Find the locally built edgeparse Rust binary.
 
-    In the standalone edgeparse repo the layout is:
-        <repo-root>/
-            benchmark/src/pdf_parser_edgeparse.py   ← this file
-            target/release/edgeparse                 ← the binary
+    Checks, in order:
+      1. ``<repo>/target/release/edgeparse`` (default or symlink)
+      2. ``cargo metadata`` target_directory (custom CARGO_TARGET_DIR)
+      3. ``EDGEPARSE_BIN`` environment override
     """
-    # benchmark/src/ → benchmark/ → repo-root/
+    import os
+    import json
+    import subprocess
+
+    if env := os.environ.get("EDGEPARSE_BIN"):
+        path = Path(env)
+        if path.exists():
+            return path
+
     repo_root = Path(__file__).parent.parent.parent.resolve()
-    binary = repo_root / "target" / "release" / "edgeparse"
-    if not binary.exists():
-        raise FileNotFoundError(
-            f"edgeparse binary not found at {binary}. "
-            "Run: cargo build --release"
+    candidates = [repo_root / "target" / "release" / "edgeparse"]
+
+    try:
+        meta = subprocess.run(
+            ["cargo", "metadata", "--no-deps", "--format-version", "1"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=False,
         )
-    return binary
+        if meta.returncode == 0:
+            target_dir = Path(json.loads(meta.stdout)["target_directory"])
+            candidates.append(target_dir / "release" / "edgeparse")
+    except Exception:
+        pass
+
+    for binary in candidates:
+        if binary.exists():
+            return binary
+
+    raise FileNotFoundError(
+        "edgeparse binary not found. Tried: "
+        + ", ".join(str(c) for c in candidates)
+        + ". Run: cargo build --release -p edgeparse-cli"
+    )
 
 
 def to_markdown(document_paths: List[Path], _input_path, output_dir: Path):
@@ -42,7 +68,9 @@ def to_markdown(document_paths: List[Path], _input_path, output_dir: Path):
     ]
 
     env = dict(**__import__("os").environ)
-    env["EDGEPARSE_RASTER_TABLE_OCR"] = "off"
+    env["EDGEPARSE_RASTER_TABLE_OCR"] = __import__("os").environ.get(
+        "EDGEPARSE_RASTER_TABLE_OCR", "on"
+    )
 
     result = subprocess.run(
         command,

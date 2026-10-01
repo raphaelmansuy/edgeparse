@@ -35,11 +35,19 @@ euclid = { workspace = true }
 zip = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+ocrs = { version = "0.13", optional = true }
+rten = { version = "0.26", optional = true, default-features = false, features = ["rten_format"] }
+rten-imageproc = { version = "0.26", optional = true }
+js-sys = { version = "0.3", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
 default = ["native"]
-native = ["rayon", "image", "zip", "lopdf/rayon"]
-wasm = ["lopdf/wasm_js"]
+# Optional crate enablement (Cargo `dep:` form does not imply a feature of the same name).
+image = ["dep:image"]
+native = ["dep:rayon", "image", "dep:zip", "lopdf/rayon"]
+wasm = ["lopdf/wasm_js", "image", "dep:js-sys", "dep:wasm-bindgen"]
 hybrid = ["dep:reqwest", "dep:tokio"]
+ocr-ocrs = ["dep:ocrs", "dep:rten", "dep:rten-imageproc", "image"]
 
 [dev-dependencies]

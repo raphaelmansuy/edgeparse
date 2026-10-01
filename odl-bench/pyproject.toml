@@ -1,0 +1,36 @@
+[project]
+name = "edgeparse-odl-bench"
+version = "0.1.0"
+description = "Official OpenDataLoader board harness — overall = mean(NID, TEDS, MHS)"
+requires-python = ">=3.11"
+dependencies = [
+    "apted>=1.0.3",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    "py-cpuinfo>=9.0.0",
+    "rapidfuzz>=3.0.0",
+]
+
+[project.optional-dependencies]
+opendataloader = [
+    "opendataloader-pdf>=2.0.0",
+]
+docling = [
+    "docling",
+]
+pymupdf4llm = [
+    "pymupdf4llm",
+]
+markitdown = [
+    "markitdown[all]",
+]
+unstructured = [
+    "unstructured[pdf]",
+]
+compare-light = [
+    "pymupdf4llm",
+    "markitdown[all]",
+]
+
+[tool.uv]
+package = false

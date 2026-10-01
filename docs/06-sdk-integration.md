@@ -2,12 +2,15 @@
 
 > Code is law. Every statement in this document is traced to a source file.
 
-This document covers all three integration surfaces for EdgeParse:
+This document covers the primary integration surfaces for EdgeParse:
 
 1. **Rust CLI** — `crates/edgeparse-cli/src/main.rs`
 2. **Python SDK** — `sdks/python/edgeparse/` + `crates/edgeparse-python/src/lib.rs`
 3. **Node.js SDK** — `sdks/node/src/` + `crates/edgeparse-node/src/lib.rs`
 4. **Batch API** — `crates/edgeparse-core/src/api/batch.rs`
+5. **Web / WASM** — `crates/edgeparse-wasm/` + product SDK `sdks/web/` (`@edgeparse/web`)
+
+For browser apps, prefer **`@edgeparse/web`** (observable state, consent-gated PP-OCR, `ParseSession` plan→OCR→finish). Low-level `edgeparse-wasm` exposes `convert_to_string`, `ParseSession`, and `version()`. See [09-wasm-sdk.md](./09-wasm-sdk.md) and the site docs under Getting Started → Web SDK.
 
 ---
 

@@ -66,3 +66,18 @@ The `thresholds.json` file defines minimum acceptable scores:
 ```
 
 CI will fail if EdgeParse scores drop below these thresholds.
+
+## Official odl-bench board
+
+To reproduce the **public OpenDataLoader-formula** leaderboard (separate from the EdgeParse harness above):
+
+```bash
+# See odl-bench/README.md for corpus setup (upstream clone + LFS)
+cd odl-bench
+uv sync
+uv run python run.py --engine edgeparse
+uv run python run.py --engine edgeparse_hybrid
+uv run python compare.py   # writes reports/board.json
+```
+
+Site numbers for both boards live in `site/src/data/benchmark.ts` (`benchmarkSnapshot` and `odlBenchSnapshot`).

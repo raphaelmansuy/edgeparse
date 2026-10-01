@@ -7,7 +7,9 @@ on:
     paths:
       - 'site/**'
       - 'demo/**'
-      - 'crates/edgeparse-wasm/pkg/**'
+      - 'sdks/web/**'
+      - 'crates/edgeparse-wasm/**'
+      - 'crates/edgeparse-core/**'
       - '.github/workflows/deploy-site.yml'
   workflow_dispatch:
 
@@ -29,6 +31,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Rust + wasm-pack
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'latest'
+
+      - name: Build edgeparse-wasm (web target)
+        run: |
+          wasm-pack build crates/edgeparse-wasm --target web --release --out-dir pkg
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -41,9 +57,15 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: site/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install site dependencies
         working-directory: site
         run: pnpm install --frozen-lockfile
+
+      - name: Build @edgeparse/web
+        working-directory: sdks/web
+        run: |
+          npm install
+          npm run build
 
       - name: Build demo app
         working-directory: demo

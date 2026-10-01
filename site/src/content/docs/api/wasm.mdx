@@ -1,11 +1,15 @@
 ---
 title: "WebAssembly API"
-description: "API reference for the EdgeParse WebAssembly SDK — convert(), convert_to_string(), and version()."
+description: "API reference for edgeparse-wasm — ParseSession, convert(), convert_to_string(), and version()."
 ---
+
+import { claims } from '../../../data/benchmark';
 
 ## Package
 
-**npm:** `edgeparse-wasm` · **Source:** [`crates/edgeparse-wasm/`](https://github.com/raphaelmansuy/edgeparse/tree/main/crates/edgeparse-wasm)
+**npm:** `edgeparse-wasm` · **Version:** {claims.version} · **Source:** [`crates/edgeparse-wasm/`](https://github.com/raphaelmansuy/edgeparse/tree/main/crates/edgeparse-wasm)
+
+For observable progress, consent-gated OCR, and React-friendly state, prefer **[`@edgeparse/web`](/api/web-sdk/)**.
 
 ## Initialization
 
@@ -19,6 +23,59 @@ await init();
 ```
 
 Call `init()` once at application startup. Subsequent calls are no-ops.
+
+## `ParseSession`
+
+Two-phase parse: **plan** (OCR candidates) → host OCR → **finish**. Used by `@edgeparse/web` so async ONNX OCR never blocks on `Atomics.wait` / COOP+COEP. Missing OCR degrades to PDF text cells.
+
+```typescript
+class ParseSession {
+  static open(
+    bytes: Uint8Array,
+    opts?: {
+      pages?: string;
+      readingOrder?: string;
+      tableMethod?: string;
+      fileName?: string;
+    },
+    on_progress?: (phase: string, done: number, total: number) => void,
+  ): ParseSession;
+
+  candidates(): Array<{ id: number; page: number; width: number; height: number; hash: string }>;
+  candidate_gray(id: number): Uint8Array;
+  provide_ocr(id: number, words: Array<{
+    text: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    confidence?: number;
+  }>): void;
+  finish(format: string): string;
+  finishAll(): { json: string; markdown: string; html: string; text: string };
+  finish_hybrid(backend_md: string | null | undefined, format: string): string;
+}
+```
+
+### Example
+
+```typescript
+import init, { ParseSession } from 'edgeparse-wasm';
+
+await init();
+
+const session = ParseSession.open(bytes, { tableMethod: 'cluster' }, (phase, done, total) => {
+  console.log(phase, done, '/', total);
+});
+
+for (const c of session.candidates()) {
+  const gray = session.candidate_gray(c.id);
+  // host OCR → words
+  session.provide_ocr(c.id, words);
+}
+
+const markdown = session.finish('markdown');
+```
 
 ## `convert()`
 
@@ -69,10 +126,8 @@ await init();
 
 const bytes = new Uint8Array(await file.arrayBuffer());
 
-// Easiest: parse JSON string — same schema as Python/Node.js SDK
 const doc = JSON.parse(convert_to_string(bytes, 'json'));
 
-// Iterate elements (uses same keys as Python/Node.js JSON output)
 for (const el of doc.kids) {
   if (el.type === 'table') {
     console.log('Table found on page', el['page number']);
@@ -136,12 +191,14 @@ function version(): string;
 
 ```typescript
 import { version } from 'edgeparse-wasm';
-console.log(version()); // "0.2.3"
+console.log(version());
 ```
+
+Current package version: **{claims.version}**.
 
 ## Error handling
 
-Both `convert()` and `convert_to_string()` throw `JsError` on failure (corrupted PDF, invalid page range, etc.):
+`ParseSession`, `convert()`, and `convert_to_string()` throw `JsError` on failure (corrupted PDF, invalid page range, etc.):
 
 ```typescript
 try {

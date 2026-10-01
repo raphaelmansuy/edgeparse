@@ -334,6 +334,20 @@ pub fn run_pipeline(state: &mut PipelineState) -> Result<(), EdgePdfError> {
         state.total_elements()
     );
 
+    // Stage 6.75: Early cluster tables on TextLines (before paragraph formation).
+    // Matches OpenDataLoader ClusterTableConsumer, which works at the raw chunk /
+    // line level so two-column prose is less likely to be swallowed as a table.
+    timed_stage!(timer, "Stage 6.75 (Early Cluster Tables)", state, {
+        par_map_pages(
+            &mut state.pages,
+            cluster_table_detector::detect_cluster_tables,
+        );
+    });
+    log::info!(
+        "Stage 6.75 (Early Cluster Tables) complete: {} elements",
+        state.total_elements()
+    );
+
     // Stage 7: Text Block Grouping (paragraph detection)
     timed_stage!(timer, "Stage 7 (Text Block Grouping)", state, {
         par_map_pages(&mut state.pages, text_block_grouper::group_text_blocks);
@@ -343,7 +357,8 @@ pub fn run_pipeline(state: &mut PipelineState) -> Result<(), EdgePdfError> {
         state.total_elements()
     );
 
-    // Stage 7b: Cluster (Borderless) Table Detection
+    // Stage 7b: Cluster (Borderless) Table Detection — second pass on TextBlocks
+    // for tables that only become clear after block grouping.
     timed_stage!(timer, "Stage 7b (Cluster Table Detection)", state, {
         par_map_pages(
             &mut state.pages,

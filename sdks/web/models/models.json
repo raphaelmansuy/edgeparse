@@ -1,0 +1,123 @@
+{
+  "version": "1",
+  "defaultTier": "small",
+  "models": [
+    {
+      "id": "ppocrv6-det-tiny",
+      "tier": "tiny",
+      "kind": "detection",
+      "urls": [
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/detection/ort/PP-OCRv6_tiny_det.ort",
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/detection/ort/PP-OCRv6_tiny_det.ort?download=true"
+      ],
+      "bytes": 1882568,
+      "sha256": "2816e82d26a09d6af722492f80f3059d458377c084eca88f34d84ddf9b385580",
+      "license": "Apache-2.0",
+      "minCapability": "simd"
+    },
+    {
+      "id": "ppocrv6-rec-tiny",
+      "tier": "tiny",
+      "kind": "recognition",
+      "urls": [
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/recognition/ort/PP-OCRv6_tiny_rec.ort",
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/recognition/ort/PP-OCRv6_tiny_rec.ort?download=true"
+      ],
+      "bytes": 4530048,
+      "sha256": "efc46adf1bde1e05b58748268abb0e71791bfa8616c435676bbca13d1ea47767",
+      "license": "Apache-2.0",
+      "minCapability": "simd"
+    },
+    {
+      "id": "ppocrv6-dict-tiny",
+      "tier": "tiny",
+      "kind": "dictionary",
+      "urls": [
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/recognition/ppocrv6_tiny_dict.txt",
+        "https://cdn.jsdelivr.net/gh/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models@main/recognition/ppocrv6_tiny_dict.txt"
+      ],
+      "bytes": 27157,
+      "sha256": "2f3717bbd530b681b6db3be35cc485e8a41a932b9558b833986bf0894eb21f2d",
+      "license": "Apache-2.0",
+      "minCapability": "none"
+    },
+    {
+      "id": "ppocrv6-det-small",
+      "tier": "small",
+      "kind": "detection",
+      "urls": [
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/detection/ort/PP-OCRv6_small_det.ort",
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/detection/ort/PP-OCRv6_small_det.ort?download=true"
+      ],
+      "bytes": 9982352,
+      "sha256": "c21be8d8268f0f45e2693b1d52432a290a56d008f6c1ff28b4baa7c35bab250e",
+      "license": "Apache-2.0",
+      "minCapability": "simd"
+    },
+    {
+      "id": "ppocrv6-rec-small",
+      "tier": "small",
+      "kind": "recognition",
+      "urls": [
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/recognition/ort/PP-OCRv6_small_rec.ort",
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/recognition/ort/PP-OCRv6_small_rec.ort?download=true"
+      ],
+      "bytes": 21290816,
+      "sha256": "40bccd9fa3ae2d14d724bf9d020c8f0edfc801489477b92f7449162a538366df",
+      "license": "Apache-2.0",
+      "minCapability": "simd"
+    },
+    {
+      "id": "ppocrv6-dict-small",
+      "tier": "small",
+      "kind": "dictionary",
+      "urls": [
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/recognition/ppocrv6_dict.txt",
+        "https://cdn.jsdelivr.net/gh/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models@main/recognition/ppocrv6_dict.txt"
+      ],
+      "bytes": 74948,
+      "sha256": "41557512862dfe31970cf22407742b629725461dd84c0d8771bde9c87c2202c8",
+      "license": "Apache-2.0",
+      "minCapability": "none"
+    },
+    {
+      "id": "ppocrv6-det-medium",
+      "tier": "medium",
+      "kind": "detection",
+      "urls": [
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/detection/ort/PP-OCRv6_medium_det.ort",
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/detection/ort/PP-OCRv6_medium_det.ort?download=true"
+      ],
+      "bytes": 62160320,
+      "sha256": "b3fad30d6dde47fd015d92a10f6cddf5969d910c6460d2f9b82de59e97931738",
+      "license": "Apache-2.0",
+      "minCapability": "webgpu"
+    },
+    {
+      "id": "ppocrv6-rec-medium",
+      "tier": "medium",
+      "kind": "recognition",
+      "urls": [
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/recognition/ort/PP-OCRv6_medium_rec.ort",
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/recognition/ort/PP-OCRv6_medium_rec.ort?download=true"
+      ],
+      "bytes": 76691568,
+      "sha256": "14bf37252c87d2359764466c751d17787a28c9c5cbd5d64059a6f49b9dbd4ab4",
+      "license": "Apache-2.0",
+      "minCapability": "webgpu"
+    },
+    {
+      "id": "ppocrv6-dict-medium",
+      "tier": "medium",
+      "kind": "dictionary",
+      "urls": [
+        "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/recognition/ppocrv6_dict.txt",
+        "https://cdn.jsdelivr.net/gh/PT-Perkasa-Pilar-Utama/ppu-paddle-ocr-models@main/recognition/ppocrv6_dict.txt"
+      ],
+      "bytes": 74948,
+      "sha256": "41557512862dfe31970cf22407742b629725461dd84c0d8771bde9c87c2202c8",
+      "license": "Apache-2.0",
+      "minCapability": "none"
+    }
+  ]
+}

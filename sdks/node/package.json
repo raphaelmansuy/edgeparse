@@ -1,7 +1,7 @@
 {
   "name": "edgeparse",
-  "version": "0.2.3",
-  "description": "High-performance PDF extraction — Rust engine, Node.js interface",
+  "version": "0.3.0",
+  "description": "High-performance PDF extraction \u2014 Rust engine, Node.js interface",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

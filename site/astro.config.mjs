@@ -3,10 +3,12 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
+import { claims } from './src/data/benchmark.ts';
 
 const siteUrl = 'https://edgeparse.com';
 const fullUrl = siteUrl;
 const ogImageUrl = `${fullUrl}/og-image.png`;
+const softwareVersion = claims.version;
 
 export default defineConfig({
 	site: siteUrl,
@@ -220,7 +222,7 @@ export default defineConfig({
 						author: { '@type': 'Person', name: 'Raphael Mansuy', url: 'https://github.com/raphaelmansuy' },
 						url: fullUrl,
 						downloadUrl: 'https://pypi.org/project/edgeparse/',
-						softwareVersion: '0.2.2',
+						softwareVersion,
 						license: 'https://opensource.org/licenses/Apache-2.0',
 						programmingLanguage: ['Rust', 'Python', 'TypeScript'],
 						image: ogImageUrl,
@@ -261,6 +263,8 @@ export default defineConfig({
 							'https://github.com/raphaelmansuy/edgeparse',
 							'https://pypi.org/project/edgeparse/',
 							'https://www.npmjs.com/package/edgeparse',
+							'https://www.npmjs.com/package/@edgeparse/web',
+							'https://www.npmjs.com/package/edgeparse-wasm',
 							'https://crates.io/crates/edgeparse-cli',
 							'https://crates.io/crates/edgeparse-core',
 						],
@@ -287,7 +291,7 @@ export default defineConfig({
 								name: 'How fast is EdgeParse compared to other PDF parsers?',
 								acceptedAnswer: {
 									'@type': 'Answer',
-									text: 'EdgeParse processes 40+ pages per second — 10 to 100× faster than Python-based alternatives like Docling or Marker. It achieves 0.026s average processing time per document.',
+									text: `EdgeParse averages ${claims.harness.speedPerDoc} on the EdgeParse harness (${claims.harness.hardware}) — ${claims.harness.vsDocling} faster than Docling and ${claims.harness.vsOpenDataLoader} faster than OpenDataLoader. Overall harness score ${claims.harness.overall}.`,
 								},
 							},
 							{
@@ -295,7 +299,7 @@ export default defineConfig({
 								name: 'What programming languages does EdgeParse support?',
 								acceptedAnswer: {
 									'@type': 'Answer',
-									text: 'EdgeParse provides native bindings for Python (via PyO3), Node.js (via NAPI-RS), a standalone CLI binary, and can be used directly as a Rust library crate.',
+									text: 'EdgeParse provides native bindings for Python (via PyO3), Node.js (via NAPI-RS), a standalone CLI binary, WebAssembly / @edgeparse/web, and can be used directly as a Rust library crate.',
 								},
 							},
 							{
@@ -303,7 +307,7 @@ export default defineConfig({
 								name: 'Does EdgeParse require GPU or ML models?',
 								acceptedAnswer: {
 									'@type': 'Answer',
-									text: 'No. EdgeParse is a rule-based extraction engine with zero ML dependencies. No GPU, no Java, no Poppler, no Tesseract required. Just pip install edgeparse and go.',
+									text: `${claims.copy.noMlStack}. No GPU, no Java, no Poppler required for born-digital PDFs. Just pip install edgeparse and go.`,
 								},
 							},
 						],
@@ -348,6 +352,7 @@ export default defineConfig({
 						{ label: 'Node.js', slug: 'getting-started/quick-start-nodejs' },
 						{ label: 'CLI', slug: 'getting-started/quick-start-cli' },
 						{ label: 'Rust', slug: 'getting-started/quick-start-rust' },
+						{ label: 'Web SDK', slug: 'getting-started/quick-start-web-sdk' },
 						{ label: 'WebAssembly', slug: 'getting-started/quick-start-wasm' },
 					],
 				},
@@ -389,6 +394,7 @@ export default defineConfig({
 						{ label: 'CLI Reference', slug: 'api/cli' },
 						{ label: 'Rust API', slug: 'api/rust' },
 						{ label: 'ProcessingConfig', slug: 'api/processing-config' },
+						{ label: 'Web SDK', slug: 'api/web-sdk' },
 						{ label: 'WebAssembly API', slug: 'api/wasm' },
 					],
 				},

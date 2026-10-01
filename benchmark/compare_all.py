@@ -88,18 +88,22 @@ ISOLATED_VENVS_DIR = BENCH_DIR / ".venvs"
 ALL_ENGINES = [
     # Non-OCR (fast)
     "edgeparse", "opendataloader", "pymupdf4llm", "markitdown", "liteparse",
+    "unstructured",
     # Hybrid
-    "opendataloader_hybrid_docling_fast", "opendataloader_hybrid_hancom",
+    "edgeparse_hybrid", "opendataloader_hybrid_docling_fast", "opendataloader_hybrid_hancom",
     # OCR / ML
-    "chandra", "docling", "marker", "mineru",
+    "chandra", "docling", "marker", "mineru", "unstructured_hi_res",
 ]
 
 # pip install commands for each engine
 INSTALL_COMMANDS = {
     "opendataloader": "opendataloader-pdf>=2.0.0",
+    "opendataloader_hybrid_docling_fast": "opendataloader-pdf[hybrid]>=2.0.0",
     "pymupdf4llm":    "pymupdf4llm",
     "markitdown":     "markitdown[all]",
     "liteparse":      "@llamaindex/liteparse",  # installed via run.py node adapter
+    "unstructured":   "unstructured[pdf]",
+    "unstructured_hi_res": "unstructured[pdf]",
     "chandra":        "chandra-ocr",
     "docling":        "docling",
     "marker":         "marker-pdf",
@@ -193,6 +197,8 @@ _ENGINE_PKG_MODULE: Dict[str, str] = {
     "docling":     "docling",
     "marker":      "marker",
     "mineru":      "mineru",
+    "unstructured": "unstructured",
+    "unstructured_hi_res": "unstructured",
 }
 
 # Engines whose pip packages have irreconcilable dependency conflicts (pillow)
@@ -228,12 +234,39 @@ def _openai_models_endpoint_ok(api_base: str, timeout_s: float = 0.8) -> bool:
 def _check_engine_available(engine: str) -> bool:
     """Check if an engine is installed and available."""
     if engine == "edgeparse":
-        binary = BENCH_DIR.parent / "target" / "release" / "edgeparse"
-        return binary.exists()
+        try:
+            sys.path.insert(0, str(BENCH_DIR / "src"))
+            import pdf_parser_edgeparse as _ep
+            return _ep._find_edgeparse_binary().exists()
+        except Exception:
+            binary = BENCH_DIR.parent / "target" / "release" / "edgeparse"
+            return binary.exists()
     if engine == "opendataloader":
         # opendataloader-pdf ships a CLI command. It lives in the active venv's
         # bin/ during `uv run`, so shutil.which covers both venv and system PATH.
         return shutil.which("opendataloader-pdf") is not None
+    if engine == "opendataloader_hybrid_docling_fast":
+        if shutil.which("opendataloader-pdf") is None:
+            return False
+        # Require a reachable hybrid backend (default port 5002).
+        url = os.environ.get("DOCLING_URL") or os.environ.get("HYBRID_URL", "http://127.0.0.1:5002")
+        parsed = urlparse(url)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or 5002
+        return _tcp_reachable(host, port)
+    if engine == "edgeparse_hybrid":
+        try:
+            sys.path.insert(0, str(BENCH_DIR / "src"))
+            import pdf_parser_edgeparse as _ep
+            if not _ep._find_edgeparse_binary().exists():
+                return False
+        except Exception:
+            return False
+        url = os.environ.get("DOCLING_URL") or os.environ.get("HYBRID_URL", "http://127.0.0.1:5002")
+        parsed = urlparse(url)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or 5002
+        return _tcp_reachable(host, port)
     if engine == "chandra":
         # Chandra is a CLI-based OCR engine.
         if shutil.which("chandra") is None:

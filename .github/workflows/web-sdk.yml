@@ -1,0 +1,73 @@
+name: Web SDK CI
+
+on:
+  push:
+    paths:
+      - 'sdks/web/**'
+      - 'crates/edgeparse-wasm/**'
+      - 'crates/edgeparse-core/**'
+      - 'odl-bench/scripts/check_wasm_sdk_gate.mjs'
+      - '.github/workflows/web-sdk.yml'
+  pull_request:
+    paths:
+      - 'sdks/web/**'
+      - 'crates/edgeparse-wasm/**'
+      - 'crates/edgeparse-core/**'
+      - 'odl-bench/scripts/check_wasm_sdk_gate.mjs'
+      - '.github/workflows/web-sdk.yml'
+
+jobs:
+  unit:
+    name: Vitest + size budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install & test @edgeparse/web
+        run: |
+          cd sdks/web
+          npm install
+          npm run check-models
+          npm run build
+          npm test
+          npm run size
+
+  rust-fmt-clippy:
+    name: fmt + clippy (core/wasm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - name: Clippy (edgeparse-core, no deps)
+        run: cargo clippy -p edgeparse-core --features native --no-deps -- -A clippy::all -D clippy::correctness -D clippy::suspicious
+      - run: cargo check -p edgeparse-wasm --target wasm32-unknown-unknown
+
+  rust-two-phase:
+    name: Two-phase equivalence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run equivalence + prefilter tests
+        run: |
+          cargo test -p edgeparse-core --features native --lib two_phase_equals_sync_fake_engine
+          cargo test -p edgeparse-core --features native --lib candidate_prefilter_keeps_docs_110_and_122
+
+  quality-gate:
+    name: odl-bench TEDS/overall gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check quality gates
+        run: node odl-bench/scripts/check_wasm_sdk_gate.mjs

@@ -1,0 +1,81 @@
+---
+title: "Quick Start: Web SDK"
+description: "Parse PDFs in the browser with @edgeparse/web — observable progress, lazy PP-OCR models, and consent-aware downloads."
+---
+
+import { claims } from '../../../data/benchmark';
+
+## Overview
+
+**`@edgeparse/web`** is the product Web SDK for EdgeParse {claims.version}. It wraps the WASM engine with:
+
+- Observable client state (`subscribe` / `getSnapshot` for React `useSyncExternalStore`)
+- Two-phase **ParseSession** (plan → async OCR → assemble)
+- Lazy, consent-gated PP-OCR model downloads
+- Graceful degradation when OCR is declined or offline
+
+On the official odl-bench board, EdgeParse WASM scores **{claims.odl.wasmOverall}** overall (TEDS {claims.odl.wasmTeds}).
+
+Prefer this path for apps. The low-level [`edgeparse-wasm`](/getting-started/quick-start-wasm/) package remains available for direct `convert_to_string` use.
+
+## Install
+
+```bash
+npm install @edgeparse/web edgeparse-wasm
+# or
+pnpm add @edgeparse/web edgeparse-wasm
+```
+
+## Quick start
+
+```typescript
+import { EdgeParse } from '@edgeparse/web';
+
+const ep = await EdgeParse.create({
+  models: 'lazy', // download OCR models only when needed
+  ocr: 'small',
+  onBeforeDownload: async (model) => {
+    // Show consent UI; return false to degrade without OCR
+    return confirm(`Download ${model.id} (~${(model.bytes / 1e6).toFixed(1)} MB)?`);
+  },
+});
+
+ep.subscribe(() => {
+  const snap = ep.getSnapshot();
+  // snap.engine / snap.models / snap.jobs — React-friendly
+});
+
+const job = ep.parse(file, { format: 'markdown', tableMethod: 'cluster' });
+job.on('progress', (p) => console.log(p.fraction, p.label));
+const result = await job.result;
+// result.quality: 'full' | 'degraded' | 'skipped'
+console.log(result.markdown);
+```
+
+## Models policy
+
+| Policy | Behavior |
+|--------|----------|
+| `lazy` (default) | Download when a parse needs OCR |
+| `preload` | Fetch the selected OCR tier at `create()` |
+| `manual` | Call `ep.models.preload()` / `ensure()` yourself |
+| `off` | Never download models; image tables degrade to PDF text |
+
+## Architecture
+
+1. **Parse worker** — `ParseSession` (Rust/WASM): extract OCR candidates, finish with OCR words
+2. **OCR worker** — onnxruntime-web (WebGPU → WASM+SIMD), PP-OCRv6 tiers
+3. **ModelManager** — pinned manifest, OPFS/Cache API, sha256 verify, Web Locks
+
+Missing OCR never fails a parse — cells fall back to PDF text and `quality: "degraded"`.
+
+## Live demo
+
+Try it: **[edgeparse.com/demo/](https://edgeparse.com/demo/)**
+
+## Next steps
+
+- [Web SDK API](/api/web-sdk/) — state, events, consent, errors, CSP, capabilities
+- [WebAssembly API](/api/wasm/) — low-level `ParseSession` / `convert_to_string`
+- [WASM Use Cases](/guides/wasm-use-cases/) — RAG, offline PWA, privacy-first apps
+- [CSP notes](https://github.com/raphaelmansuy/edgeparse/blob/main/sdks/web/docs/CSP.md)

@@ -23,7 +23,7 @@
         publish-node publish-node-dry publish-wasm publish-wasm-dry \
         publish-cli publish-cli-dry \
         publish-brew publish-brew-dry \
-        wasm-build wasm-check wasm-size wasm-clean \
+        wasm-build wasm-build-node wasm-check wasm-size wasm-clean \
         publish-all \
         clean clean-bench clean-all
 
@@ -571,10 +571,15 @@ publish-all: publish-rust publish-python publish-node publish-wasm publish-cli p
 
 WASM_CRATE := crates/edgeparse-wasm
 
-wasm-build: ## Build WASM package (release, --target web)
-	$(call log,Building WASM package...)
-	@cd $(WASM_CRATE) && wasm-pack build --target web --release --scope edgeparse
+wasm-build: ## Build WASM package (release, --target web → pkg/)
+	$(call log,Building WASM package --target web...)
+	@cd $(WASM_CRATE) && wasm-pack build --target web --release --out-dir pkg
 	$(call ok,WASM package built → $(WASM_CRATE)/pkg/)
+
+wasm-build-node: ## Build WASM package for Node (bench) → pkg-node/
+	$(call log,Building WASM package --target nodejs → pkg-node...)
+	@cd $(WASM_CRATE) && wasm-pack build --target nodejs --release --out-dir pkg-node --features ocr-ocrs
+	$(call ok,WASM Node package built → $(WASM_CRATE)/pkg-node/)
 
 wasm-check: ## Check WASM compilation (fast, no codegen)
 	$(call log,Checking WASM compilation...)
@@ -585,9 +590,9 @@ wasm-size: wasm-build ## Show WASM binary size
 	@echo "Raw WASM size:"
 	@du -h $(WASM_CRATE)/pkg/edgeparse_wasm_bg.wasm
 
-wasm-clean: ## Remove WASM build artefacts (pkg/)
-	$(call warn,Removing $(WASM_CRATE)/pkg/ ...)
-	@rm -rf $(WASM_CRATE)/pkg/
+wasm-clean: ## Remove WASM build artefacts (pkg/ and pkg-node/)
+	$(call warn,Removing $(WASM_CRATE)/pkg/ and pkg-node/ ...)
+	@rm -rf $(WASM_CRATE)/pkg/ $(WASM_CRATE)/pkg-node/
 
 # ══════════════════════════════════════════════════════════════════════════════
 ## Clean

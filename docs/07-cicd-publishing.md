@@ -260,6 +260,7 @@ fast on mismatches.
 - Publishes `edgeparse-wasm` to npm using **npm Trusted Publisher (OIDC)** — no `NPM_TOKEN` needed
 - Adds provenance attestation (`--provenance`) so the package appears as verified on npmjs.com
 - Publishes `@raphaelmansuy/edgeparse-wasm` to GitHub Packages (secondary) using the built-in `GITHUB_TOKEN` — no extra secret required
+- Builds, tests, and publishes **`@edgeparse/web`** after model hash pin check (`npm run check-models` fails closed on placeholder sha256)
 - Uploads the tarball to the GitHub Release (`--clobber` for idempotent re-runs)
 - Both publish steps treat "already published" as non-fatal
 
@@ -282,6 +283,21 @@ fast on mismatches.
 5. Workflow filename: `release-wasm.yml`
 6. Environment name: *(leave blank)*
 7. Click **Save changes**
+
+#### Configuring npm Trusted Publisher for `@edgeparse/web`
+
+Same workflow (`release-wasm.yml`), same OIDC permissions:
+
+1. Create the empty package once (or let the first publish create it), then open
+   <https://www.npmjs.com/package/@edgeparse/web> → **Settings** → **Trusted Publisher**
+2. Publisher: `GitHub Actions`
+3. Organization or user: `raphaelmansuy`
+4. Repository: `edgeparse`
+5. Workflow filename: `release-wasm.yml`
+6. Environment name: `npm` (matches the workflow `environment:`)
+7. Click **Save changes**
+
+CI refuses to publish if `sdks/web/models/models.json` still contains all-zero placeholder hashes.
 
 All future tag releases will publish via OIDC with no token required.
 
