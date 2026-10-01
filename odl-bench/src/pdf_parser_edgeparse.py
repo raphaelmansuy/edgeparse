@@ -1,5 +1,9 @@
-"""PDF parser using local edgeparse Rust build."""
+"""PDF parser using local edgeparse Rust build (official board adapter)."""
 
+from __future__ import annotations
+
+import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -10,14 +14,10 @@ def _find_edgeparse_binary() -> Path:
     """Find the locally built edgeparse Rust binary.
 
     Checks, in order:
-      1. ``<repo>/target/release/edgeparse`` (default or symlink)
-      2. ``cargo metadata`` target_directory (custom CARGO_TARGET_DIR)
-      3. ``EDGEPARSE_BIN`` environment override
+      1. ``EDGEPARSE_BIN`` environment override
+      2. ``<repo>/target/release/edgeparse``
+      3. ``cargo metadata`` target_directory (custom CARGO_TARGET_DIR)
     """
-    import os
-    import json
-    import subprocess
-
     if env := os.environ.get("EDGEPARSE_BIN"):
         path = Path(env)
         if path.exists():
@@ -51,34 +51,33 @@ def _find_edgeparse_binary() -> Path:
     )
 
 
-def to_markdown(document_paths: List[Path], _input_path, output_dir: Path):
+def to_markdown(document_paths: List[Path], _input_path, output_dir: Path) -> None:
     """Convert PDFs to Markdown using the local edgeparse Rust binary."""
     binary = _find_edgeparse_binary()
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    command = [
-        str(binary),
-        *[str(pdf_path) for pdf_path in document_paths],
-        "--output-dir", str(output_dir),
-        "--format", "markdown",
-        "--table-method", "cluster",
-        "--image-output", "off",
-        "--quiet",
-    ]
+    env = dict(**os.environ)
+    # Raster OCR recovers figure-embedded tables (TEDS) via classical
+    # projection + Tesseract — required for local to lead Docling on image grids.
+    env["EDGEPARSE_RASTER_TABLE_OCR"] = os.environ.get("EDGEPARSE_RASTER_TABLE_OCR", "on")
 
-    env = dict(**__import__("os").environ)
-    env["EDGEPARSE_RASTER_TABLE_OCR"] = __import__("os").environ.get(
-        "EDGEPARSE_RASTER_TABLE_OCR", "on"
-    )
-
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
-
-    if result.returncode != 0:
-        print("Error converting PDFs with edgeparse:", file=sys.stderr)
-        print(result.stderr, file=sys.stderr)
+    # One PDF per invocation so a slow OCR page cannot kill the whole corpus parse.
+    for pdf_path in document_paths:
+        command = [
+            str(binary),
+            str(pdf_path),
+            "--output-dir",
+            str(output_dir),
+            "--format",
+            "markdown",
+            "--table-method",
+            "cluster",
+            "--image-output",
+            "off",
+            "--quiet",
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, env=env)
+        if result.returncode != 0:
+            print(f"Error converting {pdf_path.name} with edgeparse:", file=sys.stderr)
+            print(result.stderr, file=sys.stderr)

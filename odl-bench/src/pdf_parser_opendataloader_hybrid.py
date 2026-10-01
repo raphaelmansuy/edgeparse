@@ -1,14 +1,4 @@
-"""PDF parser using published opendataloader-pdf with hybrid docling-fast backend.
-
-Requirements:
-  - Java 11+
-  - ``pip install "opendataloader-pdf[hybrid]"``
-  - Hybrid server running: ``opendataloader-pdf-hybrid --port 5002``
-
-Environment:
-  DOCLING_URL / HYBRID_URL — backend URL (default http://localhost:5002)
-  HYBRID_TIMEOUT — request timeout in milliseconds (default 600000)
-"""
+"""PDF parser using opendataloader-pdf with hybrid docling-fast backend."""
 
 from __future__ import annotations
 
@@ -19,7 +9,6 @@ import sys
 from pathlib import Path
 from typing import List
 
-
 DEFAULT_URL = "http://127.0.0.1:5002"
 
 
@@ -28,14 +17,13 @@ def _find_odl_command() -> str:
     if cmd is None:
         raise RuntimeError(
             "opendataloader-pdf command not found in PATH.\n"
-            "Install with: pip install \"opendataloader-pdf[hybrid]\"\n"
-            "Requires Java 11+. Check with: java -version"
+            'Install with: pip install "opendataloader-pdf[hybrid]"\n'
+            "Requires Java 11+."
         )
     return cmd
 
 
 def to_markdown(document_paths: List[Path], _input_path, output_dir: Path) -> None:
-    """Convert PDFs to Markdown via published CLI + local Docling Fast hybrid."""
     cmd = _find_odl_command()
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

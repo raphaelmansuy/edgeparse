@@ -45,6 +45,9 @@ compare-light = [
     "pymupdf4llm",
     "markitdown[all]",
 ]
+unstructured = [
+    "unstructured[pdf]",
+]
 dev = [
     "pytest>=8.0.0",
 ]

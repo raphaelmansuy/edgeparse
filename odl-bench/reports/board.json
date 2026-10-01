@@ -1,0 +1,107 @@
+{
+  "edgeparse": {
+    "path": "odl-bench/prediction/edgeparse/evaluation.json",
+    "metrics": {
+      "nid": 0.8942515857884262,
+      "teds": 0.7727651596485497,
+      "mhs": 0.7629963879899478,
+      "overall": 0.8574886741530996
+    },
+    "raw_keys": [
+      "formula",
+      "summary",
+      "metrics",
+      "documents"
+    ]
+  },
+  "edgeparse_hybrid": {
+    "path": "odl-bench/prediction/edgeparse_hybrid/evaluation.json",
+    "metrics": {
+      "nid": 0.917152726498581,
+      "teds": 0.9276209182697027,
+      "mhs": 0.8357796338234134,
+      "overall": 0.8995222916707335
+    },
+    "raw_keys": [
+      "formula",
+      "summary",
+      "metrics",
+      "documents"
+    ]
+  },
+  "edgeparse_wasm": {
+    "path": "odl-bench/prediction/edgeparse_wasm/evaluation.json",
+    "metrics": {
+      "nid": 0.8914836813547735,
+      "teds": 0.7756804374418664,
+      "mhs": 0.760779261369995,
+      "overall": 0.8543116521309364
+    },
+    "raw_keys": [
+      "formula",
+      "summary",
+      "metrics",
+      "documents"
+    ]
+  },
+  "docling": {
+    "path": "odl-bench/prediction/docling/evaluation.json",
+    "metrics": {
+      "nid": 0.9053446673057366,
+      "teds": 0.9248366546056291,
+      "mhs": 0.8271999321260348,
+      "overall": 0.8907164214483396
+    },
+    "raw_keys": [
+      "formula",
+      "summary",
+      "metrics",
+      "documents"
+    ]
+  },
+  "opendataloader": {
+    "path": "odl-bench/prediction/opendataloader/evaluation.json",
+    "metrics": {
+      "nid": 0.9116801780432633,
+      "teds": 0.4831169282847324,
+      "mhs": 0.7569177875400251,
+      "overall": 0.8420649312094909
+    },
+    "raw_keys": [
+      "formula",
+      "summary",
+      "metrics",
+      "documents"
+    ]
+  },
+  "pymupdf4llm": {
+    "path": "odl-bench/prediction/pymupdf4llm/evaluation.json",
+    "metrics": {
+      "nid": 0.9164657486721844,
+      "teds": 0.8028337411297525,
+      "mhs": 0.7722124830147264,
+      "overall": 0.8729054737165388
+    },
+    "raw_keys": [
+      "formula",
+      "summary",
+      "metrics",
+      "documents"
+    ]
+  },
+  "markitdown": {
+    "path": "odl-bench/prediction/markitdown/evaluation.json",
+    "metrics": {
+      "nid": 0.8436602457220033,
+      "teds": 0.2729007862854617,
+      "mhs": null,
+      "overall": 0.5885041533548623
+    },
+    "raw_keys": [
+      "formula",
+      "summary",
+      "metrics",
+      "documents"
+    ]
+  }
+}

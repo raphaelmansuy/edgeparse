@@ -1,0 +1,8 @@
+{
+  "engine": "edgeparse_wasm",
+  "nid": 0.8914836813547735,
+  "teds": 0.7756804374418664,
+  "mhs": 0.760779261369995,
+  "overall": 0.8543116521309364,
+  "source": "odl-bench/prediction/edgeparse_wasm/evaluation.json"
+}
