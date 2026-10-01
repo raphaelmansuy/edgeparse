@@ -1,5 +1,7 @@
 ---
 // Hero override for Starlight — cinematic landing hero
+import { claims } from '../../data/benchmark';
+
 const base = import.meta.env.BASE_URL;
 const installCmd = 'pip install edgeparse';
 ---
@@ -15,7 +17,7 @@ const installCmd = 'pip install edgeparse';
   <div class="hero-content">
     <div class="hero-eyebrow">
       <span class="eyebrow-badge">#1 Non-ML PDF Parser</span>
-      <span class="eyebrow-text">Leads the current benchmark · 83× faster than Docling · Zero dependencies</span>
+      <span class="eyebrow-text">Leads the current harness · {claims.harness.vsDocling} faster than Docling · {claims.copy.noMlStack}</span>
       <svg class="eyebrow-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
     </div>
 
@@ -25,7 +27,7 @@ const installCmd = 'pip install edgeparse';
     </h1>
 
     <p class="hero-subtitle">
-      Best published benchmark score without ML. 83× faster than Docling and 2× faster than OpenDataLoader. Zero GPU, zero OCR, zero JVM — just a 15&nbsp;MB Rust binary with the best reported scores across reading order, tables, headings, paragraphs, text quality, and speed.
+      Best published harness score without ML. {claims.harness.vsDocling} faster than Docling and {claims.harness.vsOpenDataLoader} faster than OpenDataLoader. Zero GPU, zero JVM — just a 15&nbsp;MB Rust binary. {claims.copy.noMlStack}. Official odl-bench hybrid overall {claims.odl.hybridOverallShort}.
     </p>
 
     <div class="hero-actions">
@@ -49,12 +51,12 @@ const installCmd = 'pip install edgeparse';
 
     <div class="hero-metrics" aria-label="Key metrics">
       <div class="metric">
-        <span class="metric-value" data-count="16">0</span><span class="metric-suffix">+</span>
+        <span class="metric-value" data-count={claims.harness.docsPerSec}>0</span><span class="metric-suffix">+</span>
         <span class="metric-label">docs/sec</span>
       </div>
       <div class="metric-sep" aria-hidden="true"></div>
       <div class="metric">
-        <span class="metric-value" data-count="79">0</span><span class="metric-suffix">%</span>
+        <span class="metric-value" data-count={claims.harness.accuracyPercent}>0</span><span class="metric-suffix">%</span>
         <span class="metric-label">accuracy</span>
       </div>
       <div class="metric-sep" aria-hidden="true"></div>

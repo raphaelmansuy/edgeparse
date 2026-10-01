@@ -1,53 +1,34 @@
-# Starlight Starter Kit: Tailwind
+# EdgeParse documentation site
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+Astro + Starlight site for [edgeparse.com](https://edgeparse.com) — product landing page, API docs, guides, and benchmark boards for EdgeParse **v0.3.0**.
 
-```
-pnpm create astro@latest -- --template starlight/tailwind
-```
+## Develop
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
-
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   ├── styles/
-│   │   └── global.css
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```bash
+pnpm install
+pnpm dev        # http://localhost:4321
+pnpm build      # production output → dist/
+pnpm preview    # preview the production build
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+## Content
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+| Path | Purpose |
+|------|---------|
+| `src/content/docs/` | Starlight MDX docs (getting started, API, guides, benchmark) |
+| `src/components/landing/` | Splash / marketing sections |
+| `src/data/benchmark.ts` | **Single source of truth** for harness + odl-bench numbers (`claims`, `speedMultipleVs`, `leaderFor`) |
+| `astro.config.mjs` | Sidebar, SEO / JSON-LD, integrations |
 
-Static assets, like favicons, can be placed in the `public/` directory.
+Do not hard-code benchmark figures in pages — import from `src/data/benchmark.ts`.
 
-The project includes [Tailwind CSS](https://starlight.astro.build/guides/css-and-tailwind/#tailwind-css) for styling. Customize your design by modifying `src/styles/global.css`.
+## Two benchmark boards
 
-## 🧞 Commands
+1. **EdgeParse harness** (`benchmarkSnapshot`) — product regression board  
+2. **Official odl-bench** (`odlBenchSnapshot`) — public OpenDataLoader-formula board  
 
-All commands are run from the root of the project, from a terminal:
+See `src/content/docs/benchmark/results.mdx`.
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
+## Deploy
 
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+GitHub Actions workflow `.github/workflows/deploy-site.yml` builds this package and publishes to the production host.

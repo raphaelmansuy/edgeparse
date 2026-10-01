@@ -1,11 +1,13 @@
 ---
 // ComparisonSection — Head-to-head feature comparison vs leading PDF parsers
-import { benchmarkSnapshot, formatSpeed, getBenchmarkTool } from '../../data/benchmark';
+import { claims, formatSpeed, formatSpeedMultiple, getBenchmarkTool, speedMultipleVs } from '../../data/benchmark';
 
 const edgeparse = getBenchmarkTool('EdgeParse');
 const opendataloader = getBenchmarkTool('OpenDataLoader');
 const docling = getBenchmarkTool('Docling (IBM)');
 const pymupdf4llm = getBenchmarkTool('PyMuPDF4LLM');
+const odlSlower = formatSpeedMultiple(speedMultipleVs('OpenDataLoader'));
+const doclingSlower = formatSpeedMultiple(speedMultipleVs('Docling (IBM)'));
 ---
 
 <section class="comparison-section" aria-labelledby="comparison-heading">
@@ -16,8 +18,8 @@ const pymupdf4llm = getBenchmarkTool('PyMuPDF4LLM');
         Why Engineers Choose EdgeParse
       </h2>
       <p class="section-subtitle">
-        EdgeParse is the only PDF engine that delivers near-ML accuracy without any ML dependencies — 
-        no OCR models, no GPU, no JVM. Just a 15 MB Rust binary.
+        EdgeParse is the only PDF engine that delivers near-ML accuracy without an ML stack —
+        {claims.copy.noMlStack}. Just a 15 MB Rust binary.
       </p>
     </div>
 
@@ -26,11 +28,11 @@ const pymupdf4llm = getBenchmarkTool('PyMuPDF4LLM');
       <div class="benchmark-card ep-card">
         <div class="bcard-label">EdgeParse</div>
         <div class="bcard-score">{edgeparse.overall.toFixed(3)}</div>
-        <div class="bcard-sub">Overall benchmark score</div>
-        <div class="bcard-speed">{formatSpeed(edgeparse.speedSeconds)} · <strong>CPU only</strong></div>
+        <div class="bcard-sub">Overall ({claims.harness.boardName})</div>
+        <div class="bcard-speed">{formatSpeed(edgeparse.speedSeconds!)} · <strong>CPU only</strong></div>
         <div class="bcard-badges">
           <span class="badge badge-green">No GPU</span>
-          <span class="badge badge-green">No OCR</span>
+          <span class="badge badge-green">No ML stack</span>
           <span class="badge badge-green">No JVM</span>
           <span class="badge badge-blue">WebAssembly</span>
           <span class="badge badge-blue">5 SDKs</span>
@@ -41,7 +43,7 @@ const pymupdf4llm = getBenchmarkTool('PyMuPDF4LLM');
         <div class="bcard-label">OpenDataLoader</div>
         <div class="bcard-score">{opendataloader.overall.toFixed(3)}</div>
         <div class="bcard-sub">Fast heuristic pipeline</div>
-        <div class="bcard-speed">{formatSpeed(opendataloader.speedSeconds)} · <strong>1.5× slower</strong></div>
+        <div class="bcard-speed">{formatSpeed(opendataloader.speedSeconds!)} · <strong>{odlSlower} slower</strong></div>
         <div class="bcard-badges">
           <span class="badge badge-gray">Python only</span>
           <span class="badge badge-gray">No WASM</span>
@@ -52,7 +54,7 @@ const pymupdf4llm = getBenchmarkTool('PyMuPDF4LLM');
         <div class="bcard-label">IBM Docling</div>
         <div class="bcard-score">{docling.overall.toFixed(3)}</div>
         <div class="bcard-sub">Requires OCR / ML stack</div>
-        <div class="bcard-speed">{formatSpeed(docling.speedSeconds)} · <strong>12× slower</strong></div>
+        <div class="bcard-speed">{formatSpeed(docling.speedSeconds!)} · <strong>{doclingSlower} slower</strong></div>
         <div class="bcard-badges">
           <span class="badge badge-red">Needs OCR</span>
           <span class="badge badge-red">Heavy setup</span>
@@ -94,10 +96,10 @@ const pymupdf4llm = getBenchmarkTool('PyMuPDF4LLM');
           </tr>
           <tr>
             <td class="feature-col">Speed (s/doc)</td>
-            <td class="ep-col"><strong>{edgeparse.speedSeconds.toFixed(3)}</strong> ✅</td>
-            <td>{opendataloader.speedSeconds.toFixed(3)}</td>
-            <td>{docling.speedSeconds.toFixed(3)}</td>
-            <td>{pymupdf4llm.speedSeconds.toFixed(3)}</td>
+            <td class="ep-col"><strong>{edgeparse.speedSeconds!.toFixed(3)}</strong> ✅</td>
+            <td>{opendataloader.speedSeconds!.toFixed(3)}</td>
+            <td>{docling.speedSeconds!.toFixed(3)}</td>
+            <td>{pymupdf4llm.speedSeconds!.toFixed(3)}</td>
           </tr>
           <tr>
             <td class="feature-col">Table extraction (TEDS)</td>
@@ -136,7 +138,7 @@ const pymupdf4llm = getBenchmarkTool('PyMuPDF4LLM');
           </tr>
           <tr>
             <td class="feature-col">OCR models required</td>
-            <td class="ep-col">❌ None</td>
+            <td class="ep-col">❌ Optional (image tables)</td>
             <td>⚠️ Optional</td>
             <td>✅ Required</td>
             <td>❌ None</td>
@@ -230,10 +232,11 @@ const pymupdf4llm = getBenchmarkTool('PyMuPDF4LLM');
     </div>
 
     <p class="comparison-footnote">
-      Benchmark: {benchmarkSnapshot.documentCount} real-world PDFs (academic papers, financial reports, multi-column layouts) on {benchmarkSnapshot.hardware}.
-      Scores: NID = reading order, TEDS = table structure, MHS = heading hierarchy.
-      Snapshot updated {benchmarkSnapshot.lastUpdated}. EdgeParse leads every reported quality metric in the current published snapshot.
-      <a href="/benchmark/" class="footnote-link">Full methodology →</a>
+      {claims.harness.boardName}: {claims.harness.documentCount} real-world PDFs on {claims.harness.hardware}
+      (overall {claims.harness.overall}, {claims.harness.speedPerDoc}). Snapshot {claims.harness.lastUpdated}.
+      Official odl-bench: EdgeParse hybrid leads at {claims.odl.hybridOverallShort} overall
+      (NID/TEDS/MHS/overall). Scores: NID = reading order, TEDS = table structure, MHS = heading hierarchy.
+      <a href="/benchmark/results/" class="footnote-link">Full methodology →</a>
     </p>
   </div>
 </section>

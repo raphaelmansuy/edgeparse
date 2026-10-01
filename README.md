@@ -1,6 +1,6 @@
 # EdgeParse
 
-**Fastest PDF extraction engine. Rust-native. Zero GPU, zero JVM, zero OCR models.**
+**Fastest PDF extraction engine. Rust-native. No ML stack required for born-digital PDFs; optional in-browser OCR for image tables.**
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
@@ -11,12 +11,15 @@
 Extract Markdown, JSON (with bounding boxes), and HTML from any born-digital PDF
 — deterministically, in milliseconds, on CPU.
 
-- **How accurate is it?** — **0.787 overall** on the latest `opendataloader.org` PDF-to-Markdown benchmark, with the best score in every reported metric: reading order, tables, headings, paragraphs, text quality, table detection, and speed. [Benchmark details](#benchmark)
-- **How fast?** — **0.064 s/doc** on the 200-document benchmark corpus on Apple M4 Max. Faster than OpenDataLoader, Docling, PyMuPDF4LLM, MarkItDown, and LiteParse.
-- **Does it need a GPU or Java?** — No. No JVM, no GPU, no OCR models, no Python runtime for the CLI. Single ~15 MB binary.
+- **How accurate is it?** — Two labeled boards (2026-10-01, Apple M4 Max, 200 docs):
+  - **Official odl-bench** (`mean(NID,TEDS,MHS)`): EdgeParse hybrid **0.900** (leads every finished metric), deterministic **0.857**, WASM **0.854**.
+  - **EdgeParse harness**: deterministic **0.782** overall at **~0.019 s/doc**.
+  Never claim a win for engines not finished (Marker, MinerU, Nutrient, Unstructured partial). [Benchmark details](#benchmark)
+- **How fast?** — **~0.02 s/doc** deterministic on Apple M4 Max for the 200-document corpus. Hybrid mode is slower (~0.81 s/doc) when pages route to a local Docling Fast backend.
+- **Does it need a GPU or Java?** — No. No JVM, no GPU, no Python runtime for the CLI. Born-digital PDFs need no OCR models; optional PP-OCRv6 runs in-browser or on Node for image tables. Single ~15 MB binary.
 - **RAG / LLM pipelines?** — Yes. Outputs structured Markdown for chunking, JSON with bounding boxes for citations, preserves reading order across multi-column layouts. [See integration examples](#rag--llm-integration)
 
-Available as a **Rust library**, **CLI binary**, **Python package**, **Node.js package**, and **WebAssembly module** for in-browser PDF parsing.
+Available as a **Rust library**, **CLI binary**, **Python package**, **Node.js package**, **WebAssembly module**, and **`@edgeparse/web`** observable Web SDK.
 
 ---
 
@@ -108,7 +111,7 @@ Release automation and registry details: [docs/07-cicd-publishing.md](docs/07-ci
 | PDF text loses reading order in multi-column layouts | XY-Cut++ algorithm preserves correct reading sequence across columns, sidebars, and mixed layouts | ✅ Shipped |
 | Table extraction is broken (merged cells, borderless tables) | Ruling-line table detection + borderless cluster method; `--table-method cluster` for complex cases | ✅ Shipped |
 | OCR/ML tools add 500 MB+ of dependencies to a simple PDF pipeline | Zero GPU, zero OCR models, zero JVM — single 15 MB binary, pure Rust | ✅ Shipped |
-| Heading hierarchy is lost (all text looks the same) | Font-metric + geometry-based heading classifier; MHS score 0.553 on the current benchmark | ✅ Shipped |
+| Heading hierarchy is lost (all text looks the same) | Font-metric + outline/section-number heading levels; MHS score 0.552 on the current benchmark | ✅ Shipped |
 | PDFs can carry hidden prompt injection payloads | AI safety filters: hidden text, off-page content, tiny-text, invisible OCG layers detected and stripped | ✅ Shipped |
 | Need bounding boxes to cite sources in RAG answers | Every element (`paragraph`, `heading`, `table`, `image`) has `[left, bottom, right, top]` coordinates in PDF points | ✅ Shipped |
 | In-browser PDF parsing uploads data to a server | WebAssembly build — full Rust engine in the browser, PDF data never leaves the device | ✅ Shipped |
@@ -121,25 +124,27 @@ Evaluated on **200 real-world PDFs** — academic papers, financial reports, mul
 
 ### Current comparison set
 
+Measured 2026-10-01 on Apple M4 Max, 200 documents, EdgeParse harness (`benchmark/`). Marker / MinerU / Unstructured hi_res were not finished in this run (install/time). Nutrient and Hancom were out of scope.
+
 | Engine | NID ↑ | TEDS ↑ | MHS ↑ | PBF ↑ | TQS ↑ | TD F1 ↑ | Speed ↓ | Overall ↑ |
 |--------|------:|-------:|------:|------:|------:|--------:|--------:|----------:|
-| **EdgeParse** | **0.889** | **0.596** | **0.553** | **0.559** | **0.920** | **0.901** | **0.064 s/doc** | **0.787** |
-| OpenDataLoader | 0.873 | 0.326 | 0.442 | 0.544 | 0.916 | 0.636 | 0.094 s/doc | 0.733 |
-| Docling | 0.867 | 0.540 | 0.438 | 0.530 | 0.908 | 0.891 | 0.768 s/doc | 0.745 |
-| PyMuPDF4LLM | 0.852 | 0.323 | 0.407 | 0.538 | 0.888 | 0.744 | 0.439 s/doc | 0.710 |
-| EdgeParse (pre-frontier baseline) | 0.859 | 0.493 | 0.500 | 0.482 | 0.891 | 0.849 | 0.232 s/doc | 0.751 |
-| MarkItDown | 0.808 | 0.193 | 0.001 | 0.362 | 0.861 | 0.558 | 0.149 s/doc | 0.564 |
-| LiteParse | 0.815 | 0.000 | 0.001 | 0.383 | 0.887 | N/A | 0.196 s/doc | 0.564 |
+| **EdgeParse** | **0.886** | 0.564 | **0.552** | 0.562 | 0.917 | 0.897 | **~0.02 s/doc** | **0.782** |
+| **EdgeParse [hybrid]** | 0.863 | **0.603** | 0.506 | 0.546 | 0.909 | **0.941** | 0.810 s/doc | 0.767 |
+| Docling | 0.875 | 0.568 | 0.450 | **0.563** | 0.916 | 0.903 | 2.332 s/doc | 0.758 |
+| OpenDataLoader | 0.873 | 0.320 | 0.441 | 0.536 | **0.917** | 0.621 | 0.022 s/doc | 0.733 |
+| PyMuPDF4LLM | 0.860 | 0.509 | 0.411 | 0.503 | 0.912 | 0.857 | 0.640 s/doc | 0.732 |
+| OpenDataLoader [hybrid] | 0.869 | 0.422 | 0.411 | 0.531 | 0.904 | **0.941** | 2.537 s/doc | 0.731 |
+| MarkItDown | 0.808 | 0.193 | 0.001 | 0.362 | 0.861 | 0.558 | 0.189 s/doc | 0.564 |
 
-EdgeParse now leads the entire comparison set on every reported benchmark metric, including speed. Relative to the previous EdgeParse baseline, the current pipeline increases reading-order accuracy, table structure similarity, paragraph boundaries, text quality, table-detection F1, and overall score while cutting latency from `0.232` to `0.064 s/doc`.
+Deterministic EdgeParse leads overall. Hybrid mode routes table / sparse-image pages to a local Docling Fast server (`opendataloader-pdf-hybrid`) and leads TEDS and table-detection F1 while still beating every finished third-party engine on overall score.
 
 **When to choose what:**
 
 | Use case | Recommendation |
 |----------|---------------|
-| Born-digital PDFs, latency matters, production deployment | **EdgeParse** — best accuracy/speed, zero dependencies |
-| Complex scanned tables, GPU available, batch offline | Consider Docling or MinerU |
-| Scanned documents requiring full OCR | Dedicated OCR pipeline |
+| Born-digital PDFs, latency matters, production deployment | **EdgeParse** — best overall accuracy/speed, zero ML stack |
+| Complex tables, local Docling Fast available | **EdgeParse `--hybrid docling-fast`** — best TEDS on this board |
+| Scanned documents requiring full OCR | Dedicated OCR pipeline or hybrid with OCR-enabled backend |
 
 ### Metrics
 
@@ -394,41 +399,52 @@ EdgeParse compiles to WebAssembly — **client-side PDF extraction in any modern
 - Same Rust engine, identical output to CLI/Python/Node
 - PDF data never leaves the user's device (privacy by design)
 - Works offline after initial WASM load (~4 MB cached)
+- Optional PP-OCRv6 for image-embedded tables via `@edgeparse/web` (consent + IndexedDB cache)
 - Zero infrastructure cost — static hosting only
 
-### Quick start
+### Preferred: `@edgeparse/web` (observable SDK)
 
-```typescript
-import init, { convert_to_string } from 'edgeparse-wasm';
-
-await init();  // load WASM binary once
-
-const bytes = new Uint8Array(await file.arrayBuffer());
-
-const markdown = convert_to_string(bytes, 'markdown');
-const json     = convert_to_string(bytes, 'json');
-const html     = convert_to_string(bytes, 'html');
+```bash
+npm install @edgeparse/web edgeparse-wasm
 ```
 
-### API
+```typescript
+import { EdgeParse } from '@edgeparse/web';
 
-| Function | Returns | Description |
-|----------|---------|-------------|
-| `convert(bytes, format?, pages?, readingOrder?, tableMethod?)` | JS object | Structured `PdfDocument` with pages, elements, bounding boxes |
-| `convert_to_string(bytes, format?, pages?, readingOrder?, tableMethod?)` | `string` | Formatted output (Markdown, JSON, HTML, or text) |
-| `version()` | `string` | EdgeParse version |
+const ep = await EdgeParse.create({
+  models: 'lazy',
+  ocr: 'small',
+  onBeforeDownload: async (m) =>
+    confirm(`Download OCR model ${m.id} (~${(m.bytes / 1e6).toFixed(1)} MB)?`),
+});
+
+const job = ep.parse(pdfBytes, { format: 'markdown' });
+job.on('progress', (p) => console.log(p.label, p.fraction));
+const { markdown, quality, warnings } = await job.result;
+```
+
+Docs: [quick-start Web SDK](https://www.edgeparse.com/getting-started/quick-start-web-sdk/) · [API](https://www.edgeparse.com/api/web-sdk/)
+
+### Low-level WASM
+
+```typescript
+import init, { convert_to_string, ParseSession } from 'edgeparse-wasm';
+
+await init();
+
+const bytes = new Uint8Array(await file.arrayBuffer());
+const markdown = convert_to_string(bytes, 'markdown');
+```
 
 ### Live demo
 
-**[edgeparse.com/demo/](https://edgeparse.com/demo/)** — drag-and-drop any PDF, all processing runs locally in your browser.
+**[edgeparse.com/demo/](https://www.edgeparse.com/demo/)** — drag-and-drop any PDF, all processing runs locally in your browser.
 
 ### Build from source
 
 ```bash
-curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-cd crates/edgeparse-wasm
-wasm-pack build --target web --release
-# Output: crates/edgeparse-wasm/pkg/
+make wasm-build          # --target web → crates/edgeparse-wasm/pkg/
+make wasm-build-node     # --target nodejs → pkg-node/ (bench)
 ```
 
 Full documentation: [docs/09-wasm-sdk.md](docs/09-wasm-sdk.md)
@@ -723,7 +739,7 @@ Stages marked `par_map_pages` run in parallel via Rayon; cross-page stages run s
 
 ### What is the best PDF parser for RAG?
 
-For RAG pipelines, you need a parser that preserves document structure, maintains correct reading order, and provides element coordinates for citations. EdgeParse outputs structured JSON with bounding boxes for every element, handles multi-column layouts with XY-Cut++, and runs locally on CPU without a GPU or JVM. On the current 200-document benchmark it leads the comparison set in both overall score (`0.787`) and latency (`0.064 s/doc`). [See RAG integration examples](#rag--llm-integration).
+For RAG pipelines, you need a parser that preserves document structure, maintains correct reading order, and provides element coordinates for citations. EdgeParse outputs structured JSON with bounding boxes for every element, handles multi-column layouts with XY-Cut++, and runs locally on CPU without a GPU or JVM. On the current 200-document benchmark it leads the finished comparison set in overall score (`0.782`) with ~`0.02 s/doc` deterministic latency. [See RAG integration examples](#rag--llm-integration).
 
 ### How do I cite PDF sources in RAG answers?
 
@@ -749,10 +765,10 @@ No. EdgeParse is a pure Rust implementation. It requires no JVM, no GPU, no OCR 
 
 | vs. | EdgeParse advantage | Tradeoff |
 |-----|---------------------|----------|
-| OpenDataLoader | Faster (`0.064` vs `0.094 s/doc`) with stronger table structure and heading recovery | OpenDataLoader remains close on text quality and paragraph boundaries |
-| IBM Docling | Faster (`0.064` vs `0.768 s/doc`) with better TEDS and overall score in the current benchmark snapshot | Docling remains a viable OCR-heavy fallback for scanned documents |
+| OpenDataLoader | Faster deterministic path with stronger table structure and heading recovery | OpenDataLoader remains close on text quality; use EdgeParse hybrid for complex tables |
+| IBM Docling | Faster and higher overall score in the current harness snapshot | Docling remains useful as the hybrid backend for hard table pages |
 | Marker | Faster and materially better on every published metric in this benchmark family | Marker supports scanned PDFs via Surya OCR |
-| PyMuPDF4LLM | Faster (`0.064` vs `0.439 s/doc`) with stronger tables, headings, and reading order | PyMuPDF4LLM is simpler if you only need lightweight text extraction |
+| PyMuPDF4LLM | Faster with stronger tables, headings, and reading order | PyMuPDF4LLM is simpler if you only need lightweight text extraction |
 
 ### Does it support scanned PDFs?
 

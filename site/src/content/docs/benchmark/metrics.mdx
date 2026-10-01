@@ -48,13 +48,21 @@ MHS compares the heading hierarchy (H1–H6) in the extracted output against the
 
 ## Overall Score
 
-The **overall** score is the arithmetic mean of NID, TEDS, and MHS:
+There are **two boards** with different overall formulas — do not mix them.
+
+### Official odl-bench board
+
+Matches the public OpenDataLoader leaderboard. The overall score is the arithmetic mean of NID, TEDS, and MHS (nulls omitted per document):
 
 ```
-Overall = (NID + TEDS + MHS) / 3
+Overall = mean(NID, TEDS, MHS)
 ```
 
-Each metric is weighted equally because they measure orthogonal quality dimensions:
+### EdgeParse harness board
+
+The product regression harness under `benchmark/` may fold additional quality signals into overall. See [Benchmark Results](/benchmark/results/) for both labeled boards.
+
+Each core metric still measures an orthogonal quality dimension:
 - **NID** → "Did we extract the right text?"
 - **TEDS** → "Did we get the tables right?"
 - **MHS** → "Did we detect the document structure?"
