@@ -45,21 +45,23 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
-      - run: >
-          cargo clippy -p edgeparse-core --features native --no-deps -- -D warnings
-          -A clippy::collapsible_match
-          -A clippy::collapsible_if
-          -A clippy::explicit_counter_loop
-          -A clippy::manual_filter
-          -A clippy::needless_return
-          -A clippy::single_char_add_str
-          -A clippy::manual_range_contains
-          -A clippy::needless_range_loop
-          -A clippy::type_complexity
-          -A clippy::if_same_then_else
-          -A clippy::useless_format
-          -A clippy::manual_clamp
-          -A clippy::unnecessary_sort_by
+      - name: Clippy (edgeparse-core, no deps)
+        run: |
+          cargo clippy -p edgeparse-core --features native --no-deps -- \
+            -D warnings \
+            -A clippy::collapsible_match \
+            -A clippy::collapsible_if \
+            -A clippy::explicit_counter_loop \
+            -A clippy::manual_filter \
+            -A clippy::needless_return \
+            -A clippy::single_char_add_str \
+            -A clippy::manual_range_contains \
+            -A clippy::needless_range_loop \
+            -A clippy::type_complexity \
+            -A clippy::if_same_then_else \
+            -A clippy::useless_format \
+            -A clippy::manual_clamp \
+            -A clippy::unnecessary_sort_by
       - run: cargo check -p edgeparse-wasm --target wasm32-unknown-unknown
 
   rust-two-phase:
