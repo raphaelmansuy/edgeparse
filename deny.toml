@@ -33,6 +33,7 @@ allow = [
     "CC0-1.0",
     "OpenSSL",
     "NCSA",
+    "CDLA-Permissive-2.0",
 ]
 
 [bans]
