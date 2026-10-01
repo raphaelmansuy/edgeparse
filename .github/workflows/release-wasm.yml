@@ -20,6 +20,10 @@ jobs:
     name: Build & publish WASM package
     runs-on: ubuntu-latest
     environment: npm
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -135,13 +139,17 @@ jobs:
       # 5a. Publish to npm via Trusted Publisher (OIDC — no access token).
       #     Requires id-token:write and package Trusted Publisher config:
       #       workflow: release-wasm.yml, environment: npm
-      #     NODE_AUTH_TOKEN must be unset or OIDC is skipped (E404).
+      #     Falls back to NPM_TOKEN. Does not abort the job on failure so
+      #     GitHub Packages + Release assets still publish.
       # ─────────────────────────────────────────────────────────────────────
       - name: Publish to npm registry
+        id: npm_wasm
+        continue-on-error: true
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          unset NODE_AUTH_TOKEN
+          unset NODE_AUTH_TOKEN || true
+          npm install -g npm@latest
           node -e "
           const fs = require('fs');
           const pkgPath = 'crates/edgeparse-wasm/pkg/package.json';
@@ -154,16 +162,26 @@ jobs:
           publish() { npm publish --provenance --access public --registry https://registry.npmjs.org; }
           if publish; then
             echo "Published edgeparse-wasm via OIDC"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
           elif npm info edgeparse-wasm@${{ env.VERSION }} version >/dev/null 2>&1; then
             echo "Already published — skipping."
+            echo "ok=true" >> "$GITHUB_OUTPUT"
           elif [[ -n "${NPM_TOKEN:-}" ]]; then
             echo "OIDC publish failed — retrying with NPM_TOKEN fallback"
             echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
-            publish \
-              || { CODE=$?; npm info edgeparse-wasm@${{ env.VERSION }} version >/dev/null 2>&1 \
-                   && echo "Already published — skipping." || exit $CODE; }
+            if publish; then
+              echo "Published edgeparse-wasm via NPM_TOKEN"
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+            elif npm info edgeparse-wasm@${{ env.VERSION }} version >/dev/null 2>&1; then
+              echo "Already published — skipping."
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "ok=false" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
           else
             echo "OIDC publish failed and NPM_TOKEN is not set"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
@@ -222,29 +240,44 @@ jobs:
           "
 
       - name: Publish @edgeparse/web to npm
+        id: npm_web
+        continue-on-error: true
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          unset NODE_AUTH_TOKEN
+          unset NODE_AUTH_TOKEN || true
           cd sdks/web
           npm run check-models
+          # Pack web SDK tarball for the GitHub Release regardless of npm auth.
+          npm pack
           publish() { npm publish --provenance --access public --registry https://registry.npmjs.org; }
           if publish; then
             echo "Published @edgeparse/web via OIDC"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
           elif npm info @edgeparse/web@${{ env.VERSION }} version >/dev/null 2>&1; then
             echo "Already published — skipping."
+            echo "ok=true" >> "$GITHUB_OUTPUT"
           elif [[ -n "${NPM_TOKEN:-}" ]]; then
             echo "OIDC publish failed — retrying with NPM_TOKEN fallback"
             echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
-            publish \
-              || { CODE=$?; npm info @edgeparse/web@${{ env.VERSION }} version >/dev/null 2>&1 \
-                   && echo "Already published — skipping." || exit $CODE; }
+            if publish; then
+              echo "Published @edgeparse/web via NPM_TOKEN"
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+            elif npm info @edgeparse/web@${{ env.VERSION }} version >/dev/null 2>&1; then
+              echo "Already published — skipping."
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "ok=false" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
           else
             echo "OIDC publish failed and NPM_TOKEN is not set"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
       - name: Verify @edgeparse/web on jsDelivr
+        if: steps.npm_web.outputs.ok == 'true'
         run: |
           MAX=12
           DELAY=20
@@ -280,7 +313,23 @@ jobs:
         run: |
           gh release upload "$TAG_NAME" crates/edgeparse-wasm/pkg/*.tgz \
             --repo "${{ github.repository }}" --clobber
+          # Also attach @edgeparse/web tarball if packed
+          shopt -s nullglob
+          WEB_TGZ=(sdks/web/edgeparse-web-*.tgz)
+          if (( ${#WEB_TGZ[@]} > 0 )); then
+            gh release upload "$TAG_NAME" "${WEB_TGZ[@]}" \
+              --repo "${{ github.repository }}" --clobber
+          fi
 
+      - name: Fail if npm publishes did not land
+        if: steps.npm_wasm.outputs.ok != 'true' || steps.npm_web.outputs.ok != 'true'
+        run: |
+          echo "::error::npm publish incomplete (edgeparse-wasm ok=${{ steps.npm_wasm.outputs.ok }} @edgeparse/web ok=${{ steps.npm_web.outputs.ok }})"
+          echo "GitHub Packages + Release assets were still attempted above."
+          echo "To finish npm: refresh secret NPM_TOKEN (classic Automation token),"
+          echo "or re-add Trusted Publisher (workflow=release-wasm.yml, environment=npm),"
+          echo "then: gh workflow run release-wasm.yml -f tag_name=v0.3.0"
+          exit 1
   # ───────────────────────────────────────────────────────────────────────────
   # Post-publish verification — runs after publish-wasm completes.
   # Verifies every distribution channel independently.  Failures here do NOT
