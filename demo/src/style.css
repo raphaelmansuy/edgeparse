@@ -210,21 +210,32 @@ html, body {
    PROGRESS BAR
 ══════════════════════════════════════════ */
 .progress-bar {
-  height: var(--ep-progress-h);
+  min-height: var(--ep-progress-h);
   overflow: hidden;
   flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.2s;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
 }
 
 .progress-bar--active {
   opacity: 1;
 }
 
+.progress-bar__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .progress-bar__indicator {
   display: block;
-  width: 100%;
-  height: 100%;
+  flex: 1;
+  height: 4px;
   appearance: none;
   border: none;
 }
@@ -250,7 +261,100 @@ html, body {
   100% { background-position: -100% 0; }
 }
 
-.progress-bar__label { display: none; }
+.progress-bar__label {
+  font-size: 12px;
+  color: var(--ep-muted, #888);
+  white-space: nowrap;
+}
+
+.progress-bar__offline {
+  font-size: 11px;
+  color: #c44;
+  font-weight: 600;
+}
+
+.progress-bar__quality {
+  font-size: 11px;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ep-surface-2, #eee);
+}
+.progress-bar__quality[data-quality="full"] {
+  color: var(--ep-primary, #2563eb);
+}
+.progress-bar__quality[data-quality="degraded"] {
+  color: #c97800;
+}
+
+.consent-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.consent-dialog {
+  background: var(--ep-surface, #fff);
+  color: var(--ep-fg, #111);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  max-width: 28rem;
+  width: calc(100% - 2rem);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.consent-dialog h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+.consent-dialog p {
+  margin: 0 0 1rem;
+  line-height: 1.45;
+  color: var(--ep-muted, #555);
+}
+.consent-dialog__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+.consent-dialog__accept,
+.consent-dialog__decline {
+  border: 1px solid var(--ep-border, #ccc);
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  background: var(--ep-surface, #fff);
+}
+.consent-dialog__accept {
+  background: var(--ep-primary, #2563eb);
+  border-color: var(--ep-primary, #2563eb);
+  color: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .consent-dialog {
+    background: #1a1a1a;
+    color: #f2f2f2;
+  }
+  .consent-dialog p { color: #aaa; }
+  .consent-dialog__decline { background: #222; color: #eee; border-color: #444; }
+}
+
+.progress-bar__model-card {
+  border: 1px solid var(--ep-border, #ddd);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--ep-surface, #fafafa);
+  font-size: 12px;
+}
+
+.progress-bar__model-title { font-weight: 600; margin-bottom: 4px; }
+.progress-bar__model-indicator { width: 100%; height: 4px; }
+.progress-bar__model-meta { color: var(--ep-muted, #888); margin-top: 4px; }
+.progress-bar__model-retry {
+  margin-top: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
 
 /* ══════════════════════════════════════════
    SPLIT PANE

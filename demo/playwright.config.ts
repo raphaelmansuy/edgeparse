@@ -12,10 +12,9 @@ export default defineConfig({
   workers: 1,
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://127.0.0.1:5177',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    // Required for SharedArrayBuffer (WASM streaming needs COOP/COEP headers)
     launchOptions: {
       args: ['--enable-features=SharedArrayBuffer'],
     },
@@ -26,5 +25,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // No webServer — dev server is already running at localhost:5173
+  webServer: {
+    command: 'npm run dev -- --host 127.0.0.1 --port 5177 --strictPort',
+    url: 'http://127.0.0.1:5177',
+    reuseExistingServer: false,
+    timeout: 120_000,
+  },
 });
