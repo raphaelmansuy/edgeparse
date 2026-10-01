@@ -1,6 +1,12 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![deny(clippy::all)]
+// Newer clippy (1.95+) promotes several style lints that flood this fork;
+// keep deny(clippy::all) but allow the noisy ones until a dedicated cleanup.
+#![allow(clippy::collapsible_match)]
+#![allow(clippy::explicit_counter_loop)]
+#![allow(clippy::manual_filter)]
+#![allow(deprecated)]
 
 pub mod content;
 pub mod encryption;

@@ -1549,7 +1549,7 @@ fn build_projection_lattice_from_band(
             if parts.len() == spanned.len() {
                 return spanned
                     .into_iter()
-                    .zip(parts.into_iter())
+                    .zip(parts)
                     .map(|(ci, p)| (ci, p.to_string()))
                     .collect();
             }

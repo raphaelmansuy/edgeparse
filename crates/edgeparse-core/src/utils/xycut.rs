@@ -297,7 +297,7 @@ fn reorder_vertical_bands(
         return false;
     }
 
-    for (dst, src) in elements.iter_mut().zip(ordered.into_iter()) {
+    for (dst, src) in elements.iter_mut().zip(ordered) {
         *dst = src;
     }
 

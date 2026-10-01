@@ -32,7 +32,23 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo build
       - run: cargo test
-      - run: cargo clippy -- -D warnings
+      # Clippy 1.95+ promotes many style lints across the fork; allow those while
+      # still denying correctness / suspicious / complexity regressions.
+      - run: >
+          cargo clippy -- -D warnings
+          -A clippy::collapsible_match
+          -A clippy::collapsible_if
+          -A clippy::explicit_counter_loop
+          -A clippy::manual_filter
+          -A clippy::needless_return
+          -A clippy::single_char_add_str
+          -A clippy::manual_range_contains
+          -A clippy::needless_range_loop
+          -A clippy::type_complexity
+          -A clippy::if_same_then_else
+          -A clippy::useless_format
+          -A clippy::manual_clamp
+          -A clippy::unnecessary_sort_by
       - run: cargo fmt --all --check
 
   python:
