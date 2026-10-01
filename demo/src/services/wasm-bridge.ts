@@ -9,6 +9,11 @@ import type { PdfDocument, OutputFormat } from '../types';
 import { store } from '../state';
 import { showModelConsent } from '../components/consent-dialog';
 
+// Vite must emit workers as .js — `new URL('…worker.ts')` copies the .ts asset
+// as-is, and GitHub Pages serves .ts as video/mp2t (breaks module workers).
+import parseWorkerUrl from '../../../sdks/web/src/workers/parse-worker.ts?worker&url';
+import ocrWorkerUrl from '../../../sdks/web/src/workers/ocr-worker.ts?worker&url';
+
 export type FormatCache = Record<OutputFormat, string>;
 
 let client: EdgeParse | null = null;
@@ -36,14 +41,8 @@ async function getClient(): Promise<EdgeParse> {
       models: 'lazy',
       ocr: 'small',
       onBeforeDownload,
-      parseWorkerUrl: new URL(
-        '../../../sdks/web/src/workers/parse-worker.ts',
-        import.meta.url,
-      ),
-      ocrWorkerUrl: new URL(
-        '../../../sdks/web/src/workers/ocr-worker.ts',
-        import.meta.url,
-      ),
+      parseWorkerUrl,
+      ocrWorkerUrl,
     })
       .then((ep) => {
         client = ep;

@@ -213,9 +213,12 @@ export class EdgeParse {
       return this.options.parseWorkerUrl;
     }
     if (typeof this.options.parseWorkerUrl === 'string') {
-      return new URL(this.options.parseWorkerUrl, import.meta.url);
+      // Absolute paths from bundlers (?worker&url) resolve against the document.
+      return new URL(this.options.parseWorkerUrl, self.location?.href ?? import.meta.url);
     }
-    return new URL('./workers/parse-worker.js', import.meta.url);
+    // Concatenate so Vite/Rollup do not statically rewrite this to a .ts asset
+    // (GitHub Pages serves .ts as video/mp2t and module workers fail).
+    return new URL('./workers/' + 'parse-worker.js', import.meta.url);
   }
 
   private ocrWorkerUrl(): URL {
@@ -223,9 +226,9 @@ export class EdgeParse {
       return this.options.ocrWorkerUrl;
     }
     if (typeof this.options.ocrWorkerUrl === 'string') {
-      return new URL(this.options.ocrWorkerUrl, import.meta.url);
+      return new URL(this.options.ocrWorkerUrl, self.location?.href ?? import.meta.url);
     }
-    return new URL('./workers/ocr-worker.js', import.meta.url);
+    return new URL('./workers/' + 'ocr-worker.js', import.meta.url);
   }
 
   private async spawnParseWorker(): Promise<void> {

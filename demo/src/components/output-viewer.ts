@@ -33,10 +33,9 @@ type RenderWorkerMsg =
   | { id: string; ok: true;  html: string }
   | { id: string; ok: false; error: string };
 
-const renderWorker = new Worker(
-  new URL('../workers/render-worker.ts', import.meta.url),
-  { type: 'module' },
-);
+import renderWorkerUrl from '../workers/render-worker.ts?worker&url';
+
+const renderWorker = new Worker(renderWorkerUrl, { type: 'module' });
 
 const renderPending = new Map<
   string,
