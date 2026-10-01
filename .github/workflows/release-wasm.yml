@@ -188,6 +188,54 @@ jobs:
             || { CODE=$?; echo "GitHub Packages publish exited $CODE — may already exist for this version." ; }
 
       # ─────────────────────────────────────────────────────────────────────
+      # 5c. Build & publish @edgeparse/web (TypeScript SDK on top of wasm).
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Build @edgeparse/web
+        run: |
+          cd sdks/web
+          npm install
+          npm run check-models
+          npm run build
+          npm test
+          npm run size
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.version = process.env.VERSION;
+          pkg.dependencies = pkg.dependencies || {};
+          pkg.peerDependencies = {
+            ...(pkg.peerDependencies || {}),
+            'edgeparse-wasm': '>=' + process.env.VERSION
+          };
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Publish @edgeparse/web to npm
+        run: |
+          cd sdks/web
+          npm run check-models
+          npm publish --provenance --access public --registry https://registry.npmjs.org \
+            || { CODE=$?; npm info @edgeparse/web@${{ env.VERSION }} version >/dev/null 2>&1 \
+                 && echo "Already published — skipping." || exit $CODE; }
+
+      - name: Verify @edgeparse/web on jsDelivr
+        run: |
+          MAX=12
+          DELAY=20
+          URL="https://cdn.jsdelivr.net/npm/@edgeparse/web@${VERSION}/dist/index.js"
+          for i in $(seq 1 $MAX); do
+            echo "Attempt $i/$MAX — $URL"
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL" || true)
+            if [[ "$CODE" == "200" ]]; then
+              echo "✓ jsDelivr serves @edgeparse/web@$VERSION"
+              exit 0
+            fi
+            echo "  HTTP $CODE — waiting ${DELAY}s..."
+            sleep $DELAY
+          done
+          echo "WARN: jsDelivr not yet serving @edgeparse/web@$VERSION (non-fatal)"
+
+      # ─────────────────────────────────────────────────────────────────────
       # 6. Attach the tarball to the GitHub Release.
       # ─────────────────────────────────────────────────────────────────────
       - name: Ensure GitHub Release exists
