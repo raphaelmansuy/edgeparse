@@ -24,13 +24,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Node.js is needed for npm pack / publish and wasm-pack post-processing.
-      # Registry URL is overridden per-publish step via .npmrc; the value here
-      # merely ensures `NODE_AUTH_TOKEN` is wired into the environment.
+      # Node.js for npm pack / publish. Do NOT set registry-url here — it writes a
+      # dummy NODE_AUTH_TOKEN into .npmrc that breaks npm Trusted Publisher (OIDC).
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -135,18 +133,15 @@ jobs:
 
       # ─────────────────────────────────────────────────────────────────────
       # 5a. Publish to npm via Trusted Publisher (OIDC — no access token).
-      #     Requires id-token:write permission (set at top of this file) and
-      #     the package configured at:
-      #       https://www.npmjs.com/package/edgeparse-wasm
-      #       → Settings → Trusted Publisher → workflow: release-wasm.yml
-      #     "already-published" is treated as idempotent.
+      #     Requires id-token:write and package Trusted Publisher config:
+      #       workflow: release-wasm.yml, environment: npm
+      #     NODE_AUTH_TOKEN must be unset or OIDC is skipped (E404).
       # ─────────────────────────────────────────────────────────────────────
       - name: Publish to npm registry
         env:
-          # Prefer classic token when OIDC Trusted Publisher is misconfigured
-          # (E404 on PUT). Provenance still works with id-token:write.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          unset NODE_AUTH_TOKEN
           node -e "
           const fs = require('fs');
           const pkgPath = 'crates/edgeparse-wasm/pkg/package.json';
@@ -156,9 +151,21 @@ jobs:
           fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
           "
           cd crates/edgeparse-wasm/pkg
-          npm publish --provenance --access public --registry https://registry.npmjs.org \
-            || { CODE=$?; npm info edgeparse-wasm@${{ env.VERSION }} version >/dev/null 2>&1 \
-                 && echo "Already published — skipping." || exit $CODE; }
+          publish() { npm publish --provenance --access public --registry https://registry.npmjs.org; }
+          if publish; then
+            echo "Published edgeparse-wasm via OIDC"
+          elif npm info edgeparse-wasm@${{ env.VERSION }} version >/dev/null 2>&1; then
+            echo "Already published — skipping."
+          elif [[ -n "${NPM_TOKEN:-}" ]]; then
+            echo "OIDC publish failed — retrying with NPM_TOKEN fallback"
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
+            publish \
+              || { CODE=$?; npm info edgeparse-wasm@${{ env.VERSION }} version >/dev/null 2>&1 \
+                   && echo "Already published — skipping." || exit $CODE; }
+          else
+            echo "OIDC publish failed and NPM_TOKEN is not set"
+            exit 1
+          fi
 
       # ─────────────────────────────────────────────────────────────────────
       # 5b. Publish to GitHub Packages (secondary registry — useful for
@@ -216,13 +223,26 @@ jobs:
 
       - name: Publish @edgeparse/web to npm
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          unset NODE_AUTH_TOKEN
           cd sdks/web
           npm run check-models
-          npm publish --provenance --access public --registry https://registry.npmjs.org \
-            || { CODE=$?; npm info @edgeparse/web@${{ env.VERSION }} version >/dev/null 2>&1 \
-                 && echo "Already published — skipping." || exit $CODE; }
+          publish() { npm publish --provenance --access public --registry https://registry.npmjs.org; }
+          if publish; then
+            echo "Published @edgeparse/web via OIDC"
+          elif npm info @edgeparse/web@${{ env.VERSION }} version >/dev/null 2>&1; then
+            echo "Already published — skipping."
+          elif [[ -n "${NPM_TOKEN:-}" ]]; then
+            echo "OIDC publish failed — retrying with NPM_TOKEN fallback"
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
+            publish \
+              || { CODE=$?; npm info @edgeparse/web@${{ env.VERSION }} version >/dev/null 2>&1 \
+                   && echo "Already published — skipping." || exit $CODE; }
+          else
+            echo "OIDC publish failed and NPM_TOKEN is not set"
+            exit 1
+          fi
 
       - name: Verify @edgeparse/web on jsDelivr
         run: |

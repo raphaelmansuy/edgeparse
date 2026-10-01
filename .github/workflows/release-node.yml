@@ -75,8 +75,9 @@ jobs:
           mkdir -p "sdks/node/npm/${{ matrix.node-platform }}"
           cp "$SRC" "$DEST"
           ls -la "$DEST"
-          # upload-artifact respects .gitignore (*.node) — stage outside the repo tree
-          STAGE="/tmp/edgeparse-node-artifact/${{ matrix.node-platform }}"
+          # upload-artifact respects .gitignore (*.node) — stage outside the repo tree.
+          # Use RUNNER_TEMP (works on Windows; /tmp does not).
+          STAGE="${RUNNER_TEMP}/edgeparse-node-artifact/${{ matrix.node-platform }}"
           mkdir -p "$STAGE"
           cp "$DEST" "$STAGE/"
           cp "sdks/node/npm/${{ matrix.node-platform }}/package.json" "$STAGE/"
@@ -84,7 +85,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: node-${{ matrix.node-platform }}
-          path: /tmp/edgeparse-node-artifact/${{ matrix.node-platform }}/
+          path: ${{ runner.temp }}/edgeparse-node-artifact/${{ matrix.node-platform }}/
           if-no-files-found: error
 
   publish-npm:
@@ -94,10 +95,10 @@ jobs:
     environment: npm
     steps:
       - uses: actions/checkout@v4
+      # Do NOT set registry-url — dummy NODE_AUTH_TOKEN breaks Trusted Publisher.
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
 
       - uses: actions/download-artifact@v4
         with:
@@ -186,33 +187,64 @@ jobs:
 
       - name: Publish platform packages
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN || true
+          publish_dir() {
+            (cd "$1" && npm publish --provenance --access public --registry https://registry.npmjs.org)
+          }
           for dir in sdks/node/npm/*/; do
-            OUTPUT=$((cd "$dir" && npm publish --provenance --access public) 2>&1) && echo "$OUTPUT" || {
-              echo "$OUTPUT"
-              if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
-                echo "::warning::Package already published for $dir — skipping."
-              elif echo "$OUTPUT" | grep -Eq "E403|403 Forbidden|You may not perform that action with these credentials"; then
-                echo "::warning::npm publish is unavailable for $dir with the current credentials — keeping the tarball on the GitHub Release instead."
-              else
-                exit 1
+            NAME=$(node -p "require('./${dir}package.json').name")
+            VER=$(node -p "require('./${dir}package.json').version")
+            if publish_dir "$dir"; then
+              echo "Published $NAME@$VER via OIDC"
+              continue
+            fi
+            if npm info "${NAME}@${VER}" version >/dev/null 2>&1; then
+              echo "::warning::$NAME@$VER already published — skipping."
+              continue
+            fi
+            if [[ -n "${NPM_TOKEN:-}" ]]; then
+              echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
+              if publish_dir "$dir"; then
+                echo "Published $NAME@$VER via NPM_TOKEN"
+                continue
               fi
-            }
+              if npm info "${NAME}@${VER}" version >/dev/null 2>&1; then
+                echo "::warning::$NAME@$VER already published — skipping."
+                continue
+              fi
+            fi
+            echo "::warning::npm publish unavailable for $NAME — keeping the tarball on the GitHub Release instead."
           done
 
       - name: Publish edgeparse (main package)
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN || true
           cd sdks/node
-          OUTPUT=$(npm publish --provenance --access public 2>&1) && echo "$OUTPUT" || {
-            echo "$OUTPUT"
-            if echo "$OUTPUT" | grep -Eq "cannot publish over the previously published versions|You cannot publish over the previously published version"; then
-              echo "edgeparse already published at this version — skipping."
-            elif echo "$OUTPUT" | grep -Eq "E403|403 Forbidden|You may not perform that action with these credentials"; then
-              echo "::warning::npm publish is unavailable for the main package with the current credentials — keeping the tarball on the GitHub Release instead."
-            else
-              exit 1
+          VER=$(node -p "require('./package.json').version")
+          publish() { npm publish --provenance --access public --registry https://registry.npmjs.org; }
+          if publish; then
+            echo "Published edgeparse@$VER via OIDC"
+            exit 0
+          fi
+          if npm info "edgeparse@${VER}" version >/dev/null 2>&1; then
+            echo "edgeparse@$VER already published — skipping."
+            exit 0
+          fi
+          if [[ -n "${NPM_TOKEN:-}" ]]; then
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
+            if publish; then
+              echo "Published edgeparse@$VER via NPM_TOKEN"
+              exit 0
             fi
-          }
+            if npm info "edgeparse@${VER}" version >/dev/null 2>&1; then
+              echo "edgeparse@$VER already published — skipping."
+              exit 0
+            fi
+          fi
+          echo "::warning::npm publish unavailable for edgeparse — keeping the tarball on the GitHub Release instead."
