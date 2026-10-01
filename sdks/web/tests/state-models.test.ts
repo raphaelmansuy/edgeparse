@@ -109,6 +109,24 @@ describe('ModelManager', () => {
     await expect(mm.ensure('declined-model')).rejects.toMatchObject({ code: 'ABORTED' });
   });
 
+  it('peekCached does not download or prompt', async () => {
+    const state = new ClientState();
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
+    const mm = new ModelManager({
+      manifest: {
+        ...manifest,
+        models: [{ ...manifest.models[0]!, id: 'uncached-peek' }],
+      },
+      state,
+      fetchImpl,
+      onBeforeDownload: async () => {
+        throw new Error('should not prompt');
+      },
+    });
+    await expect(mm.peekCached('uncached-peek')).resolves.toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('emits MODEL_INTEGRITY_FAILED on hash mismatch', async () => {
     const badManifest: ModelManifest = {
       ...manifest,

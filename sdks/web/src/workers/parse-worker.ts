@@ -53,7 +53,7 @@ let activeJob: string | null = null;
 async function loadWasm(wasmUrl?: string): Promise<WasmModule> {
   // Dynamic import so bundlers can tree-shake / alias edgeparse-wasm.
   const mod = (await import('edgeparse-wasm')) as unknown as WasmModule;
-  await mod.default(wasmUrl);
+  await mod.default(wasmUrl || undefined);
   return mod;
 }
 
@@ -126,7 +126,21 @@ self.onmessage = async (ev: MessageEvent) => {
         const format = (msg.format as string) ?? 'markdown';
         const backend = msg.backendMarkdown as string | null | undefined;
         if (format === 'all' && typeof session.finishAll === 'function') {
-          const all = session.finishAll();
+          const raw = session.finishAll() as unknown;
+          const all =
+            raw instanceof Map
+              ? {
+                  json: String(raw.get('json') ?? ''),
+                  markdown: String(raw.get('markdown') ?? ''),
+                  html: String(raw.get('html') ?? ''),
+                  text: String(raw.get('text') ?? ''),
+                }
+              : (raw as {
+                  json: string;
+                  markdown: string;
+                  html: string;
+                  text: string;
+                });
           (self as DedicatedWorkerGlobalScope).postMessage({
             type: 'done',
             jobId: msg.jobId,

@@ -20,6 +20,7 @@ export interface AppState {
   outputFormat: OutputFormat;
   outputText: string;
   formatCache: FormatCache | null;
+  parseEpoch: number;
   hoveredElement: ContentElement | null;
   wasmStatus: WasmStatus;
   parseStatus: ParseStatus;
@@ -46,6 +47,7 @@ class StateStore extends EventTarget {
       outputFormat: 'json',
       outputText: '',
       formatCache: null,
+      parseEpoch: 0,
       hoveredElement: null,
       wasmStatus: 'idle',
       parseStatus: 'idle',
@@ -66,8 +68,14 @@ class StateStore extends EventTarget {
   }
 
   set<K extends StateKey>(key: K, value: AppState[K]): void {
-    this.state[key] = value;
-    this.dispatchEvent(new CustomEvent('change', { detail: { key, value } }));
+    this.patch({ [key]: value } as Partial<AppState>);
+  }
+
+  patch(partial: Partial<AppState>): void {
+    for (const [key, value] of Object.entries(partial) as [StateKey, AppState[StateKey]][]) {
+      this.state[key] = value as never;
+      this.dispatchEvent(new CustomEvent('change', { detail: { key, value } }));
+    }
   }
 
   subscribe(key: StateKey, callback: (value: unknown) => void): () => void {

@@ -72,6 +72,27 @@ export class ModelManager {
     return out;
   }
 
+  /** Return a cached model without prompting or downloading. */
+  async peekCached(id: string): Promise<StoredModel | null> {
+    const inflight = this.inflight.get(id);
+    if (inflight) {
+      try {
+        return await inflight;
+      } catch {
+        return null;
+      }
+    }
+    const entry = this.manifest.models.find((m) => m.id === id);
+    if (!entry) return null;
+    const cached = await loadCached(id);
+    if (!cached) return null;
+    const ok =
+      cached.sha256 === entry.sha256 ||
+      (await sha256Hex(cached.bytes)) === entry.sha256;
+    if (!ok || isPlaceholderHash(entry.sha256)) return null;
+    return cached;
+  }
+
   async ensure(id: string, signal?: AbortSignal): Promise<StoredModel> {
     const existing = this.inflight.get(id);
     if (existing) return existing;

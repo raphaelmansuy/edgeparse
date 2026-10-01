@@ -87,7 +87,7 @@ function setSanitizedHtml(target: HTMLElement, sanitizedHtml: string): void {
 let editorView: EditorView | null = null;
 
 // Sanitized HTML string cache — keyed by OutputFormat, cleared on new PDF.
-const renderCache = new Map<OutputFormat, string>();
+const renderCache = new Map<string, string>();
 
 // Monotonically-increasing counter. Each async render captures the current
 // value; if it has changed by the time the render completes the result is
@@ -206,7 +206,7 @@ export function createOutputViewer(): HTMLElement {
 
     // ── Rendered view (markdown | html) ──────────────────────────────────────
 
-    const cached = renderCache.get(format);
+    const cached = renderCache.get(`${store.get('parseEpoch')}:${format}`);
     if (cached !== undefined) {
       // Cache hit: cancel in-flight render, serve immediately, no overlay.
       renderBusy = false;
@@ -228,8 +228,9 @@ export function createOutputViewer(): HTMLElement {
       let rawHtml: string;
 
       if (format === 'markdown') {
-        // Worker converts markdown→HTML off-thread (main thread stays free).
-        rawHtml = await markdownToHtml(text);
+        rawHtml = text.trim()
+          ? await markdownToHtml(text)
+          : '<p class="output-viewer__empty">No markdown produced for this PDF.</p>';
       } else {
         // HTML format: WASM already produced HTML; just need to sanitize.
         // Yield so the shimmer bar + dim are guaranteed to paint first.
@@ -247,7 +248,7 @@ export function createOutputViewer(): HTMLElement {
       const sanitized = DOMPurify.sanitize(rawHtml);
       if (rev !== renderRevision) return;
 
-      renderCache.set(format, sanitized);
+      renderCache.set(`${store.get('parseEpoch')}:${format}`, sanitized);
 
       // Swap content then fade in via CSS transition (class removal → opacity 1).
       setSanitizedHtml(renderedPane, sanitized);
@@ -265,17 +266,8 @@ export function createOutputViewer(): HTMLElement {
     }
   }
 
-  // Clear render cache ONLY when a new PDF is loaded (formatCache changes from
-  // the WASM parse worker). Format switches do NOT clear it — so switching back
-  // to a previously-rendered format is always an instant cache hit.
-  store.subscribe('formatCache', () => {
-    renderCache.clear();
-    renderRevision++; // cancel any in-flight render from the previous PDF
-  });
-
-  // Re-render whenever the output text changes (handles both format switches
-  // and new PDF loads — by the time this fires, outputFormat is already the
-  // new value so both reads are consistent).
+  // Re-render whenever the output text changes (format switch or new PDF).
+  // Cache keys include parseEpoch, so a new PDF cannot reuse a previous render.
   store.subscribe('outputText', () => updateContent());
   store.subscribe('darkMode', () => updateTheme());
 

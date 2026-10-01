@@ -236,20 +236,27 @@ export class EdgeParse {
     this.parseWorker = new Worker(this.parseWorkerUrl(), { type: 'module' });
     await new Promise<void>((resolve, reject) => {
       const w = this.parseWorker!;
+      const timer = setTimeout(() => {
+        w.removeEventListener('message', onMsg);
+        reject(new Error('parse worker init timed out'));
+      }, 30_000);
       const onMsg = (ev: MessageEvent) => {
         if (ev.data?.type === 'ready') {
+          clearTimeout(timer);
           this.wasmVersion = ev.data.version ?? 'unknown';
           w.removeEventListener('message', onMsg);
           resolve();
         } else if (ev.data?.type === 'error') {
+          clearTimeout(timer);
           w.removeEventListener('message', onMsg);
           reject(new Error(ev.data.error));
         }
       };
       w.addEventListener('message', onMsg);
-      w.addEventListener('error', (e) =>
-        reject(new Error(e.message || 'parse worker failed')),
-      );
+      w.addEventListener('error', (e) => {
+        clearTimeout(timer);
+        reject(new Error(e.message || 'parse worker failed'));
+      });
       w.postMessage({ type: 'init', wasmUrl: this.options.wasmUrl });
     });
   }
@@ -270,6 +277,35 @@ export class EdgeParse {
       w.addEventListener('message', onMsg);
       w.postMessage({ type: 'init', providers: [...providers] });
     });
+  }
+
+  private async tryWarmCachedOcrModels(): Promise<boolean> {
+    if (!this.ocrWorker || this.tier === 'off') return false;
+    if (this.options.models === 'manual' || this.options.models === 'off') return false;
+    const entries = this.modelManager.modelsForTier(this.tier as ModelTier);
+    const detEntry = entries.find((e) => e.kind === 'detection');
+    const recEntry = entries.find((e) => e.kind === 'recognition');
+    const dictEntry = entries.find((e) => e.kind === 'dictionary');
+    if (!detEntry || !recEntry || !dictEntry) return false;
+    const [det, rec, dict] = await Promise.all([
+      this.modelManager.peekCached(detEntry.id),
+      this.modelManager.peekCached(recEntry.id),
+      this.modelManager.peekCached(dictEntry.id),
+    ]);
+    if (!det || !rec || !dict) return false;
+    const dictionary = new TextDecoder().decode(dict.bytes);
+    const reqId = `ocr-init-${Date.now()}`;
+    await this.workerRequest(this.ocrWorker, {
+      type: 'init',
+      reqId,
+      providers: this.backend === 'webgpu' ? ['webgpu', 'wasm'] : ['wasm'],
+      models: {
+        detection: det.bytes,
+        recognition: rec.bytes,
+        dictionary,
+      },
+    });
+    return true;
   }
 
   private async warmOcrModels(): Promise<void> {
@@ -338,6 +374,9 @@ export class EdgeParse {
     };
 
     const bytes = await toUint8Array(input);
+    // Copy before postMessage transfer — transferring the viewer's buffer
+    // detaches it and PDF.js / later parses see an empty document.
+    const workerBytes = new Uint8Array(bytes);
     const t0 = performance.now();
     emit('opening', 'Opening PDF', JOB_WEIGHTS.opening * 0.5);
 
@@ -347,7 +386,7 @@ export class EdgeParse {
     }>(this.parseWorker, {
       type: 'open',
       jobId: job.id,
-      bytes,
+      bytes: workerBytes,
       opts: {
         pages: opts.pages,
         readingOrder: opts.readingOrder,
@@ -383,7 +422,11 @@ export class EdgeParse {
       throw new EdgeParseError('ABORTED', 'Aborted');
     }
 
-    // Lazy model download when first candidate appears.
+    // OCR is optional. Native PDF text must still assemble immediately.
+    // Only run OCR when models are already cached (or policy is preload).
+    // Prompting for a download here used to stall parse until the user
+    // accepted/declined, leaving the markdown pane empty.
+    let ocrReady = false;
     if (
       candidates.length > 0 &&
       this.tier !== 'off' &&
@@ -391,7 +434,13 @@ export class EdgeParse {
       this.options.models !== 'manual'
     ) {
       try {
-        await this.warmOcrModels();
+        ocrReady = await this.tryWarmCachedOcrModels();
+        if (!ocrReady) {
+          quality = 'degraded';
+          warnings.push(
+            'OCR models not cached — using PDF text only. Download models to OCR image tables.',
+          );
+        }
       } catch (err) {
         quality = 'degraded';
         warnings.push(
@@ -406,62 +455,64 @@ export class EdgeParse {
     }
 
     const tOcr = performance.now();
-    for (let i = 0; i < candidates.length; i++) {
-      if (job.isAborted) throw new EdgeParseError('ABORTED', 'Aborted');
-      const cand = candidates[i]!;
-      emit(
-        'ocr',
-        `OCR ${i + 1}/${candidates.length}`,
-        JOB_WEIGHTS.opening +
-          JOB_WEIGHTS.planning +
-          JOB_WEIGHTS.ocr * ((i + 0.5) / Math.max(1, candidates.length)),
-      );
+    if (ocrReady) {
+      for (let i = 0; i < candidates.length; i++) {
+        if (job.isAborted) throw new EdgeParseError('ABORTED', 'Aborted');
+        const cand = candidates[i]!;
+        emit(
+          'ocr',
+          `OCR ${i + 1}/${candidates.length}`,
+          JOB_WEIGHTS.opening +
+            JOB_WEIGHTS.planning +
+            JOB_WEIGHTS.ocr * ((i + 0.5) / Math.max(1, candidates.length)),
+        );
 
-      const grayMsg = await this.workerRequest<{
-        type: 'gray';
-        gray: Uint8Array;
-        width: number;
-        height: number;
-        hash: string;
-      }>(this.parseWorker, { type: 'gray', jobId: job.id, id: cand.id });
+        const grayMsg = await this.workerRequest<{
+          type: 'gray';
+          gray: Uint8Array;
+          width: number;
+          height: number;
+          hash: string;
+        }>(this.parseWorker, { type: 'gray', jobId: job.id, id: cand.id });
 
-      let words: unknown[] = [];
-      if (this.ocrWorker && this.tier !== 'off') {
-        try {
-          const ocrMsg = await this.workerRequest<{
-            type: 'words';
-            words: unknown[];
-            cacheHit?: boolean;
-          }>(this.ocrWorker, {
-            type: 'recognize',
-            reqId: `${job.id}-${cand.id}`,
-            id: cand.id,
-            hash: grayMsg.hash || cand.hash,
-            width: grayMsg.width,
-            height: grayMsg.height,
-            gray: grayMsg.gray,
-          });
-          words = ocrMsg.words ?? [];
-          if (ocrMsg.cacheHit) cacheHits += 1;
-          if (words.length) imagesOcred += 1;
-        } catch (err) {
-          quality = 'degraded';
-          warnings.push(
-            `OCR failed for candidate ${cand.id}: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-          );
+        let words: unknown[] = [];
+        if (this.ocrWorker && this.tier !== 'off') {
+          try {
+            const ocrMsg = await this.workerRequest<{
+              type: 'words';
+              words: unknown[];
+              cacheHit?: boolean;
+            }>(this.ocrWorker, {
+              type: 'recognize',
+              reqId: `${job.id}-${cand.id}`,
+              id: cand.id,
+              hash: grayMsg.hash || cand.hash,
+              width: grayMsg.width,
+              height: grayMsg.height,
+              gray: grayMsg.gray,
+            });
+            words = ocrMsg.words ?? [];
+            if (ocrMsg.cacheHit) cacheHits += 1;
+            if (words.length) imagesOcred += 1;
+          } catch (err) {
+            quality = 'degraded';
+            warnings.push(
+              `OCR failed for candidate ${cand.id}: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
         }
-      } else if (candidates.length > 0) {
-        quality = quality === 'full' ? 'degraded' : quality;
-      }
 
-      await this.workerRequest(this.parseWorker, {
-        type: 'ocr',
-        jobId: job.id,
-        id: cand.id,
-        words,
-      });
+        await this.workerRequest(this.parseWorker, {
+          type: 'ocr',
+          jobId: job.id,
+          id: cand.id,
+          words,
+        });
+      }
+    } else if (candidates.length > 0) {
+      quality = quality === 'full' ? 'degraded' : quality;
     }
     timings.ocrMs = performance.now() - tOcr;
 
@@ -505,8 +556,8 @@ export class EdgeParse {
         tier: this.tier,
       },
     };
-    if (typeof done.result === 'object' && done.result !== null) {
-      const all = done.result;
+    const all = asFormatBundle(done.result);
+    if (all) {
       parseResult.json = all.json;
       parseResult.markdown = all.markdown;
       parseResult.html = all.html;
@@ -611,6 +662,39 @@ export class EdgeParse {
       worker.postMessage(payload, transfer);
     });
   }
+}
+
+function asFormatBundle(
+  value: unknown,
+): { json: string; markdown: string; html: string; text: string } | null {
+  if (!value || typeof value !== 'object') return null;
+  const read = (key: string): string | undefined => {
+    const rec = value as Record<string, unknown>;
+    if (typeof rec[key] === 'string') return rec[key] as string;
+    if (value instanceof Map) {
+      const v = value.get(key);
+      if (typeof v === 'string') return v;
+    }
+    return undefined;
+  };
+  const json = read('json');
+  const markdown = read('markdown');
+  const html = read('html');
+  const text = read('text');
+  if (
+    json === undefined &&
+    markdown === undefined &&
+    html === undefined &&
+    text === undefined
+  ) {
+    return null;
+  }
+  return {
+    json: json ?? '',
+    markdown: markdown ?? '',
+    html: html ?? '',
+    text: text ?? '',
+  };
 }
 
 function wordsQuality(

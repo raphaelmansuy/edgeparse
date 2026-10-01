@@ -98,55 +98,61 @@ export async function parsePdf(
 ): Promise<{ document: PdfDocument; cache: FormatCache; result: ParseResult }> {
   const ep = await getClient();
   store.set('parseStatus', 'parsing');
+  store.set('errorMessage', null);
 
-  const job = ep.parse(bytes, {
-    format: 'all',
-    wantAllFormats: true,
-    tableMethod: 'cluster',
-    fileName: store.get('fileName') || 'uploaded.pdf',
-  });
-
-  job.on('progress', (p) => {
-    window.dispatchEvent(
-      new CustomEvent('edgeparse:job-progress', { detail: p }),
-    );
-  });
-
-  const result = await job.result;
-  const cache: FormatCache = {
-    json: result.json ?? '',
-    markdown: result.markdown ?? '',
-    html: result.html ?? '',
-    text: result.text ?? '',
-  };
-
-  let document: PdfDocument;
   try {
-    document = (result.document as PdfDocument) ?? (JSON.parse(cache.json) as PdfDocument);
-  } catch {
-    document = {
-      file_name: store.get('fileName') || 'uploaded.pdf',
-      number_of_pages: 0,
-      kids: [],
-    } as unknown as PdfDocument;
-  }
+    const job = ep.parse(bytes, {
+      format: 'all',
+      wantAllFormats: true,
+      tableMethod: 'cluster',
+      fileName: store.get('fileName') || 'uploaded.pdf',
+    });
 
-  if (result.quality === 'degraded') {
-    store.set(
-      'errorMessage',
-      `Parsed with degraded OCR quality. ${result.warnings.join(' ')}`.trim(),
+    job.on('progress', (p) => {
+      window.dispatchEvent(
+        new CustomEvent('edgeparse:job-progress', { detail: p }),
+      );
+    });
+
+    const result = await job.result;
+    const cache: FormatCache = {
+      json: result.json ?? '',
+      markdown: result.markdown ?? '',
+      html: result.html ?? '',
+      text: result.text ?? '',
+    };
+
+    let document: PdfDocument;
+    try {
+      document = (result.document as PdfDocument) ?? (JSON.parse(cache.json) as PdfDocument);
+    } catch {
+      document = {
+        file_name: store.get('fileName') || 'uploaded.pdf',
+        number_of_pages: 0,
+        kids: [],
+      } as unknown as PdfDocument;
+    }
+
+    if (result.quality === 'degraded') {
+      store.set(
+        'errorMessage',
+        `Parsed with degraded OCR quality. ${result.warnings.join(' ')}`.trim(),
+      );
+    }
+
+    lastResult = result;
+    window.dispatchEvent(
+      new CustomEvent('edgeparse:parse-result', {
+        detail: { quality: result.quality, warnings: result.warnings },
+      }),
     );
+
+    store.set('parseStatus', 'done');
+    return { document, cache, result };
+  } catch (err) {
+    store.set('parseStatus', 'error');
+    throw err;
   }
-
-  lastResult = result;
-  window.dispatchEvent(
-    new CustomEvent('edgeparse:parse-result', {
-      detail: { quality: result.quality, warnings: result.warnings },
-    }),
-  );
-
-  store.set('parseStatus', 'done');
-  return { document, cache, result };
 }
 
 export function getLastResult(): ParseResult | null {

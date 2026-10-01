@@ -232,6 +232,40 @@ test.describe('EdgeParse Demo', () => {
     await expect(page.getByRole('tab', { name: 'MARKDOWN' })).toHaveAttribute('aria-selected', 'true');
 
     await expect(page.locator('.output-viewer__rendered')).toBeVisible();
+    await expect(page.locator('.output-viewer__rendered')).not.toContainText(
+      'No markdown produced',
+    );
+    const content = await page.locator('.output-viewer__rendered').textContent();
+    expect(content!.length).toBeGreaterThan(10);
+  });
+
+  test('3.2b − uploaded PDF fills markdown after parse', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.toolbar__btn--upload')).toBeVisible();
+
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.locator('.toolbar__btn--upload').click(),
+    ]);
+    await fileChooser.setFiles(LOREM_PDF);
+
+    await expect(page.locator('.progress-bar--active')).toBeVisible({ timeout: 15_000 });
+    await page.waitForFunction(
+      () => {
+        const cm = document.querySelector('.cm-content');
+        return cm?.textContent?.trimStart().startsWith('{');
+      },
+      { timeout: 60_000 },
+    );
+
+    await page.getByRole('tab', { name: 'MARKDOWN' }).click();
+    await expect(page.locator('.output-viewer__rendered')).toBeVisible();
+    await expect(page.locator('.output-viewer__rendered')).not.toContainText(
+      'No markdown produced',
+    );
+    await expect(page.locator('.output-viewer__rendered')).toContainText(/[A-Za-z]{4,}/, {
+      timeout: 20_000,
+    });
     const content = await page.locator('.output-viewer__rendered').textContent();
     expect(content!.length).toBeGreaterThan(10);
   });

@@ -17,9 +17,12 @@ store.subscribe('pdfBytes', async () => {
   if (!bytes) return;
   try {
     const { document, cache } = await parsePdf(bytes);
-    store.set('parsedDocument', document);
-    store.set('formatCache', cache);
-    store.set('outputText', cache[store.get('outputFormat')]);
+    store.patch({
+      parsedDocument: document,
+      formatCache: cache,
+      parseEpoch: store.get('parseEpoch') + 1,
+      outputText: cache[store.get('outputFormat')] ?? '',
+    });
   } catch (err: unknown) {
     store.set('errorMessage', `Parse error: ${err}`);
   }
