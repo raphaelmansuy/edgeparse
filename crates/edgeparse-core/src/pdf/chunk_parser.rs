@@ -203,8 +203,7 @@ impl ChunkParserState {
                     self.mcid_stack.push(None);
                     self.actual_text_stack.push(None);
                     self.actual_text_emitted.push(false);
-                    self.ocg_visible_stack
-                        .push(self.current_ocg_visible());
+                    self.ocg_visible_stack.push(self.current_ocg_visible());
                 }
                 "BDC" => {
                     let props = resolve_bdc_properties(doc, resources, &op.operands);
@@ -234,18 +233,17 @@ impl ChunkParserState {
                 // ── Graphics state ──
                 "q" => self.gs_stack.save(),
                 "Q" => self.gs_stack.restore(),
-                "cm"
-                    if op.operands.len() == 6 => {
-                        let vals: Vec<f64> = op
-                            .operands
-                            .iter()
-                            .filter_map(|o| obj_to_f64(o.clone()))
-                            .collect();
-                        if vals.len() == 6 {
-                            self.gs_stack
-                                .concat_ctm(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
-                        }
+                "cm" if op.operands.len() == 6 => {
+                    let vals: Vec<f64> = op
+                        .operands
+                        .iter()
+                        .filter_map(|o| obj_to_f64(o.clone()))
+                        .collect();
+                    if vals.len() == 6 {
+                        self.gs_stack
+                            .concat_ctm(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
                     }
+                }
                 "gs" => {
                     // Extended Graphics State — look up in /ExtGState resources
                     if let Some(name) = op.operands.first().and_then(obj_name_bytes) {
@@ -257,16 +255,15 @@ impl ChunkParserState {
                 "BT" => self.gs_stack.current.begin_text(),
                 "ET" => {}
 
-                "Tf"
-                    if op.operands.len() == 2 => {
-                        if let Object::Name(ref name) = op.operands[0] {
-                            self.gs_stack.current.text_state.font_name =
-                                String::from_utf8_lossy(name).to_string();
-                        }
-                        if let Some(size) = obj_to_f64(op.operands[1].clone()) {
-                            self.gs_stack.current.text_state.font_size = size;
-                        }
+                "Tf" if op.operands.len() == 2 => {
+                    if let Object::Name(ref name) = op.operands[0] {
+                        self.gs_stack.current.text_state.font_name =
+                            String::from_utf8_lossy(name).to_string();
                     }
+                    if let Some(size) = obj_to_f64(op.operands[1].clone()) {
+                        self.gs_stack.current.text_state.font_size = size;
+                    }
+                }
                 "Tc" => {
                     if let Some(v) = op.operands.first().and_then(|o| obj_to_f64(o.clone())) {
                         self.gs_stack.current.text_state.char_spacing = v;
@@ -299,32 +296,29 @@ impl ChunkParserState {
                 }
 
                 // ── Text positioning ──
-                "Td"
-                    if op.operands.len() == 2 => {
-                        let tx = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
-                        let ty = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
-                        self.gs_stack.current.translate_text(tx, ty);
+                "Td" if op.operands.len() == 2 => {
+                    let tx = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
+                    let ty = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
+                    self.gs_stack.current.translate_text(tx, ty);
+                }
+                "TD" if op.operands.len() == 2 => {
+                    let tx = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
+                    let ty = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
+                    self.gs_stack.current.text_state.leading = -ty;
+                    self.gs_stack.current.translate_text(tx, ty);
+                }
+                "Tm" if op.operands.len() == 6 => {
+                    let vals: Vec<f64> = op
+                        .operands
+                        .iter()
+                        .filter_map(|o| obj_to_f64(o.clone()))
+                        .collect();
+                    if vals.len() == 6 {
+                        self.gs_stack
+                            .current
+                            .set_text_matrix(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
                     }
-                "TD"
-                    if op.operands.len() == 2 => {
-                        let tx = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
-                        let ty = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
-                        self.gs_stack.current.text_state.leading = -ty;
-                        self.gs_stack.current.translate_text(tx, ty);
-                    }
-                "Tm"
-                    if op.operands.len() == 6 => {
-                        let vals: Vec<f64> = op
-                            .operands
-                            .iter()
-                            .filter_map(|o| obj_to_f64(o.clone()))
-                            .collect();
-                        if vals.len() == 6 {
-                            self.gs_stack.current.set_text_matrix(
-                                vals[0], vals[1], vals[2], vals[3], vals[4], vals[5],
-                            );
-                        }
-                    }
+                }
                 "T*" => {
                     self.gs_stack.current.next_line();
                 }
@@ -346,19 +340,18 @@ impl ChunkParserState {
                         self.emit_text_chunk(&text_bytes);
                     }
                 }
-                "\""
-                    if op.operands.len() == 3 => {
-                        if let Some(aw) = obj_to_f64(op.operands[0].clone()) {
-                            self.gs_stack.current.text_state.word_spacing = aw;
-                        }
-                        if let Some(ac) = obj_to_f64(op.operands[1].clone()) {
-                            self.gs_stack.current.text_state.char_spacing = ac;
-                        }
-                        self.gs_stack.current.next_line();
-                        if let Some(text_bytes) = extract_string_bytes(&op.operands[2]) {
-                            self.emit_text_chunk(&text_bytes);
-                        }
+                "\"" if op.operands.len() == 3 => {
+                    if let Some(aw) = obj_to_f64(op.operands[0].clone()) {
+                        self.gs_stack.current.text_state.word_spacing = aw;
                     }
+                    if let Some(ac) = obj_to_f64(op.operands[1].clone()) {
+                        self.gs_stack.current.text_state.char_spacing = ac;
+                    }
+                    self.gs_stack.current.next_line();
+                    if let Some(text_bytes) = extract_string_bytes(&op.operands[2]) {
+                        self.emit_text_chunk(&text_bytes);
+                    }
+                }
 
                 // ── Color operators ──
                 "g" => {
@@ -373,40 +366,36 @@ impl ChunkParserState {
                         self.gs_stack.current.stroke_color_space_components = 1;
                     }
                 }
-                "rg"
-                    if op.operands.len() == 3 => {
-                        let r = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
-                        let g = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
-                        let b = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
-                        self.gs_stack.current.fill_color = vec![r, g, b];
-                        self.gs_stack.current.fill_color_space_components = 3;
-                    }
-                "RG"
-                    if op.operands.len() == 3 => {
-                        let r = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
-                        let g = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
-                        let b = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
-                        self.gs_stack.current.stroke_color = vec![r, g, b];
-                        self.gs_stack.current.stroke_color_space_components = 3;
-                    }
-                "k"
-                    if op.operands.len() == 4 => {
-                        let c = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
-                        let m = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
-                        let y = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
-                        let kk = obj_to_f64(op.operands[3].clone()).unwrap_or(0.0);
-                        self.gs_stack.current.fill_color = vec![c, m, y, kk];
-                        self.gs_stack.current.fill_color_space_components = 4;
-                    }
-                "K"
-                    if op.operands.len() == 4 => {
-                        let c = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
-                        let m = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
-                        let y = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
-                        let kk = obj_to_f64(op.operands[3].clone()).unwrap_or(0.0);
-                        self.gs_stack.current.stroke_color = vec![c, m, y, kk];
-                        self.gs_stack.current.stroke_color_space_components = 4;
-                    }
+                "rg" if op.operands.len() == 3 => {
+                    let r = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
+                    let g = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
+                    let b = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
+                    self.gs_stack.current.fill_color = vec![r, g, b];
+                    self.gs_stack.current.fill_color_space_components = 3;
+                }
+                "RG" if op.operands.len() == 3 => {
+                    let r = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
+                    let g = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
+                    let b = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
+                    self.gs_stack.current.stroke_color = vec![r, g, b];
+                    self.gs_stack.current.stroke_color_space_components = 3;
+                }
+                "k" if op.operands.len() == 4 => {
+                    let c = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
+                    let m = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
+                    let y = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
+                    let kk = obj_to_f64(op.operands[3].clone()).unwrap_or(0.0);
+                    self.gs_stack.current.fill_color = vec![c, m, y, kk];
+                    self.gs_stack.current.fill_color_space_components = 4;
+                }
+                "K" if op.operands.len() == 4 => {
+                    let c = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
+                    let m = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
+                    let y = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
+                    let kk = obj_to_f64(op.operands[3].clone()).unwrap_or(0.0);
+                    self.gs_stack.current.stroke_color = vec![c, m, y, kk];
+                    self.gs_stack.current.stroke_color_space_components = 4;
+                }
                 "cs" => {
                     if let Some(name) = op.operands.first() {
                         let cs_name = obj_to_name(name);
@@ -467,111 +456,106 @@ impl ChunkParserState {
                 }
 
                 // ── Path construction ──
-                "m"
-                    if op.operands.len() >= 2 => {
-                        if let (Some(x), Some(y)) = (
-                            op.operands.first().and_then(|o| obj_to_f64(o.clone())),
-                            op.operands.get(1).and_then(|o| obj_to_f64(o.clone())),
-                        ) {
-                            let (tx, ty) = self.transform_point(x, y);
-                            self.subpath_start = Some((tx, ty));
-                            self.current_point = Some((tx, ty));
-                        }
+                "m" if op.operands.len() >= 2 => {
+                    if let (Some(x), Some(y)) = (
+                        op.operands.first().and_then(|o| obj_to_f64(o.clone())),
+                        op.operands.get(1).and_then(|o| obj_to_f64(o.clone())),
+                    ) {
+                        let (tx, ty) = self.transform_point(x, y);
+                        self.subpath_start = Some((tx, ty));
+                        self.current_point = Some((tx, ty));
                     }
-                "l"
-                    if op.operands.len() >= 2 => {
-                        if let (Some(x), Some(y)) = (
-                            op.operands.first().and_then(|o| obj_to_f64(o.clone())),
-                            op.operands.get(1).and_then(|o| obj_to_f64(o.clone())),
-                        ) {
-                            let (tx, ty) = self.transform_point(x, y);
-                            if let Some((cx, cy)) = self.current_point {
-                                self.current_path.push(PathSegment::Line {
-                                    x1: cx,
-                                    y1: cy,
-                                    x2: tx,
-                                    y2: ty,
-                                });
-                            }
-                            self.current_point = Some((tx, ty));
+                }
+                "l" if op.operands.len() >= 2 => {
+                    if let (Some(x), Some(y)) = (
+                        op.operands.first().and_then(|o| obj_to_f64(o.clone())),
+                        op.operands.get(1).and_then(|o| obj_to_f64(o.clone())),
+                    ) {
+                        let (tx, ty) = self.transform_point(x, y);
+                        if let Some((cx, cy)) = self.current_point {
+                            self.current_path.push(PathSegment::Line {
+                                x1: cx,
+                                y1: cy,
+                                x2: tx,
+                                y2: ty,
+                            });
                         }
+                        self.current_point = Some((tx, ty));
                     }
-                "c"
-                    if op.operands.len() >= 6 => {
-                        let vals: Vec<f64> = op
-                            .operands
-                            .iter()
-                            .filter_map(|o| obj_to_f64(o.clone()))
-                            .collect();
-                        if vals.len() >= 6 {
-                            let (tx, ty) = self.transform_point(vals[4], vals[5]);
-                            if let Some((cx, cy)) = self.current_point {
-                                let (cp1x, cp1y) = self.transform_point(vals[0], vals[1]);
-                                let (cp2x, cp2y) = self.transform_point(vals[2], vals[3]);
-                                self.current_path.push(PathSegment::Curve {
-                                    x1: cx,
-                                    y1: cy,
-                                    cp1x,
-                                    cp1y,
-                                    cp2x,
-                                    cp2y,
-                                    x2: tx,
-                                    y2: ty,
-                                });
-                            }
-                            self.current_point = Some((tx, ty));
+                }
+                "c" if op.operands.len() >= 6 => {
+                    let vals: Vec<f64> = op
+                        .operands
+                        .iter()
+                        .filter_map(|o| obj_to_f64(o.clone()))
+                        .collect();
+                    if vals.len() >= 6 {
+                        let (tx, ty) = self.transform_point(vals[4], vals[5]);
+                        if let Some((cx, cy)) = self.current_point {
+                            let (cp1x, cp1y) = self.transform_point(vals[0], vals[1]);
+                            let (cp2x, cp2y) = self.transform_point(vals[2], vals[3]);
+                            self.current_path.push(PathSegment::Curve {
+                                x1: cx,
+                                y1: cy,
+                                cp1x,
+                                cp1y,
+                                cp2x,
+                                cp2y,
+                                x2: tx,
+                                y2: ty,
+                            });
                         }
+                        self.current_point = Some((tx, ty));
                     }
-                "v"
-                    if op.operands.len() >= 4 => {
-                        let vals: Vec<f64> = op
-                            .operands
-                            .iter()
-                            .filter_map(|o| obj_to_f64(o.clone()))
-                            .collect();
-                        if vals.len() >= 4 {
-                            let (tx, ty) = self.transform_point(vals[2], vals[3]);
-                            if let Some((cx, cy)) = self.current_point {
-                                let (cp2x, cp2y) = self.transform_point(vals[0], vals[1]);
-                                self.current_path.push(PathSegment::Curve {
-                                    x1: cx,
-                                    y1: cy,
-                                    cp1x: cx,
-                                    cp1y: cy,
-                                    cp2x,
-                                    cp2y,
-                                    x2: tx,
-                                    y2: ty,
-                                });
-                            }
-                            self.current_point = Some((tx, ty));
+                }
+                "v" if op.operands.len() >= 4 => {
+                    let vals: Vec<f64> = op
+                        .operands
+                        .iter()
+                        .filter_map(|o| obj_to_f64(o.clone()))
+                        .collect();
+                    if vals.len() >= 4 {
+                        let (tx, ty) = self.transform_point(vals[2], vals[3]);
+                        if let Some((cx, cy)) = self.current_point {
+                            let (cp2x, cp2y) = self.transform_point(vals[0], vals[1]);
+                            self.current_path.push(PathSegment::Curve {
+                                x1: cx,
+                                y1: cy,
+                                cp1x: cx,
+                                cp1y: cy,
+                                cp2x,
+                                cp2y,
+                                x2: tx,
+                                y2: ty,
+                            });
                         }
+                        self.current_point = Some((tx, ty));
                     }
-                "y"
-                    if op.operands.len() >= 4 => {
-                        let vals: Vec<f64> = op
-                            .operands
-                            .iter()
-                            .filter_map(|o| obj_to_f64(o.clone()))
-                            .collect();
-                        if vals.len() >= 4 {
-                            let (tx, ty) = self.transform_point(vals[2], vals[3]);
-                            if let Some((cx, cy)) = self.current_point {
-                                let (cp1x, cp1y) = self.transform_point(vals[0], vals[1]);
-                                self.current_path.push(PathSegment::Curve {
-                                    x1: cx,
-                                    y1: cy,
-                                    cp1x,
-                                    cp1y,
-                                    cp2x: tx,
-                                    cp2y: ty,
-                                    x2: tx,
-                                    y2: ty,
-                                });
-                            }
-                            self.current_point = Some((tx, ty));
+                }
+                "y" if op.operands.len() >= 4 => {
+                    let vals: Vec<f64> = op
+                        .operands
+                        .iter()
+                        .filter_map(|o| obj_to_f64(o.clone()))
+                        .collect();
+                    if vals.len() >= 4 {
+                        let (tx, ty) = self.transform_point(vals[2], vals[3]);
+                        if let Some((cx, cy)) = self.current_point {
+                            let (cp1x, cp1y) = self.transform_point(vals[0], vals[1]);
+                            self.current_path.push(PathSegment::Curve {
+                                x1: cx,
+                                y1: cy,
+                                cp1x,
+                                cp1y,
+                                cp2x: tx,
+                                cp2y: ty,
+                                x2: tx,
+                                y2: ty,
+                            });
                         }
+                        self.current_point = Some((tx, ty));
                     }
+                }
                 "h" => {
                     if let (Some((sx, sy)), Some((cx, cy))) =
                         (self.subpath_start, self.current_point)
@@ -587,42 +571,41 @@ impl ChunkParserState {
                         self.current_point = self.subpath_start;
                     }
                 }
-                "re"
-                    if op.operands.len() >= 4 => {
-                        let vals: Vec<f64> = op
-                            .operands
-                            .iter()
-                            .filter_map(|o| obj_to_f64(o.clone()))
-                            .collect();
-                        if vals.len() >= 4 {
-                            let (x, y, w, h) = (vals[0], vals[1], vals[2], vals[3]);
-                            let (x1, y1) = self.transform_point(x, y);
-                            let (x2, y2) = self.transform_point(x + w, y);
-                            let (x3, y3) = self.transform_point(x + w, y + h);
-                            let (x4, y4) = self.transform_point(x, y + h);
-                            self.current_path.push(PathSegment::Line { x1, y1, x2, y2 });
-                            self.current_path.push(PathSegment::Line {
-                                x1: x2,
-                                y1: y2,
-                                x2: x3,
-                                y2: y3,
-                            });
-                            self.current_path.push(PathSegment::Line {
-                                x1: x3,
-                                y1: y3,
-                                x2: x4,
-                                y2: y4,
-                            });
-                            self.current_path.push(PathSegment::Line {
-                                x1: x4,
-                                y1: y4,
-                                x2: x1,
-                                y2: y1,
-                            });
-                            self.subpath_start = Some((x1, y1));
-                            self.current_point = Some((x1, y1));
-                        }
+                "re" if op.operands.len() >= 4 => {
+                    let vals: Vec<f64> = op
+                        .operands
+                        .iter()
+                        .filter_map(|o| obj_to_f64(o.clone()))
+                        .collect();
+                    if vals.len() >= 4 {
+                        let (x, y, w, h) = (vals[0], vals[1], vals[2], vals[3]);
+                        let (x1, y1) = self.transform_point(x, y);
+                        let (x2, y2) = self.transform_point(x + w, y);
+                        let (x3, y3) = self.transform_point(x + w, y + h);
+                        let (x4, y4) = self.transform_point(x, y + h);
+                        self.current_path.push(PathSegment::Line { x1, y1, x2, y2 });
+                        self.current_path.push(PathSegment::Line {
+                            x1: x2,
+                            y1: y2,
+                            x2: x3,
+                            y2: y3,
+                        });
+                        self.current_path.push(PathSegment::Line {
+                            x1: x3,
+                            y1: y3,
+                            x2: x4,
+                            y2: y4,
+                        });
+                        self.current_path.push(PathSegment::Line {
+                            x1: x4,
+                            y1: y4,
+                            x2: x1,
+                            y2: y1,
+                        });
+                        self.subpath_start = Some((x1, y1));
+                        self.current_point = Some((x1, y1));
                     }
+                }
 
                 // ── Path painting ──
                 "S" => {
@@ -1263,10 +1246,7 @@ impl ChunkParserState {
 
     /// Innermost non-empty `/ActualText` on the marked-content stack.
     fn active_actual_text(&self) -> Option<String> {
-        self.actual_text_stack
-            .iter()
-            .rev()
-            .find_map(|t| t.clone())
+        self.actual_text_stack.iter().rev().find_map(|t| t.clone())
     }
 
     /// Mark the innermost ActualText span as emitted. Returns true if this
@@ -2450,7 +2430,11 @@ mod tests {
         let (&page_num, &page_id) = pages.iter().next().unwrap();
         let chunks = extract_page_chunks(&doc, page_num, page_id).unwrap();
 
-        let joined: String = chunks.text_chunks.iter().map(|c| c.value.as_str()).collect();
+        let joined: String = chunks
+            .text_chunks
+            .iter()
+            .map(|c| c.value.as_str())
+            .collect();
         assert!(
             joined.contains("42"),
             "Expected ActualText '42', got chunks: {:?}",
@@ -2523,7 +2507,11 @@ mod tests {
         let pages = doc.get_pages();
         let (&page_num, &page_id) = pages.iter().next().unwrap();
         let chunks = extract_page_chunks(&doc, page_num, page_id).unwrap();
-        let joined: String = chunks.text_chunks.iter().map(|c| c.value.as_str()).collect();
+        let joined: String = chunks
+            .text_chunks
+            .iter()
+            .map(|c| c.value.as_str())
+            .collect();
         assert!(
             joined.contains("Hello") && joined.contains("World"),
             "got: {joined:?}"

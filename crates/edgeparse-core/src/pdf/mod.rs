@@ -14,10 +14,10 @@ pub mod font_type3_ocr;
 pub mod form_extractor;
 pub mod graphics_state;
 pub mod hyperlink_extractor;
-pub mod image_extractor;
 /// Image XObject codecs (DCT / Flate / JBIG2 / JPX) for the OCR path.
 #[cfg(feature = "image")]
 pub mod image_codecs;
+pub mod image_extractor;
 /// Cheap image-region classifier + OCR budget (native + WASM).
 pub mod image_region;
 /// In-memory Image-XObject → table lattice (WASM-safe; no pdfimages).

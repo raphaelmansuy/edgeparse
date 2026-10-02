@@ -1090,9 +1090,10 @@ fn find_blank_form_tables(
             let row_refs: Vec<&ChunkRef> = row_chunks.iter().collect();
             let segs = split_into_segments(&row_refs, row_fs);
             if segs.len() != 1
-                && (segs.is_empty() || segs.iter().any(|s| s.left_x >= header_left - row_fs)) {
-                    break;
-                }
+                && (segs.is_empty() || segs.iter().any(|s| s.left_x >= header_left - row_fs))
+            {
+                break;
+            }
             let stub = &segs[0];
             if stub.right_x > header_left - row_fs * 0.25 {
                 break;

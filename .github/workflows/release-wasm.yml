@@ -32,7 +32,7 @@ jobs:
       # dummy NODE_AUTH_TOKEN into .npmrc that breaks npm Trusted Publisher (OIDC).
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -149,7 +149,8 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           unset NODE_AUTH_TOKEN || true
-          npm install -g npm@latest
+          # Stay on the Node 22 bundled npm — npm@latest (12+) needs Node >=22.22.2
+          # and breaks publish on the setup-node default 22.x images.
           node -e "
           const fs = require('fs');
           const pkgPath = 'crates/edgeparse-wasm/pkg/package.json';
@@ -359,7 +360,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       # ── Resolve the version to check (supports both tag push and manual dispatch) ──
       - name: Resolve version

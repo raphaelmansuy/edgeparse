@@ -782,7 +782,10 @@ fn resolve_cid_font_cmap_fallback(
 }
 
 /// Parse `/CIDToGIDMap`. `None` means Identity (CID == GID).
-fn resolve_cid_to_gid_map(doc: &lopdf::Document, cid_font_dict: &lopdf::Dictionary) -> Option<Vec<u16>> {
+fn resolve_cid_to_gid_map(
+    doc: &lopdf::Document,
+    cid_font_dict: &lopdf::Dictionary,
+) -> Option<Vec<u16>> {
     let obj = cid_font_dict.get(b"CIDToGIDMap").ok()?;
     let resolved = resolve_object(doc, obj);
     match resolved {
