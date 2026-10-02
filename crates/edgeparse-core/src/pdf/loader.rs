@@ -36,6 +36,10 @@ pub struct PdfMetadata {
     pub creation_date: Option<String>,
     /// Modification date
     pub modification_date: Option<String>,
+    /// PDF producer application
+    pub producer: Option<String>,
+    /// Creator application
+    pub creator: Option<String>,
 }
 
 /// Load a PDF file and extract basic structure.
@@ -82,6 +86,8 @@ fn extract_metadata(doc: &Document) -> PdfMetadata {
                     metadata.title = extract_string_field(dict, b"Title");
                     metadata.creation_date = extract_string_field(dict, b"CreationDate");
                     metadata.modification_date = extract_string_field(dict, b"ModDate");
+                    metadata.producer = extract_string_field(dict, b"Producer");
+                    metadata.creator = extract_string_field(dict, b"Creator");
                 }
             }
         }

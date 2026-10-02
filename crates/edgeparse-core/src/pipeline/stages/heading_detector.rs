@@ -273,6 +273,14 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
         let is_above_body =
             !stats.has_larger_font_sizes() || stats.is_in_higher_font_sizes(font_size);
 
+        // Near-body sizes (±0.5pt of mode) are CTM noise or body text even when
+        // quantized one step above the mode. When a size hierarchy exists, skip
+        // them — and also skip anything not in the higher-size inventory
+        // (smaller diagram labels etc.).
+        if stats.has_larger_font_sizes() && (stats.is_body_font_size(font_size) || !is_above_body) {
+            continue;
+        }
+
         // Skip primarily-numeric text — table data, not headings
         // e.g. "76.1 76.1", "94.3", "0.4 0.6 0.8"
         // Exception: allow above-body-size numeric text — these are typically
@@ -320,6 +328,13 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
         // captions, not section headings.  They often have distinct font
         // properties (bold, italic) that the scoring would otherwise promote.
         if is_caption_prefix(p.base.value().trim()) {
+            continue;
+        }
+
+        // Short labels sitting on an image are float titles/captions, not
+        // outline nodes. Promoting them also disables captioned-media layout
+        // which requires a heading-free page.
+        if is_image_adjacent_title(pages, page_idx, elem_idx, p) {
             continue;
         }
 
@@ -380,40 +395,32 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
 
         // Rarity boosts are added OUTSIDE the multiplier/clamp (matches the reference implementation HeadingProcessor).
         //
-        // Rarity boosts should only promote paragraphs that are genuinely above
-        // body text size. In 1901-style documents the body and (sub-)heading fonts
-        // differ by as little as 0.05 pt, and a continuous 0.2 pt tolerance would
-        // erroneously classify body-size bold paragraphs (run-in labels) as
-        // "heading-sized".
-        //
-        // Strategy:
-        //  • `is_above_body` uses the same 0.1 pt quantization as `find_higher_values`:
-        //    a paragraph is "above body" only if its quantized key strictly exceeds
-        //    the mode's quantized key (e.g., 10.909 → key 109 = mode → FALSE;
-        //    10.959 → key 110 > 109 → TRUE).
-        //  • In multi-size docs, size rarity only applies when above body.
-        //  • Weight rarity is always applied (matches the reference implementation HeadingProcessor behaviour).
-        //    Phase 2b body-bold filter catches excessive false positives.
-
+        // First principle: rare weight is a heading signal only when size also
+        // distinguishes headings, or when the document has no size hierarchy and
+        // neighbors already look heading-like. Body-size bold labels on a page
+        // that also has larger title text are diagram chrome, not outline nodes.
         let size_rarity = if is_above_body {
             stats.font_size_rarity_boost(font_size)
         } else {
             0.0 // body-size paragraph in multi-size doc: no false-positive size boost
         };
 
-        // Weight rarity boost is unconditional — the reference implementation applies it to all paragraphs
-        // whose font weight is above the document's mode weight.
-        let weight_rarity = stats.font_weight_rarity_boost(font_weight);
+        let weight_rarity = if stats.has_larger_font_sizes() && !is_above_body {
+            0.0
+        } else {
+            stats.font_weight_rarity_boost(font_weight)
+        };
 
         let mut probability = base_prob + size_rarity + weight_rarity;
 
-        // Typographic inventory: short labels at ≥1.15× body mode (or bold
-        // above the body weight mode) are heading candidates even when neighbor
-        // scoring is weak — same geometry as hybrid `heading_inventory_deficit`.
+        // Typographic inventory: short labels at ≥1.15× body mode, or bold at
+        // above-body size, are heading candidates even when neighbor scoring is
+        // weak. Body-size bold alone is not enough when a size hierarchy exists.
         if probability < HEADING_PROBABILITY {
             if let Some(mode) = stats.mode_size {
                 let size_hit = font_size >= mode * 1.15;
-                let weight_hit = font_weight >= 600.0
+                let weight_hit = is_above_body
+                    && font_weight >= 600.0
                     && stats
                         .higher_weights
                         .first()
@@ -1232,27 +1239,65 @@ fn is_standalone_page_number(para: &SemanticParagraph, stats: &DocFontStats) -> 
 }
 
 /// Check if text starts with a figure/table caption prefix.
-/// "Figure 1.", "Table 2:", "Fig. 3", "FIGURE 4" are captions.
+/// "Figure 1.", "Table 2:", "Fig. 3", "FIGURE 4", "Diagram 5" are captions.
 fn is_caption_prefix(text: &str) -> bool {
     let lower = text.to_lowercase();
-    // Match "figure N", "fig. N", "fig N", "table N"
-    if lower.starts_with("figure ")
-        || lower.starts_with("fig. ")
-        || lower.starts_with("fig ")
-        || lower.starts_with("table ")
-    {
-        // Check if the next non-space character is a digit
-        let rest = if lower.starts_with("figure ") {
-            &text[7..]
-        } else if lower.starts_with("fig. ") {
-            &text[5..]
-        } else if lower.starts_with("fig ") {
-            &text[4..]
-        } else {
-            &text[6..]
+    // Match "figure N", "fig. N", "fig N", "table N", "diagram N"
+    let (prefix_len, matched) = if lower.starts_with("figure ") {
+        (7usize, true)
+    } else if lower.starts_with("diagram ") {
+        (8, true)
+    } else if lower.starts_with("fig. ") {
+        (5, true)
+    } else if lower.starts_with("fig ") {
+        (4, true)
+    } else if lower.starts_with("table ") {
+        (6, true)
+    } else {
+        (0, false)
+    };
+    if !matched {
+        return false;
+    }
+    let rest = &text[prefix_len..];
+    let first_non_space = rest.trim_start().chars().next();
+    first_non_space.is_some_and(|c| c.is_ascii_digit())
+}
+
+/// True when a short paragraph sits as a title/caption next to a page image.
+/// Those labels describe floats; they are not section-outline headings.
+fn is_image_adjacent_title(
+    pages: &[Vec<ContentElement>],
+    page_idx: usize,
+    elem_idx: usize,
+    para: &SemanticParagraph,
+) -> bool {
+    let text_len = para.base.value().trim().len();
+    if text_len == 0 || text_len > 120 {
+        return false;
+    }
+    let pb = &para.base.bbox;
+    let page = &pages[page_idx];
+    for (i, elem) in page.iter().enumerate() {
+        if i == elem_idx {
+            continue;
+        }
+        let ib = match elem {
+            ContentElement::Image(img) => &img.bbox,
+            ContentElement::Figure(fig) => &fig.bbox,
+            ContentElement::Picture(pic) => &pic.bbox,
+            _ => continue,
         };
-        let first_non_space = rest.trim_start().chars().next();
-        return first_non_space.is_some_and(|c| c.is_ascii_digit());
+        let overlap = pb.right_x.min(ib.right_x) - pb.left_x.max(ib.left_x);
+        if overlap <= 0.0 {
+            continue;
+        }
+        // Caption/title above the image (common) or tightly below.
+        let gap_above = pb.bottom_y - ib.top_y;
+        let gap_below = ib.bottom_y - pb.top_y;
+        if (0.0..=72.0).contains(&gap_above) || (0.0..=48.0).contains(&gap_below) {
+            return true;
+        }
     }
     false
 }
@@ -1435,10 +1480,11 @@ impl DocFontStats {
         size_key > mode_key && !self.higher_sizes.is_empty()
     }
 
-    /// Check if a font size matches the body text mode (quantized to 0.1pt).
+    /// Check if a font size matches the body text mode (quantized to 0.1pt),
+    /// or lies within a half-point of the mode (CTM/rounding noise from
+    /// design-tool PDFs that is not a typographic step).
     fn is_body_font_size(&self, size: f64) -> bool {
-        self.mode_size
-            .is_some_and(|m| (size * 10.0).round() as i32 == (m * 10.0).round() as i32)
+        self.mode_size.is_some_and(|m| (size - m).abs() <= 0.5)
     }
 }
 
@@ -1457,6 +1503,28 @@ fn rarity_boost(value: f64, higher_values: &[f64], max_boost: f64) -> f64 {
             rank * max_boost
         }
         None => 0.0,
+    }
+}
+
+/// Non-whitespace character mass — used so body mode follows reading content,
+/// not the count of short diagram labels.
+fn text_mass(text: &str) -> usize {
+    text.chars().filter(|c| !c.is_whitespace()).count().max(1)
+}
+
+fn content_element_text_mass(elem: &ContentElement) -> usize {
+    match elem {
+        ContentElement::TextLine(tl) => text_mass(&tl.value()),
+        ContentElement::TextChunk(tc) => text_mass(&tc.value),
+        ContentElement::TextBlock(tb) => {
+            let mut n = 0;
+            for line in &tb.text_lines {
+                n += text_mass(&line.value());
+            }
+            n.max(1)
+        }
+        ContentElement::Paragraph(p) => text_mass(&p.base.value()),
+        _ => 1,
     }
 }
 
@@ -1493,6 +1561,9 @@ fn content_element_font_size(elem: &ContentElement) -> Option<f64> {
 }
 
 /// Collect font size and weight statistics from all paragraphs.
+///
+/// Counts are weighted by non-whitespace character mass so a few long body
+/// paragraphs dominate many short diagram labels at a different size.
 fn collect_statistics(pages: &[Vec<ContentElement>]) -> DocFontStats {
     let mut size_counts: BTreeMap<i32, usize> = BTreeMap::new();
     let mut weight_counts: BTreeMap<i32, usize> = BTreeMap::new();
@@ -1506,13 +1577,14 @@ fn collect_statistics(pages: &[Vec<ContentElement>]) -> DocFontStats {
                     }
                     let size = p.base.font_size.unwrap_or(0.0);
                     let weight = p.base.font_weight.unwrap_or(400.0);
+                    let mass = text_mass(&p.base.value());
 
                     // Quantize to avoid floating point fragmentation
                     let size_key = (size * 10.0).round() as i32; // 0.1pt resolution
                     let weight_key = weight.round() as i32;
 
-                    *size_counts.entry(size_key).or_insert(0) += 1;
-                    *weight_counts.entry(weight_key).or_insert(0) += 1;
+                    *size_counts.entry(size_key).or_insert(0) += mass;
+                    *weight_counts.entry(weight_key).or_insert(0) += mass;
                 }
                 ContentElement::List(lst) => {
                     // Include list item content font sizes in body-text statistics.
@@ -1526,9 +1598,10 @@ fn collect_statistics(pages: &[Vec<ContentElement>]) -> DocFontStats {
                         for content_elem in &item.contents {
                             if let Some(size) = content_element_font_size(content_elem) {
                                 if size > 0.0 {
+                                    let mass = content_element_text_mass(content_elem);
                                     let size_key = (size * 10.0).round() as i32;
-                                    *size_counts.entry(size_key).or_insert(0) += 1;
-                                    *weight_counts.entry(400).or_insert(0) += 1;
+                                    *size_counts.entry(size_key).or_insert(0) += mass;
+                                    *weight_counts.entry(400).or_insert(0) += mass;
                                 }
                             }
                         }
@@ -1543,9 +1616,10 @@ fn collect_statistics(pages: &[Vec<ContentElement>]) -> DocFontStats {
                             for tok in &cell.content {
                                 let size = tok.base.font_size;
                                 if size > 0.0 {
+                                    let mass = text_mass(&tok.base.value);
                                     let size_key = (size * 10.0).round() as i32;
-                                    *size_counts.entry(size_key).or_insert(0) += 1;
-                                    *weight_counts.entry(400).or_insert(0) += 1;
+                                    *size_counts.entry(size_key).or_insert(0) += mass;
+                                    *weight_counts.entry(400).or_insert(0) += mass;
                                 }
                             }
                         }

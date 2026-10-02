@@ -18,6 +18,7 @@ type CandidateMeta = {
   width: number;
   height: number;
   hash: string;
+  kind?: 'table' | 'textBlocks';
 };
 
 type SessionLike = {

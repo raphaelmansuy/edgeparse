@@ -7,6 +7,22 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.1] — 2026-10-02
+
+### Fixed
+- **Skia/Chrome Pattern fills** — tiling Pattern paints resolve to `ImageChunk`s; PatternType-2 shadings and soft-circle AA (thousands of 1×1 filled rects) no longer explode into Line spam that broke `finishAll` JSON
+- **Filled paths vs strokes** — fills emit Lines only for thin geometric strips (table rules); equidimensional fills are decoration
+- **OCR routing** — `RasterCandidateKind::TextBlocks` for full-bleed / image-only / Pattern-fill pages; table OCR reserved for ruled lattices
+- **Overpaint text** — identical glyphs redrawn at the same origin (faux-bold) are deduped before line grouping
+- **Heading false positives** — body mode uses character-mass weighting; near-body bold diagram labels are not outline nodes when a size hierarchy exists
+- **Title / checkbox markdown** — Info.Title only when corroborated; Unicode/`[x]`/`[ ]` task items (not Latin `X`)
+
+### Added
+- Pattern-image fixture + WASM/Playwright e2e coverage for form-style Pattern fills
+- `ImagePaintSource` on image chunks; quality warning for raster-heavy pages
+
+---
+
 ## [0.3.0] — 2026-10-01
 
 ### Added

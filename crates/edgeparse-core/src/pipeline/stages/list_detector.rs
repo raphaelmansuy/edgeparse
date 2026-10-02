@@ -20,8 +20,12 @@ const MIN_LIST_ITEMS: usize = 2;
 /// Bullet characters recognised as unordered list labels.
 const BULLET_CHARS: &[char] = &[
     '•', '◦', '▪', '▸', '▹', '►', '▻', '●', '○', '■', '□', '◆', '◇', '→', '➤', '✓', '✔', '★', '☆',
-    '➜', '➢', '⁃', '‣', '∙', '⦿', '⦾',
+    '➜', '➢', '⁃', '‣', '∙', '⦿', '⦾', '☐', '☑', '☒', '✗', '✘', '✕',
 ];
+
+/// Checkbox / task-list label characters (checked and unchecked).
+const CHECKBOX_CHARS: &[char] = &['☐', '☑', '☒', '□', '■', '✓', '✔', '✗', '✘', '✕', '○', '●'];
+const CHECKED_CHECKBOX_CHARS: &[char] = &['☑', '☒', '■', '✓', '✔', '✗', '✘', '✕', '●'];
 
 /// Detect lists in a page of content elements.
 ///
@@ -118,6 +122,16 @@ fn detect_label(elem: &ContentElement) -> Option<DetectedLabel> {
         return None;
     }
 
+    // Markdown-style checkbox prefixes: "[x] foo", "[ ] foo"
+    if let Some(label) = try_checkbox_bracket(text) {
+        return Some(label);
+    }
+
+    // Unicode checkbox / ballot glyphs (ISO / ZapfDingbats), not Latin "X".
+    if let Some(label) = try_checkbox_glyph(text) {
+        return Some(label);
+    }
+
     // Check bullet characters
     let first_char = text.chars().next()?;
     if BULLET_CHARS.contains(&first_char) {
@@ -181,6 +195,62 @@ fn detect_label(elem: &ContentElement) -> Option<DetectedLabel> {
     }
 
     None
+}
+
+/// Detect `[x]` / `[ ]` / `[X]` style checkbox prefixes.
+fn try_checkbox_bracket(text: &str) -> Option<DetectedLabel> {
+    let bytes = text.as_bytes();
+    if bytes.len() < 3 || bytes[0] != b'[' {
+        return None;
+    }
+    let close = text.find(']')?;
+    if close != 2 {
+        return None;
+    }
+    let inner = text.chars().nth(1)?;
+    let checked = matches!(inner, 'x' | 'X' | '✓' | '✔' | '*');
+    let unchecked = matches!(inner, ' ' | '\u{00a0}' | '_');
+    if !checked && !unchecked {
+        return None;
+    }
+    // Require trailing whitespace or end (avoid matching "[x]ample")
+    let rest = text.get(close + 1..).unwrap_or("");
+    if !rest.is_empty() && !rest.starts_with([' ', '\t']) {
+        return None;
+    }
+    Some(DetectedLabel {
+        label_text: text[..close + 1].to_string(),
+        category: LabelCategory::Bullet,
+        sequence_value: if checked { 1 } else { 0 },
+    })
+}
+
+/// Detect a Unicode checkbox glyph (☐☑☒ etc.) followed by body text.
+fn try_checkbox_glyph(text: &str) -> Option<DetectedLabel> {
+    let mut chars = text.chars();
+    let first = chars.next()?;
+    let checked = if CHECKED_CHECKBOX_CHARS.contains(&first) {
+        true
+    } else if CHECKBOX_CHARS.contains(&first) {
+        false
+    } else {
+        return None;
+    };
+    let rest: String = chars.collect();
+    let rest = rest.trim_start();
+    if rest.is_empty() {
+        // Bare glyph — still a checkbox label; body may be a sibling element.
+        return Some(DetectedLabel {
+            label_text: first.to_string(),
+            category: LabelCategory::Bullet,
+            sequence_value: if checked { 1 } else { 0 },
+        });
+    }
+    Some(DetectedLabel {
+        label_text: first.to_string(),
+        category: LabelCategory::Bullet,
+        sequence_value: if checked { 1 } else { 0 },
+    })
 }
 
 /// Try to parse an Arabic number label like "1.", "2)", "(3)"

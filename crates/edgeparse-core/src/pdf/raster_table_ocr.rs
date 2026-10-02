@@ -4190,6 +4190,7 @@ mod tests {
             bbox: BoundingBox::new(Some(1), 0.0, 0.0, 400.0, 400.0),
             index: Some(1),
             level: None,
+            source: Default::default(),
         }
     }
 
@@ -4315,6 +4316,7 @@ mod tests {
             bbox: BoundingBox::new(Some(1), 56.6929, 163.6519, 555.3071, 442.0069),
             index: Some(1),
             level: None,
+            source: Default::default(),
         };
         let words = vec![
             word_at((1, 1, 1), 10, 10, 110, "TempC"),
@@ -4638,6 +4640,7 @@ mod tests {
             bbox: BoundingBox::new(Some(1), 0.0, 0.0, 440.0, 120.0),
             index: Some(1),
             level: None,
+            source: Default::default(),
         };
         let words = vec![
             word_at((1, 1, 1), 14, 10, 36, "B23"),
@@ -4664,6 +4667,7 @@ mod tests {
             bbox: BoundingBox::new(Some(1), 0.0, 0.0, 440.0, 140.0),
             index: Some(1),
             level: None,
+            source: Default::default(),
         };
         let words = vec![
             word_at((1, 1, 1), 10, 10, 64, "Year"),

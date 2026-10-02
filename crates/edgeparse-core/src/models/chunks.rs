@@ -105,6 +105,21 @@ impl TextChunk {
     }
 }
 
+/// How an image was painted onto the page (ISO 32000 operators).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImagePaintSource {
+    /// Unknown / legacy.
+    #[default]
+    Unknown,
+    /// Painted via the `Do` XObject operator.
+    Do,
+    /// Painted via a tiling Pattern fill (`cs/scn` + `f`).
+    PatternFill,
+    /// Inline image (`BI`/`ID`/`EI`).
+    Inline,
+}
+
 /// Image bounding box — actual pixel data extracted at output time.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageChunk {
@@ -114,6 +129,9 @@ pub struct ImageChunk {
     pub index: Option<u32>,
     /// Nesting level
     pub level: Option<String>,
+    /// PDF operator path that painted this image.
+    #[serde(default)]
+    pub source: ImagePaintSource,
 }
 
 /// Line segment — used for table border detection.

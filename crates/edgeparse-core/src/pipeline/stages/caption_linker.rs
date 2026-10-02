@@ -540,6 +540,7 @@ mod tests {
             bbox: BoundingBox::new(Some(1), 72.0, y_bottom, 300.0, y_top),
             index: None,
             level: None,
+            source: Default::default(),
         })
     }
 

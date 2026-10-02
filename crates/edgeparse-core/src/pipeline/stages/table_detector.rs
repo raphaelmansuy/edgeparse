@@ -1913,6 +1913,7 @@ mod tests {
             bbox: BoundingBox::new(Some(1), 100.0, 100.0, 200.0, 200.0),
             index: None,
             level: None,
+            source: Default::default(),
         })];
         let result = detect_table_borders(elements);
         assert!(result
@@ -2139,6 +2140,7 @@ mod tests {
             bbox: BoundingBox::new(Some(1), 110.0, 110.0, 150.0, 150.0),
             index: None,
             level: None,
+            source: Default::default(),
         });
         let table = TableBorder {
             bbox: BoundingBox::new(Some(1), 100.0, 100.0, 300.0, 300.0),

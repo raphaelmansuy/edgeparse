@@ -248,6 +248,10 @@ pub struct ExtractSession {
     pub creation_date: Option<String>,
     /// Modification date metadata.
     pub modification_date: Option<String>,
+    /// Producer metadata.
+    pub producer: Option<String>,
+    /// Creator metadata.
+    pub creator: Option<String>,
     /// Page count.
     pub number_of_pages: u32,
     /// Per-page content elements (tables not yet recovered from OCR candidates).
@@ -302,11 +306,18 @@ pub fn extract_session(
 
         #[cfg(feature = "image")]
         if config.raster_table_ocr_enabled() {
+            let (page_w, page_h) = page_info_list
+                .iter()
+                .find(|p| p.page_number == page_num)
+                .map(|p| (p.width, p.height))
+                .unwrap_or((612.0, 792.0));
             let page_cands = pdf::inmem_raster::collect_raster_candidates(
                 &raw_doc.document,
                 page_id,
                 &page_chunks.image_chunks,
                 &page_chunks.text_chunks,
+                page_w,
+                page_h,
                 &mut next_id,
             );
             candidates.extend(page_cands);
@@ -354,6 +365,8 @@ pub fn extract_session(
         title: raw_doc.metadata.title,
         creation_date: raw_doc.metadata.creation_date,
         modification_date: raw_doc.metadata.modification_date,
+        producer: raw_doc.metadata.producer,
+        creator: raw_doc.metadata.creator,
         number_of_pages: pages_map.len() as u32,
         page_contents,
         page_info_list,
@@ -389,6 +402,27 @@ impl ExtractSession {
     }
 }
 
+/// Drop the source Image (by XObject index) and inject OCR words as text chunks.
+#[cfg(feature = "image")]
+fn inject_ocr_text_blocks(
+    session: &mut ExtractSession,
+    page_idx: usize,
+    cand: &pdf::inmem_raster::RasterCandidate,
+    words: &[pdf::ocr::OcrWord],
+) {
+    if let Some(page) = session.page_contents.get_mut(page_idx) {
+        if let Some(idx) = cand.image_index {
+            page.retain(|el| match el {
+                ContentElement::Image(img) => img.index != Some(idx),
+                _ => true,
+            });
+        }
+        for chunk in pdf::inmem_raster::ocr_words_to_text_chunks(cand, words) {
+            page.push(ContentElement::TextChunk(chunk));
+        }
+    }
+}
+
 /// Run the pipeline after injecting OCR-derived tables from session candidates.
 pub fn assemble(
     mut session: ExtractSession,
@@ -397,9 +431,11 @@ pub fn assemble(
     #[cfg(feature = "image")]
     if session.config.raster_table_ocr_enabled() {
         use image::GrayImage;
+        use pdf::inmem_raster::RasterCandidateKind;
         use pdf::ocr::{default_engine, OcrEngine};
 
-        for cand in &session.candidates {
+        let candidates = std::mem::take(&mut session.candidates);
+        for cand in &candidates {
             let words = match &mode {
                 OcrAssembleMode::SyncEngine => {
                     if let Some(gray) =
@@ -423,15 +459,27 @@ pub fn assemble(
                     }
                 }
             };
-            if let Some(table) = pdf::inmem_raster::build_table_from_candidate(cand, &words) {
-                if pdf::inmem_raster::bordered_table_is_plausible(&table) {
-                    let page_idx = cand.page.saturating_sub(1) as usize;
-                    if let Some(page) = session.page_contents.get_mut(page_idx) {
-                        page.push(ContentElement::TableBorder(table));
+            let page_idx = cand.page.saturating_sub(1) as usize;
+            match cand.kind {
+                RasterCandidateKind::Table => {
+                    let table = pdf::inmem_raster::build_table_from_candidate(cand, &words)
+                        .filter(|t| pdf::inmem_raster::bordered_table_is_plausible(t));
+                    if let Some(table) = table {
+                        if let Some(page) = session.page_contents.get_mut(page_idx) {
+                            page.push(ContentElement::TableBorder(table));
+                        }
+                    } else if !words.is_empty() {
+                        // OCR found glyphs but no lattice — assemble as text,
+                        // not discard (right assembly from evidence).
+                        inject_ocr_text_blocks(&mut session, page_idx, cand, &words);
                     }
+                }
+                RasterCandidateKind::TextBlocks => {
+                    inject_ocr_text_blocks(&mut session, page_idx, cand, &words);
                 }
             }
         }
+        session.candidates = candidates;
     }
 
     #[cfg(not(feature = "image"))]
@@ -452,6 +500,8 @@ pub fn assemble(
     doc.title = session.title;
     doc.creation_date = session.creation_date;
     doc.modification_date = session.modification_date;
+    doc.producer = session.producer;
+    doc.creator = session.creator;
 
     for page in pipeline_state.pages {
         doc.kids.extend(page);
@@ -775,5 +825,106 @@ mod tests {
             // but candidates must exist (assertion above). Soft-check tables when OCR works.
             let _ = count_table_borders(&doc);
         }
+    }
+
+    /// Pattern-painted page raster (Skia/Penpot style) must emit an OCR
+    /// candidate, skip page-edge lines, and not render artifact metadata titles.
+    #[cfg(feature = "image")]
+    #[test]
+    fn pattern_form_fixture_emits_text_blocks_candidate() {
+        let pdf =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/pattern_form.pdf");
+        assert!(pdf.exists(), "missing fixture {}", pdf.display());
+        let data = std::fs::read(&pdf).unwrap();
+        let config = ProcessingConfig::default();
+        let session = extract_session(&data, "pattern_form.pdf", &config, None).unwrap();
+        assert!(
+            !session.candidates.is_empty(),
+            "expected ≥1 OCR candidate from pattern-painted image"
+        );
+        assert!(
+            session
+                .candidates
+                .iter()
+                .any(|c| c.kind == pdf::inmem_raster::RasterCandidateKind::TextBlocks),
+            "expected TextBlocks candidate for page-sized raster"
+        );
+
+        // No OCR words → still assemble; markdown must skip "Penpot - Render".
+        let doc = assemble(session, OcrAssembleMode::Provided).unwrap();
+        assert_eq!(doc.producer.as_deref(), Some("Skia/PDF m151"));
+        let md = output::markdown::to_markdown(&doc).unwrap();
+        assert!(
+            !md.contains("# Penpot - Render"),
+            "artifact metadata title must not become H1, got:\n{md}"
+        );
+        // Native text from the fixture should still appear.
+        assert!(
+            md.contains("NAME VALUE") || md.contains("ACME"),
+            "expected native text in markdown, got:\n{md}"
+        );
+        // Reading order: title (higher on page) before value text.
+        if let (Some(a), Some(b)) = (md.find("ACME"), md.find("NAME VALUE")) {
+            assert!(a < b, "expected ACME before NAME VALUE in:\n{md}");
+        }
+
+        // Page-edge lines should not dominate kids.
+        let edge_lines = doc
+            .kids
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    models::content::ContentElement::Line(l)
+                        if l.bbox.width() < 2.0 || l.bbox.height() < 2.0
+                )
+            })
+            .count();
+        assert_eq!(edge_lines, 0, "pattern fill must not emit page-edge lines");
+        assert!(
+            !doc.kids.iter().any(|e| matches!(
+                e,
+                models::content::ContentElement::Image(_)
+                    | models::content::ContentElement::Figure(_)
+            )),
+            "page-sized TextBlocks source image should be dropped from layout"
+        );
+    }
+
+    #[test]
+    fn artifact_metadata_title_skipped_in_markdown() {
+        let mut doc = PdfDocument::new("x.pdf".into());
+        doc.title = Some("Penpot - Render".into());
+        doc.producer = Some("Skia/PDF m151".into());
+        doc.creator = Some("Chromium".into());
+        doc.number_of_pages = 1;
+        // Body text present but does not corroborate Info.Title → skip H1.
+        doc.kids.push(models::content::ContentElement::TextChunk(
+            models::chunks::TextChunk {
+                value: "MANSUY RAPHAEL".into(),
+                bbox: models::bbox::BoundingBox::new(Some(1), 10.0, 100.0, 200.0, 120.0),
+                font_name: "Helvetica".into(),
+                font_size: 12.0,
+                font_weight: 400.0,
+                italic_angle: 0.0,
+                font_color: "#000000".into(),
+                contrast_ratio: 21.0,
+                symbol_ends: vec![200.0],
+                text_format: models::enums::TextFormat::Normal,
+                text_type: models::enums::TextType::Regular,
+                pdf_layer: models::enums::PdfLayer::Main,
+                ocg_visible: true,
+                index: Some(0),
+                page_number: Some(1),
+                level: None,
+                mcid: None,
+            },
+        ));
+        let md = output::markdown::to_markdown(&doc).unwrap();
+        assert!(
+            !md.contains("# Penpot - Render"),
+            "uncorroborated metadata title must be skipped when body text exists, got:\n{md}"
+        );
+        assert!(md.contains("MANSUY RAPHAEL"), "got:\n{md}");
     }
 }
