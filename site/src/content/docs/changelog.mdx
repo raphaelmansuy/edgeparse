@@ -10,6 +10,33 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.2] — 2026-10-02
+
+### Fixed
+- Type 3 / Skia font widths and metadata; header/footer swallowing; raster OCR routing; WASM compact JSON
+- ActualText, TJ word gaps, CID/Identity-H, encrypted PDFs, OCG visibility
+
+### Added
+- OCR on/off across Web/WASM/Python/Node/CLI + demo toolbar toggle
+- PDF format helpers (Type3 OCR seam, image region classifier, codecs, OCG, pdf_string)
+- [OCR Models](/guides/ocr-models/) guide — tiers, OPFS/Cache, Hugging Face CSP, self-host / offline
+
+### Changed
+- Site and Web SDK docs: OPFS+Cache (not IndexedDB); CSP includes `huggingface.co`
+
+---
+
+## [0.3.1] — 2026-10-02
+
+### Fixed
+- Skia/Chrome Pattern fills, filled-path decoration, OCR routing for image-only pages
+- Overpaint text dedupe, heading false positives, title/checkbox markdown
+
+### Added
+- Pattern-image fixtures and WASM/Playwright e2e coverage
+
+---
+
 ## [0.3.0] — 2026-10-01
 
 ### Added

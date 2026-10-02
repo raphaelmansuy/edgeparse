@@ -100,36 +100,53 @@ pub fn detect_encryption(doc: &Document) -> EncryptionInfo {
 
 /// Try to load a PDF with an optional password.
 ///
-/// Returns the loaded document or an error if the password is wrong or the file
-/// is otherwise unreadable.
+/// Uses the Standard Security Handler decrypt path in `pdf-cos` (lopdf)
+/// for revisions 2–6 when a password is supplied.
 pub fn load_with_password(
     data: &[u8],
     password: Option<&str>,
 ) -> Result<Document, crate::EdgePdfError> {
-    // lopdf doesn't natively support decryption — for encrypted PDFs,
-    // we attempt a plain load and report encryption status on failure.
-    match Document::load_mem(data) {
-        Ok(doc) => {
-            let info = detect_encryption(&doc);
-            if info.is_encrypted && password.is_none() {
-                log::warn!("Document is encrypted but no password was provided");
-            }
-            Ok(doc)
-        }
-        Err(e) => {
-            if password.is_some() {
-                Err(crate::EdgePdfError::LoadError(format!(
-                    "Failed to load encrypted PDF (password may be incorrect): {}",
-                    e
-                )))
-            } else {
-                Err(crate::EdgePdfError::LoadError(format!(
-                    "Failed to load PDF (may be encrypted — try providing a password): {}",
-                    e
-                )))
-            }
+    let mut doc = Document::load_mem(data).map_err(|e| {
+        crate::EdgePdfError::LoadError(format!(
+            "Failed to load PDF (may be encrypted — try providing a password): {e}"
+        ))
+    })?;
+
+    decrypt_document(&mut doc, password)?;
+    Ok(doc)
+}
+
+/// Decrypt an already-parsed document in place when encrypted.
+///
+/// No-op when the document is not encrypted. When encrypted and `password` is
+/// `None`, attempts an empty-user-password decrypt (common for owner-only locks).
+pub fn decrypt_document(
+    doc: &mut Document,
+    password: Option<&str>,
+) -> Result<(), crate::EdgePdfError> {
+    if !doc.is_encrypted() {
+        return Ok(());
+    }
+
+    let candidates: Vec<&str> = match password {
+        Some(p) => vec![p, ""],
+        None => vec![""],
+    };
+
+    let mut last_err = None;
+    for pw in candidates {
+        match doc.decrypt(pw) {
+            Ok(()) => return Ok(()),
+            Err(e) => last_err = Some(e),
         }
     }
+
+    Err(crate::EdgePdfError::LoadError(format!(
+        "Failed to decrypt PDF (password may be incorrect): {}",
+        last_err
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "unknown error".into())
+    )))
 }
 
 #[cfg(test)]
@@ -149,13 +166,12 @@ mod tests {
 
     #[test]
     fn test_permissions_parsing() {
-        // All permissions granted
         let info = EncryptionInfo {
             is_encrypted: true,
             version: Some(2),
             key_length: Some(128),
             filter: Some("Standard".to_string()),
-            permissions: Some(-1), // All bits set
+            permissions: Some(-1),
         };
         assert!(info.can_print());
         assert!(info.can_copy());
@@ -164,7 +180,6 @@ mod tests {
 
     #[test]
     fn test_restricted_permissions() {
-        // No permissions
         let info = EncryptionInfo {
             is_encrypted: true,
             version: Some(2),
@@ -179,11 +194,16 @@ mod tests {
 
     #[test]
     fn test_load_empty_pdf_bytes() {
-        // Minimal valid PDF
         let mut doc = Document::new();
         let mut buf = Vec::new();
         doc.save_to(&mut buf).unwrap();
         let result = load_with_password(&buf, None);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn decrypt_noop_on_plain_doc() {
+        let mut doc = Document::new();
+        assert!(decrypt_document(&mut doc, Some("secret")).is_ok());
     }
 }

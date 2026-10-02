@@ -1,0 +1,105 @@
+---
+title: "OCR Models"
+description: "Enable, download, package, and self-host PP-OCR models for EdgeParse image-table recovery in the browser and on Node."
+---
+
+import { claims } from '../../../data/benchmark';
+
+## What OCR does
+
+EdgeParse extracts **born-digital** PDF text without any ML stack. Optional OCR recovers text from **image-embedded / raster tables** (and related image regions) when you turn it on.
+
+| Surface | Flag |
+|---------|------|
+| Web SDK | `ParseOptions.enableOcr` (default `true`); create with `ocr: 'off'` to disable |
+| WASM / config | `rasterTableOcr` |
+| Python | `raster_table_ocr` |
+| Node | `rasterTableOcr` |
+| CLI | `--raster-table-ocr` |
+
+When OCR is off or models are declined, born-digital text still extracts; image tables degrade to PDF text with `quality: "degraded"`.
+
+Live demo: **[edgeparse.com/demo/](https://edgeparse.com/demo/)** — toolbar OCR toggle → `enableOcr` without recreating the client.
+
+## Browser path (`@edgeparse/web`)
+
+```bash
+npm install @edgeparse/web edgeparse-wasm
+```
+
+```typescript
+import { EdgeParse } from '@edgeparse/web';
+
+const ep = await EdgeParse.create({
+  models: 'lazy',   // or 'preload' | 'manual' | 'off'
+  ocr: 'small',     // 'tiny' | 'small' | 'medium' | 'off'
+  onBeforeDownload: async (model) =>
+    confirm(`Download ${model.id} (~${(model.bytes / 1e6).toFixed(1)} MB)?`),
+});
+
+const job = ep.parse(file, { format: 'markdown', enableOcr: true });
+const { markdown, quality } = await job.result;
+```
+
+Architecture:
+
+1. **Parse worker** — `ParseSession` (Rust/WASM): plan candidates, finish with OCR words
+2. **OCR worker** — onnxruntime-web (WebGPU → WASM+SIMD), PP-OCRv6
+3. **ModelManager** — pinned [`models.json`](https://github.com/raphaelmansuy/edgeparse/blob/main/sdks/web/models/models.json), **OPFS then Cache API** (not IndexedDB), sha256 verify, Web Locks
+
+## Tiers and sizes
+
+Default tier is **`small`**. Approximate download sizes (det + rec + dict from the shipped manifest):
+
+| Tier | Approx. size | `minCapability` |
+|------|--------------|-----------------|
+| `tiny` | ~6.4 MB | `simd` |
+| `small` | ~31 MB | `simd` |
+| `medium` | ~139 MB | `webgpu` |
+
+Weights are **Apache-2.0** PP-OCRv6 artifacts (Hugging Face `snowfluke/ppu-paddle-ocr-models`). Attribute the license in redistributions.
+
+## Download, cache, offline
+
+- **npm ships the pinned manifest only** (`models/models.json` + sha256). Weight blobs are fetched at runtime.
+- Primary host: **Hugging Face**; dictionary failover includes **jsDelivr**.
+- After a successful download, artifacts stay in **OPFS** (preferred) or the **Cache API**.
+- `models: 'preload'` (or `ep.models.preload()`) once online → that tier works **offline** later.
+- If the browser is offline and the model is not cached → error code `OFFLINE` (parse degrades).
+- With `navigator.connection.saveData`, downloads ask consent again or skip (`ABORTED`).
+
+## Consent
+
+`onBeforeDownload` runs before each uncached artifact. Return `false` to skip OCR for that model; the parse continues with `quality: "degraded"`.
+
+## Self-host / air-gap
+
+Pass a custom `manifest` whose `urls` point at your CDN (keep the same `sha256` / `bytes`):
+
+```typescript
+const ep = await EdgeParse.create({
+  ocr: 'small',
+  manifest: myManifest, // same schema as models/models.json
+  onBeforeDownload: () => true,
+});
+```
+
+CSP `connect-src` must allow those hosts. See [CSP.md](https://github.com/raphaelmansuy/edgeparse/blob/main/sdks/web/docs/CSP.md).
+
+## Publishing note
+
+Release CI runs `npm run check-models` and **fails closed** on placeholder sha256s. Published `@edgeparse/web` includes the pinned manifest, not the multi‑MB weight files.
+
+## Native / Node (separate from web PP-OCR)
+
+| Path | Behavior |
+|------|----------|
+| `@edgeparse/web/node` | `NullOcrBackend` by default; optional `NodePpocrBackend` (onnxruntime-node) |
+| Native ocrs | Optional `.rten` models via `EDGEPARSE_OCRS_MODEL_DIR` — **not** the web PP-OCR ORT packages |
+
+## See also
+
+- [Quick Start: Web SDK](/getting-started/quick-start-web-sdk/)
+- [Web SDK API](/api/web-sdk/)
+- [WASM Use Cases](/guides/wasm-use-cases/)
+- EdgeParse {claims.version} changelog

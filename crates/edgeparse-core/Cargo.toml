@@ -40,6 +40,8 @@ rten = { version = "0.26", optional = true, default-features = false, features =
 rten-imageproc = { version = "0.26", optional = true }
 js-sys = { version = "0.3", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
+hayro-jbig2 = { version = "0.3", optional = true, default-features = false, features = ["std"] }
+jpeg2k = { version = "0.9", optional = true }
 
 [features]
 default = ["native"]
@@ -49,5 +51,9 @@ native = ["dep:rayon", "image", "dep:zip", "lopdf/rayon"]
 wasm = ["lopdf/wasm_js", "image", "dep:js-sys", "dep:wasm-bindgen"]
 hybrid = ["dep:reqwest", "dep:tokio"]
 ocr-ocrs = ["dep:ocrs", "dep:rten", "dep:rten-imageproc", "image"]
+# Optional PDF image codecs for the OCR path (scanned / hybrid pages).
+codecs-jbig2 = ["dep:hayro-jbig2", "image"]
+codecs-jpx = ["dep:jpeg2k", "image"]
+codecs = ["codecs-jbig2", "codecs-jpx"]
 
 [dev-dependencies]

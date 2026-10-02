@@ -61,6 +61,21 @@ export function createToolbar(): HTMLElement {
     overlayBtn.setAttribute('aria-pressed', String(next));
   });
 
+  // OCR toggle — re-parses when a PDF is loaded
+  const ocrBtn = el('button', {
+    className: 'toolbar__btn toolbar__btn--ocr toolbar__btn--active',
+    textContent: 'OCR',
+    ariaLabel: 'Toggle raster OCR',
+    ariaPressed: 'true',
+  }) as HTMLButtonElement;
+
+  ocrBtn.addEventListener('click', () => {
+    const next = !store.get('enableOcr');
+    store.set('enableOcr', next);
+    ocrBtn.classList.toggle('toolbar__btn--active', next);
+    ocrBtn.setAttribute('aria-pressed', String(next));
+  });
+
   // Dark mode toggle
   const darkBtn = el('button', {
     className: 'toolbar__btn toolbar__btn--dark',
@@ -81,7 +96,7 @@ export function createToolbar(): HTMLElement {
   const div2 = el('span', { className: 'toolbar__divider', ariaHidden: 'true' });
 
   const actions = el('div', { className: 'toolbar__actions' });
-  actions.append(uploadBtn, div1, formatTabs, div2, overlayBtn, darkBtn);
+  actions.append(uploadBtn, div1, formatTabs, div2, ocrBtn, overlayBtn, darkBtn);
 
   header.append(brand, actions);
   return header;

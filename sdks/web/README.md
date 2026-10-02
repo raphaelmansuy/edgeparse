@@ -31,7 +31,28 @@ const job = ep.parse(file, { format: 'markdown', tableMethod: 'cluster' });
 job.on('progress', (p) => console.log(p.fraction, p.label));
 const result = await job.result;
 // result.quality: 'full' | 'degraded' | 'skipped'
+
+// Disable raster OCR for a single parse (born-digital text only):
+// const job = ep.parse(file, { format: 'markdown', enableOcr: false });
 ```
+
+## Models
+
+PP-OCRv6 tiers (Apache-2.0). The npm package ships a **pinned manifest** (`models/models.json` + sha256); weight blobs download at runtime from Hugging Face (jsDelivr dict failover).
+
+| Tier | Approx. size | Notes |
+|------|--------------|--------|
+| `tiny` | ~6.4 MB | SIMD |
+| `small` (default) | ~31 MB | SIMD |
+| `medium` | ~139 MB | prefers WebGPU |
+
+- Storage: **OPFS**, then **Cache API** (not IndexedDB)
+- Consent: `onBeforeDownload` before each uncached artifact
+- Offline: preload once online (`models: 'preload'` or `ep.models.preload()`), then that tier works offline; uncached + offline → `OFFLINE`
+- `saveData` / low memory: downloads may prompt again or skip
+- Self-host: pass a custom `manifest` with rewritten `urls` (same sha256); update CSP
+
+Full guide: [OCR Models](https://www.edgeparse.com/guides/ocr-models/)
 
 ## Architecture
 
@@ -43,7 +64,7 @@ Missing OCR never fails a parse — cells fall back to PDF text and `quality: "d
 
 ## CSP
 
-See [docs/CSP.md](./docs/CSP.md).
+See [docs/CSP.md](./docs/CSP.md). Allow `https://huggingface.co` (and jsDelivr) in `connect-src`.
 
 ## Node / benchmarks
 
@@ -51,3 +72,5 @@ See [docs/CSP.md](./docs/CSP.md).
 import { parsePdfFile } from '@edgeparse/web/node';
 const result = await parsePdfFile('./doc.pdf', { format: 'markdown' });
 ```
+
+Default Node OCR backend is `NullOcrBackend`; use `NodePpocrBackend` when onnxruntime-node is available.

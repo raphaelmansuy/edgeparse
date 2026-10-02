@@ -116,6 +116,9 @@ pub struct ProcessingConfig {
     pub image_dir: Option<String>,
     /// Enable raster table OCR recovery on image-based tables
     pub raster_table_ocr: bool,
+    /// Soft wall-clock budget for raster OCR recovery (milliseconds).
+    /// `None` = unlimited. When exhausted, remaining images are skipped.
+    pub ocr_budget_ms: Option<u64>,
     /// Pages to extract (e.g., "1,3,5-7")
     pub pages: Option<String>,
     /// Include headers/footers in output
@@ -153,6 +156,7 @@ impl Default for ProcessingConfig {
             image_format: ImageFormat::Png,
             image_dir: None,
             raster_table_ocr: true,
+            ocr_budget_ms: None,
             pages: None,
             include_header_footer: false,
             hybrid: HybridBackend::Off,
@@ -177,6 +181,11 @@ impl ProcessingConfig {
     /// Independent of Docling hybrid; disabled only via `raster_table_ocr`.
     pub fn raster_table_ocr_enabled(&self) -> bool {
         self.raster_table_ocr
+    }
+
+    /// OCR wall-clock budget for this document.
+    pub fn ocr_budget(&self) -> crate::pdf::image_region::OcrBudget {
+        crate::pdf::image_region::OcrBudget::from_millis(self.ocr_budget_ms)
     }
 }
 

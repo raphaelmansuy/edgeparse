@@ -381,6 +381,9 @@ export class EdgeParse {
     const t0 = performance.now();
     emit('opening', 'Opening PDF', JOB_WEIGHTS.opening * 0.5);
 
+    const rasterTableOcr =
+      opts.enableOcr !== false && this.tier !== 'off';
+
     const planned = await this.workerRequest<{
       type: 'planned';
       candidates: CandidateMeta[];
@@ -392,6 +395,7 @@ export class EdgeParse {
         pages: opts.pages,
         readingOrder: opts.readingOrder,
         tableMethod: opts.tableMethod,
+        rasterTableOcr,
         fileName:
           opts.fileName ??
           (typeof File !== 'undefined' && input instanceof File ? input.name : 'uploaded.pdf'),
@@ -429,6 +433,7 @@ export class EdgeParse {
     // accepted/declined, leaving the markdown pane empty.
     let ocrReady = false;
     if (
+      rasterTableOcr &&
       candidates.length > 0 &&
       this.tier !== 'off' &&
       this.options.models !== 'off' &&
@@ -456,6 +461,8 @@ export class EdgeParse {
     } else if (candidates.length > 0 && this.options.models === 'manual') {
       quality = 'degraded';
       warnings.push('OCR models policy is manual — skipping download');
+    } else if (!rasterTableOcr && candidates.length === 0) {
+      // Explicit OCR off — no warning; born-digital text only.
     }
 
     const tOcr = performance.now();

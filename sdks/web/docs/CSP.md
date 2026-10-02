@@ -7,7 +7,7 @@ Content-Security-Policy:
   default-src 'self';
   script-src 'self' 'wasm-unsafe-eval';
   worker-src 'self' blob:;
-  connect-src 'self' https://cdn.jsdelivr.net https://cdn.jsdelivr.net/gh/;
+  connect-src 'self' https://huggingface.co https://cdn.jsdelivr.net https://cdn.jsdelivr.net/gh/;
   img-src 'self' data: blob:;
   style-src 'self' 'unsafe-inline';
 ```
@@ -16,7 +16,7 @@ Notes:
 
 - **`script-src 'wasm-unsafe-eval'`** — required for WebAssembly instantiate.
 - **`worker-src`** — parse + OCR module workers (and `blob:` if your bundler inlines workers).
-- **`connect-src`** — allowlist model CDN hosts from `models/models.json` only.
+- **`connect-src`** — allowlist model hosts from `models/models.json` (Hugging Face is primary; jsDelivr is a dict failover). Add any self-hosted CDN you put in a custom `manifest`.
 - **No `eval`** — the SDK never calls `eval` / `new Function`.
 - **No COOP/COEP required** — the two-phase OCR path avoids `Atomics.wait`.
 

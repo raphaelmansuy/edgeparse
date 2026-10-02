@@ -109,6 +109,12 @@ export interface ParseOptions {
   fileName?: string;
   signal?: AbortSignal;
   backendMarkdown?: string | null;
+  /**
+   * Enable raster OCR (candidate collection + host PP-OCR). Default true.
+   * When false, skips OCR models and sets core `rasterTableOcr: false`.
+   * Also disabled when `EdgeParse.create({ ocr: 'off' })`.
+   */
+  enableOcr?: boolean;
 }
 
 export interface ResultMeta {

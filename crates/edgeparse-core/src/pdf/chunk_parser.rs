@@ -19,6 +19,8 @@ use crate::EdgePdfError;
 
 use super::font::{resolve_page_fonts, FontCache, PdfFont};
 use super::graphics_state::{GraphicsStateStack, Matrix};
+use super::ocg::{load_ocg_visibility, OcgVisibility};
+use super::pdf_string::decode_pdf_string;
 
 /// Maximum recursion depth for Form XObject processing (prevents infinite loops).
 const MAX_FORM_RECURSION_DEPTH: u32 = 10;
@@ -94,6 +96,7 @@ pub fn extract_page_chunks(
     let resources = resolve_page_resources(doc, &page_dict);
 
     let mut parser = ChunkParserState::new(page_number, font_cache);
+    parser.ocg = load_ocg_visibility(doc);
     parser.process_operations(doc, &content.operations, &resources, 0);
 
     Ok(parser.into_page_chunks())
@@ -129,6 +132,16 @@ struct ChunkParserState {
 
     // Marked content tracking
     mcid_stack: Vec<Option<i64>>,
+    /// Stack of `/ActualText` replacements from BDC spans (ISO 32000-1 §14.9.4).
+    /// `Some(text)` means glyph shows in this span must be replaced; the text
+    /// is emitted once on the first show operator, then suppressed until EMC.
+    actual_text_stack: Vec<Option<String>>,
+    /// True after we've emitted the ActualText for the current innermost span.
+    actual_text_emitted: Vec<bool>,
+    /// Catalog OCG default visibility.
+    ocg: OcgVisibility,
+    /// Per marked-content span: whether content is OCG-visible (innermost wins).
+    ocg_visible_stack: Vec<bool>,
 
     // Path construction state
     current_path: Vec<PathSegment>,
@@ -154,6 +167,10 @@ impl ChunkParserState {
             line_index: 0,
 
             mcid_stack: Vec::new(),
+            actual_text_stack: Vec::new(),
+            actual_text_emitted: Vec::new(),
+            ocg: OcgVisibility::default(),
+            ocg_visible_stack: Vec::new(),
 
             current_path: Vec::new(),
             subpath_start: None,
@@ -184,20 +201,41 @@ impl ChunkParserState {
                 // ── Marked content operators ──
                 "BMC" => {
                     self.mcid_stack.push(None);
+                    self.actual_text_stack.push(None);
+                    self.actual_text_emitted.push(false);
+                    self.ocg_visible_stack
+                        .push(self.current_ocg_visible());
                 }
                 "BDC" => {
-                    let mcid = extract_mcid_from_bdc(&op.operands);
+                    let props = resolve_bdc_properties(doc, resources, &op.operands);
+                    let mcid = props.as_ref().and_then(|d| {
+                        d.get(b"MCID").ok().and_then(|o| match o {
+                            Object::Integer(n) => Some(*n),
+                            _ => None,
+                        })
+                    });
+                    let actual = props.as_ref().and_then(extract_actual_text);
+                    let visible = props
+                        .as_ref()
+                        .and_then(|d| ocg_visibility_from_props(doc, d, &self.ocg))
+                        .unwrap_or_else(|| self.current_ocg_visible());
                     self.mcid_stack.push(mcid);
+                    self.actual_text_stack.push(actual);
+                    self.actual_text_emitted.push(false);
+                    self.ocg_visible_stack.push(visible);
                 }
                 "EMC" => {
                     self.mcid_stack.pop();
+                    self.actual_text_stack.pop();
+                    self.actual_text_emitted.pop();
+                    self.ocg_visible_stack.pop();
                 }
 
                 // ── Graphics state ──
                 "q" => self.gs_stack.save(),
                 "Q" => self.gs_stack.restore(),
-                "cm" => {
-                    if op.operands.len() == 6 {
+                "cm"
+                    if op.operands.len() == 6 => {
                         let vals: Vec<f64> = op
                             .operands
                             .iter()
@@ -208,7 +246,6 @@ impl ChunkParserState {
                                 .concat_ctm(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
                         }
                     }
-                }
                 "gs" => {
                     // Extended Graphics State — look up in /ExtGState resources
                     if let Some(name) = op.operands.first().and_then(obj_name_bytes) {
@@ -220,8 +257,8 @@ impl ChunkParserState {
                 "BT" => self.gs_stack.current.begin_text(),
                 "ET" => {}
 
-                "Tf" => {
-                    if op.operands.len() == 2 {
+                "Tf"
+                    if op.operands.len() == 2 => {
                         if let Object::Name(ref name) = op.operands[0] {
                             self.gs_stack.current.text_state.font_name =
                                 String::from_utf8_lossy(name).to_string();
@@ -230,7 +267,6 @@ impl ChunkParserState {
                             self.gs_stack.current.text_state.font_size = size;
                         }
                     }
-                }
                 "Tc" => {
                     if let Some(v) = op.operands.first().and_then(|o| obj_to_f64(o.clone())) {
                         self.gs_stack.current.text_state.char_spacing = v;
@@ -263,23 +299,21 @@ impl ChunkParserState {
                 }
 
                 // ── Text positioning ──
-                "Td" => {
-                    if op.operands.len() == 2 {
+                "Td"
+                    if op.operands.len() == 2 => {
                         let tx = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                         let ty = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                         self.gs_stack.current.translate_text(tx, ty);
                     }
-                }
-                "TD" => {
-                    if op.operands.len() == 2 {
+                "TD"
+                    if op.operands.len() == 2 => {
                         let tx = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                         let ty = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                         self.gs_stack.current.text_state.leading = -ty;
                         self.gs_stack.current.translate_text(tx, ty);
                     }
-                }
-                "Tm" => {
-                    if op.operands.len() == 6 {
+                "Tm"
+                    if op.operands.len() == 6 => {
                         let vals: Vec<f64> = op
                             .operands
                             .iter()
@@ -291,7 +325,6 @@ impl ChunkParserState {
                             );
                         }
                     }
-                }
                 "T*" => {
                     self.gs_stack.current.next_line();
                 }
@@ -313,8 +346,8 @@ impl ChunkParserState {
                         self.emit_text_chunk(&text_bytes);
                     }
                 }
-                "\"" => {
-                    if op.operands.len() == 3 {
+                "\""
+                    if op.operands.len() == 3 => {
                         if let Some(aw) = obj_to_f64(op.operands[0].clone()) {
                             self.gs_stack.current.text_state.word_spacing = aw;
                         }
@@ -326,7 +359,6 @@ impl ChunkParserState {
                             self.emit_text_chunk(&text_bytes);
                         }
                     }
-                }
 
                 // ── Color operators ──
                 "g" => {
@@ -341,26 +373,24 @@ impl ChunkParserState {
                         self.gs_stack.current.stroke_color_space_components = 1;
                     }
                 }
-                "rg" => {
-                    if op.operands.len() == 3 {
+                "rg"
+                    if op.operands.len() == 3 => {
                         let r = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                         let g = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                         let b = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
                         self.gs_stack.current.fill_color = vec![r, g, b];
                         self.gs_stack.current.fill_color_space_components = 3;
                     }
-                }
-                "RG" => {
-                    if op.operands.len() == 3 {
+                "RG"
+                    if op.operands.len() == 3 => {
                         let r = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                         let g = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                         let b = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
                         self.gs_stack.current.stroke_color = vec![r, g, b];
                         self.gs_stack.current.stroke_color_space_components = 3;
                     }
-                }
-                "k" => {
-                    if op.operands.len() == 4 {
+                "k"
+                    if op.operands.len() == 4 => {
                         let c = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                         let m = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                         let y = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
@@ -368,9 +398,8 @@ impl ChunkParserState {
                         self.gs_stack.current.fill_color = vec![c, m, y, kk];
                         self.gs_stack.current.fill_color_space_components = 4;
                     }
-                }
-                "K" => {
-                    if op.operands.len() == 4 {
+                "K"
+                    if op.operands.len() == 4 => {
                         let c = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                         let m = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                         let y = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
@@ -378,7 +407,6 @@ impl ChunkParserState {
                         self.gs_stack.current.stroke_color = vec![c, m, y, kk];
                         self.gs_stack.current.stroke_color_space_components = 4;
                     }
-                }
                 "cs" => {
                     if let Some(name) = op.operands.first() {
                         let cs_name = obj_to_name(name);
@@ -439,8 +467,8 @@ impl ChunkParserState {
                 }
 
                 // ── Path construction ──
-                "m" => {
-                    if op.operands.len() >= 2 {
+                "m"
+                    if op.operands.len() >= 2 => {
                         if let (Some(x), Some(y)) = (
                             op.operands.first().and_then(|o| obj_to_f64(o.clone())),
                             op.operands.get(1).and_then(|o| obj_to_f64(o.clone())),
@@ -450,9 +478,8 @@ impl ChunkParserState {
                             self.current_point = Some((tx, ty));
                         }
                     }
-                }
-                "l" => {
-                    if op.operands.len() >= 2 {
+                "l"
+                    if op.operands.len() >= 2 => {
                         if let (Some(x), Some(y)) = (
                             op.operands.first().and_then(|o| obj_to_f64(o.clone())),
                             op.operands.get(1).and_then(|o| obj_to_f64(o.clone())),
@@ -469,9 +496,8 @@ impl ChunkParserState {
                             self.current_point = Some((tx, ty));
                         }
                     }
-                }
-                "c" => {
-                    if op.operands.len() >= 6 {
+                "c"
+                    if op.operands.len() >= 6 => {
                         let vals: Vec<f64> = op
                             .operands
                             .iter()
@@ -496,9 +522,8 @@ impl ChunkParserState {
                             self.current_point = Some((tx, ty));
                         }
                     }
-                }
-                "v" => {
-                    if op.operands.len() >= 4 {
+                "v"
+                    if op.operands.len() >= 4 => {
                         let vals: Vec<f64> = op
                             .operands
                             .iter()
@@ -522,9 +547,8 @@ impl ChunkParserState {
                             self.current_point = Some((tx, ty));
                         }
                     }
-                }
-                "y" => {
-                    if op.operands.len() >= 4 {
+                "y"
+                    if op.operands.len() >= 4 => {
                         let vals: Vec<f64> = op
                             .operands
                             .iter()
@@ -548,7 +572,6 @@ impl ChunkParserState {
                             self.current_point = Some((tx, ty));
                         }
                     }
-                }
                 "h" => {
                     if let (Some((sx, sy)), Some((cx, cy))) =
                         (self.subpath_start, self.current_point)
@@ -564,8 +587,8 @@ impl ChunkParserState {
                         self.current_point = self.subpath_start;
                     }
                 }
-                "re" => {
-                    if op.operands.len() >= 4 {
+                "re"
+                    if op.operands.len() >= 4 => {
                         let vals: Vec<f64> = op
                             .operands
                             .iter()
@@ -600,7 +623,6 @@ impl ChunkParserState {
                             self.current_point = Some((x1, y1));
                         }
                     }
-                }
 
                 // ── Path painting ──
                 "S" => {
@@ -673,6 +695,29 @@ impl ChunkParserState {
             .unwrap_or_else(|| PdfFont::default_font(&self.gs_stack.current.text_state.font_name));
         let active_mcid = self.active_mcid();
 
+        // ISO 32000-1 §14.9.4: /ActualText replaces glyph text for extraction.
+        if let Some(actual) = self.active_actual_text() {
+            if self.mark_actual_text_emitted() {
+                if let Some(chunk) = create_text_chunk_with_override(
+                    text_bytes,
+                    Some(&actual),
+                    &font,
+                    &mut self.gs_stack,
+                    self.page_number,
+                    &mut self.text_index,
+                    active_mcid,
+                ) {
+                    let mut chunk = chunk;
+                    chunk.ocg_visible = self.current_ocg_visible();
+                    self.text_chunks.push(chunk);
+                }
+            } else {
+                // Span already emitted ActualText — advance matrix only.
+                advance_text_matrix(text_bytes, &font, &mut self.gs_stack);
+            }
+            return;
+        }
+
         if let Some(chunk) = create_text_chunk(
             text_bytes,
             &font,
@@ -681,6 +726,8 @@ impl ChunkParserState {
             &mut self.text_index,
             active_mcid,
         ) {
+            let mut chunk = chunk;
+            chunk.ocg_visible = self.current_ocg_visible();
             self.text_chunks.push(chunk);
         }
     }
@@ -692,11 +739,32 @@ impl ChunkParserState {
             .cloned()
             .unwrap_or_else(|| PdfFont::default_font(&self.gs_stack.current.text_state.font_name));
         let active_mcid = self.active_mcid();
+        let actual = self.active_actual_text();
+        let mut emitted_actual = false;
 
         for item in arr {
             match item {
                 Object::String(bytes, _) => {
-                    if let Some(chunk) = create_text_chunk(
+                    if let Some(ref actual_text) = actual {
+                        if !emitted_actual && self.mark_actual_text_emitted() {
+                            emitted_actual = true;
+                            if let Some(chunk) = create_text_chunk_with_override(
+                                bytes,
+                                Some(actual_text),
+                                &font,
+                                &mut self.gs_stack,
+                                self.page_number,
+                                &mut self.text_index,
+                                active_mcid,
+                            ) {
+                                let mut chunk = chunk;
+                                chunk.ocg_visible = self.current_ocg_visible();
+                                self.text_chunks.push(chunk);
+                            }
+                        } else {
+                            advance_text_matrix(bytes, &font, &mut self.gs_stack);
+                        }
+                    } else if let Some(chunk) = create_text_chunk(
                         bytes,
                         &font,
                         &mut self.gs_stack,
@@ -704,13 +772,33 @@ impl ChunkParserState {
                         &mut self.text_index,
                         active_mcid,
                     ) {
+                        let mut chunk = chunk;
+                        chunk.ocg_visible = self.current_ocg_visible();
                         self.text_chunks.push(chunk);
                     }
                 }
                 _ => {
                     if let Some(adj) = obj_to_f64(item.clone()) {
-                        let displacement =
-                            -adj / 1000.0 * self.gs_stack.current.text_state.font_size;
+                        // Large negative TJ adjustments open visual gaps that
+                        // often encode word spaces (TeX / InDesign). Insert an
+                        // explicit space glyph-width advance threshold.
+                        let font_size = self.gs_stack.current.text_state.font_size.max(1.0);
+                        if adj <= SpaceThreshold::TJ_WORD_GAP_THOUSANDTHS {
+                            // Record a synthetic space chunk so needs_space /
+                            // whitespace filters see an explicit boundary.
+                            if let Some(chunk) = create_synthetic_space_chunk(
+                                &mut self.gs_stack,
+                                self.page_number,
+                                &mut self.text_index,
+                                active_mcid,
+                                font_size,
+                            ) {
+                                let mut chunk = chunk;
+                                chunk.ocg_visible = self.current_ocg_visible();
+                                self.text_chunks.push(chunk);
+                            }
+                        }
+                        let displacement = -adj / 1000.0 * font_size;
                         self.gs_stack.current.advance_text(displacement);
                     }
                 }
@@ -764,12 +852,11 @@ impl ChunkParserState {
                 // Image XObject → create ImageChunk with CTM-based bbox
                 self.emit_image_from_ctm();
             }
-            Some("Form") => {
+            Some("Form")
                 // Form XObject → recursive content stream processing
-                if recursion_depth < MAX_FORM_RECURSION_DEPTH {
+                if recursion_depth < MAX_FORM_RECURSION_DEPTH => {
                     self.process_form_xobject(doc, &stream, resources, recursion_depth);
                 }
-            }
             _ => {}
         }
     }
@@ -1173,11 +1260,45 @@ impl ChunkParserState {
     fn active_mcid(&self) -> Option<i64> {
         self.mcid_stack.iter().rev().find_map(|&mcid| mcid)
     }
+
+    /// Innermost non-empty `/ActualText` on the marked-content stack.
+    fn active_actual_text(&self) -> Option<String> {
+        self.actual_text_stack
+            .iter()
+            .rev()
+            .find_map(|t| t.clone())
+    }
+
+    /// Mark the innermost ActualText span as emitted. Returns true if this
+    /// call is the first emission for that span.
+    fn mark_actual_text_emitted(&mut self) -> bool {
+        if let Some(flag) = self.actual_text_emitted.last_mut() {
+            if !*flag {
+                *flag = true;
+                return true;
+            }
+            return false;
+        }
+        true
+    }
+
+    /// Current OCG visibility (innermost marked-content span, default true).
+    fn current_ocg_visible(&self) -> bool {
+        self.ocg_visible_stack.last().copied().unwrap_or(true)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // Helper functions (shared with text_extractor for backward compat)
 // ═══════════════════════════════════════════════════════════════════
+
+/// Named thresholds for gap→space decisions (no scattered magic numbers).
+struct SpaceThreshold;
+impl SpaceThreshold {
+    /// TJ adjustment (thousandths of em) at or below which we insert a word space.
+    /// −200 ≈ 0.2 em visual gap, typical for justified word separators.
+    const TJ_WORD_GAP_THOUSANDTHS: f64 = -200.0;
+}
 
 /// Create a TextChunk from raw text bytes — same logic as text_extractor.
 fn create_text_chunk(
@@ -1188,7 +1309,29 @@ fn create_text_chunk(
     chunk_index: &mut usize,
     mcid: Option<i64>,
 ) -> Option<TextChunk> {
-    if text_bytes.is_empty() {
+    create_text_chunk_with_override(
+        text_bytes,
+        None,
+        font,
+        state,
+        page_number,
+        chunk_index,
+        mcid,
+    )
+}
+
+/// Like [`create_text_chunk`], but optionally override the decoded Unicode
+/// (used for `/ActualText`). Glyph widths still come from `text_bytes`.
+fn create_text_chunk_with_override(
+    text_bytes: &[u8],
+    unicode_override: Option<&str>,
+    font: &PdfFont,
+    state: &mut GraphicsStateStack,
+    page_number: u32,
+    chunk_index: &mut usize,
+    mcid: Option<i64>,
+) -> Option<TextChunk> {
+    if text_bytes.is_empty() && unicode_override.is_none_or(|s| s.is_empty()) {
         return None;
     }
 
@@ -1215,7 +1358,9 @@ fn create_text_chunk(
         pos += bpc;
 
         let decoded = font.decode_char(char_code);
-        text.push_str(&decoded);
+        if unicode_override.is_none() {
+            text.push_str(&decoded);
+        }
 
         let glyph_w = font.glyph_width(char_code) / 1000.0;
         total_width += glyph_w;
@@ -1229,6 +1374,16 @@ fn create_text_chunk(
         }
     }
 
+    if let Some(over) = unicode_override {
+        text = over.to_string();
+        if symbol_ends.is_empty() {
+            // No glyph bytes — estimate width from character count.
+            let est = over.chars().count() as f64 * 0.5;
+            total_width = est;
+            symbol_ends.push(start_x + est * font_size);
+        }
+    }
+
     let displacement = total_width * state.current.text_state.font_size;
     state.current.advance_text(displacement);
 
@@ -1236,17 +1391,11 @@ fn create_text_chunk(
         return None;
     }
 
-    // Compute TRM_after (text rendering matrix after text advancement)
     let trm_after = state.current.text_rendering_matrix();
-
-    // Use font ascent/descent from font descriptor (glyph-space units, per-mille).
     let ascent = font.ascent;
     let descent = font.descent;
-
-    // TRM matrix: a=scaleX, b=shearY, c=shearX, d=scaleY, e=translateX, f=translateY
     let trm_before = &trm;
 
-    // The reference bbox formula with 4 branches based on text direction/orientation.
     let (x1, x2) = if trm_before.a >= 0.0 && trm_before.c >= 0.0 {
         (
             trm_before.e + descent * trm_before.c / 1000.0,
@@ -1308,9 +1457,6 @@ fn create_text_chunk(
         "[{}]",
         fc.iter()
             .map(|v| {
-                // The reference veraPDF stores colors as the reference implementation float (f32), then serializes
-                // via double's toString(), giving full f64 representation of the f32 value.
-                // We replicate: parse as f64 (from lopdf) → round to f32 → back to f64.
                 let f32_val = *v as f32;
                 let f64_repr = f32_val as f64;
                 if f32_val.fract() == 0.0 {
@@ -1334,6 +1480,62 @@ fn create_text_chunk(
         contrast_ratio: 21.0,
         symbol_ends,
         text_format,
+        text_type: crate::models::enums::TextType::Regular,
+        pdf_layer: crate::models::enums::PdfLayer::Main,
+        ocg_visible: true,
+        index: Some(*chunk_index),
+        page_number: Some(page_number),
+        level: None,
+        mcid,
+    })
+}
+
+/// Advance the text matrix for `text_bytes` without emitting a chunk.
+fn advance_text_matrix(text_bytes: &[u8], font: &PdfFont, state: &mut GraphicsStateStack) {
+    let font_size = state.current.text_state.font_size.max(0.1);
+    let bpc = font.bytes_per_code as usize;
+    let mut total_width = 0.0;
+    let mut pos = 0;
+    while pos + bpc <= text_bytes.len() {
+        let char_code = if bpc == 2 {
+            ((text_bytes[pos] as u32) << 8) | (text_bytes[pos + 1] as u32)
+        } else {
+            text_bytes[pos] as u32
+        };
+        pos += bpc;
+        let decoded = font.decode_char(char_code);
+        total_width += font.glyph_width(char_code) / 1000.0;
+        total_width += state.current.text_state.char_spacing / font_size;
+        if decoded == " " {
+            total_width += state.current.text_state.word_spacing / font_size;
+        }
+    }
+    state.current.advance_text(total_width * font_size);
+}
+
+/// Emit a tiny whitespace chunk so word-boundary detectors see an explicit space.
+fn create_synthetic_space_chunk(
+    state: &mut GraphicsStateStack,
+    page_number: u32,
+    chunk_index: &mut usize,
+    mcid: Option<i64>,
+    font_size: f64,
+) -> Option<TextChunk> {
+    let trm = state.current.text_rendering_matrix();
+    let x = trm.e;
+    let y = trm.f;
+    *chunk_index += 1;
+    Some(TextChunk {
+        value: " ".to_string(),
+        bbox: BoundingBox::new(Some(page_number), x, y, x + font_size * 0.25, y + font_size),
+        font_name: String::new(),
+        font_size,
+        font_weight: 400.0,
+        italic_angle: 0.0,
+        font_color: "[0.0]".to_string(),
+        contrast_ratio: 21.0,
+        symbol_ends: vec![x + font_size * 0.25],
+        text_format: crate::models::enums::TextFormat::Normal,
         text_type: crate::models::enums::TextType::Regular,
         pdf_layer: crate::models::enums::PdfLayer::Main,
         ocg_visible: true,
@@ -1547,16 +1749,69 @@ fn extract_string_bytes(obj: &Object) -> Option<Vec<u8>> {
     }
 }
 
-fn extract_mcid_from_bdc(operands: &[Object]) -> Option<i64> {
+/// Resolve the BDC properties dictionary (inline or named via `/Properties`).
+fn resolve_bdc_properties(
+    doc: &Document,
+    resources: &Dictionary,
+    operands: &[Object],
+) -> Option<Dictionary> {
     if operands.len() < 2 {
         return None;
     }
     match &operands[1] {
-        Object::Dictionary(dict) => {
-            if let Ok(Object::Integer(n)) = dict.get(b"MCID") {
-                return Some(*n);
+        Object::Dictionary(dict) => Some(dict.clone()),
+        Object::Name(name) => {
+            let props = resources.get(b"Properties").ok()?;
+            let props_dict = match resolve_obj(doc, props) {
+                Object::Dictionary(d) => d,
+                _ => return None,
+            };
+            match props_dict.get(name.as_slice()).ok() {
+                Some(obj) => match resolve_obj(doc, obj) {
+                    Object::Dictionary(d) => Some(d),
+                    _ => None,
+                },
+                None => None,
             }
-            None
+        }
+        Object::Reference(id) => match doc.get_object(*id).ok()? {
+            Object::Dictionary(d) => Some(d.clone()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Extract `/ActualText` from a marked-content properties dictionary.
+fn extract_actual_text(props: &Dictionary) -> Option<String> {
+    let obj = props.get(b"ActualText").ok()?;
+    match obj {
+        Object::String(bytes, _) => {
+            let s = decode_pdf_string(bytes);
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Resolve `/OC` on a BDC properties dict against catalog OCG defaults.
+fn ocg_visibility_from_props(
+    doc: &Document,
+    props: &Dictionary,
+    vis: &OcgVisibility,
+) -> Option<bool> {
+    let oc = props.get(b"OC").ok()?;
+    match resolve_obj(doc, oc) {
+        Object::Reference(id) => Some(vis.is_visible(id)),
+        Object::Dictionary(d) => {
+            // Optional content membership dict — honor /Type /OCG by name lookup
+            // when we only have an inline dict without a stable id (treat as ON).
+            let _ = d;
+            Some(true)
         }
         _ => None,
     }
@@ -2126,5 +2381,156 @@ mod tests {
         let chunks = extract_page_chunks(&doc, page_num, page_id).unwrap();
         assert_eq!(chunks.line_chunks.len(), 1, "Expected 1 horizontal line");
         assert!(chunks.line_chunks[0].is_horizontal_line);
+    }
+
+    #[test]
+    fn test_actual_text_bdc_replaces_glyphs() {
+        // Glyph shows "xx" but /ActualText says "42" — extraction must prefer ActualText.
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Helvetica",
+        });
+
+        // UTF-16BE BOM + "42"
+        let actual_bytes: Vec<u8> = vec![0xFE, 0xFF, 0x00, b'4', 0x00, b'2'];
+        let content = Content {
+            operations: vec![
+                Operation::new("BT", vec![]),
+                Operation::new("Tf", vec!["F1".into(), 12.into()]),
+                Operation::new("Td", vec![72.into(), 720.into()]),
+                Operation::new(
+                    "BDC",
+                    vec![
+                        "Span".into(),
+                        Object::Dictionary(dictionary! {
+                            "ActualText" => Object::String(
+                                actual_bytes,
+                                lopdf::StringFormat::Hexadecimal,
+                            ),
+                        }),
+                    ],
+                ),
+                Operation::new("Tj", vec![Object::string_literal("xx")]),
+                Operation::new("EMC", vec![]),
+                Operation::new("ET", vec![]),
+            ],
+        };
+
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "Resources" => resources_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => 1,
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+
+        let pages = doc.get_pages();
+        let (&page_num, &page_id) = pages.iter().next().unwrap();
+        let chunks = extract_page_chunks(&doc, page_num, page_id).unwrap();
+
+        let joined: String = chunks.text_chunks.iter().map(|c| c.value.as_str()).collect();
+        assert!(
+            joined.contains("42"),
+            "Expected ActualText '42', got chunks: {:?}",
+            chunks
+                .text_chunks
+                .iter()
+                .map(|c| &c.value)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            !joined.contains("xx"),
+            "Glyph text must not leak when ActualText is present, got: {joined:?}"
+        );
+    }
+
+    #[test]
+    fn test_tj_large_negative_inserts_space() {
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Helvetica",
+        });
+
+        let content = Content {
+            operations: vec![
+                Operation::new("BT", vec![]),
+                Operation::new("Tf", vec!["F1".into(), 12.into()]),
+                Operation::new("Td", vec![72.into(), 720.into()]),
+                Operation::new(
+                    "TJ",
+                    vec![Object::Array(vec![
+                        Object::string_literal("Hello"),
+                        Object::Integer(-250),
+                        Object::string_literal("World"),
+                    ])],
+                ),
+                Operation::new("ET", vec![]),
+            ],
+        };
+
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "Resources" => resources_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => 1,
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+
+        let pages = doc.get_pages();
+        let (&page_num, &page_id) = pages.iter().next().unwrap();
+        let chunks = extract_page_chunks(&doc, page_num, page_id).unwrap();
+        let joined: String = chunks.text_chunks.iter().map(|c| c.value.as_str()).collect();
+        assert!(
+            joined.contains("Hello") && joined.contains("World"),
+            "got: {joined:?}"
+        );
+        assert!(
+            joined.contains(' '),
+            "large negative TJ must insert space, got: {joined:?}"
+        );
     }
 }

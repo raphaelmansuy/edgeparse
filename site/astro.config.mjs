@@ -383,6 +383,7 @@ export default defineConfig({
 						{ label: 'RAG Integration', slug: 'guides/rag-integration' },
 						{ label: 'Hybrid Mode', slug: 'guides/hybrid-mode' },
 						{ label: 'Image Extraction', slug: 'guides/image-extraction' },
+						{ label: 'OCR Models', slug: 'guides/ocr-models' },
 						{ label: 'WASM Use Cases', slug: 'guides/wasm-use-cases' },
 					],
 				},

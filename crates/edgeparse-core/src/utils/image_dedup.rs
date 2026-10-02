@@ -67,7 +67,7 @@ pub fn deduplicate(images: &[ImageRef]) -> Vec<DeduplicatedImage> {
         })
         .collect();
 
-    result.sort_by(|a, b| b.occurrence_count.cmp(&a.occurrence_count));
+    result.sort_by_key(|b| std::cmp::Reverse(b.occurrence_count));
     result
 }
 

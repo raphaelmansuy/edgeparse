@@ -381,11 +381,10 @@ fn typographic_heading_deficit(doc: &PdfDocument) -> bool {
                     body_weights.push(w);
                 }
             }
-            ContentElement::Heading(h) => {
-                if h.base.base.semantic_type != SemanticType::Caption {
+            ContentElement::Heading(h)
+                if h.base.base.semantic_type != SemanticType::Caption => {
                     recovered += 1;
                 }
-            }
             ContentElement::NumberHeading(_) => {
                 recovered += 1;
             }

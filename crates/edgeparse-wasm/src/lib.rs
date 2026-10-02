@@ -33,7 +33,8 @@ pub struct ParseSession {
 impl ParseSession {
     /// Open a PDF and extract pages + OCR candidates.
     ///
-    /// `opts` may include `{pages, readingOrder, tableMethod, fileName}`.
+    /// `opts` may include `{pages, readingOrder, tableMethod, fileName, rasterTableOcr}`.
+    /// `rasterTableOcr` (bool) or `ocr: false|"off"` disables raster OCR candidate collection.
     /// `on_progress(phase, done, total)` is called synchronously between pages.
     #[wasm_bindgen]
     pub fn open(
@@ -127,7 +128,14 @@ impl ParseSession {
             .ok_or_else(|| JsError::new("session already finished"))?;
         let doc = assemble(session, OcrAssembleMode::Provided)
             .map_err(|e| JsError::new(&e.to_string()))?;
-        let json = output::json::to_json_string(&doc).map_err(|e| JsError::new(&e.to_string()))?;
+        let json = {
+            let stem = doc
+                .file_name
+                .trim_end_matches(".pdf")
+                .trim_end_matches(".PDF");
+            output::legacy_json::to_legacy_json_string(&doc, stem)
+                .map_err(|e| JsError::new(&e.to_string()))?
+        };
         let markdown =
             output::markdown::to_markdown(&doc).map_err(|e| JsError::new(&e.to_string()))?;
         let html = output::html::to_html(&doc).map_err(|e| JsError::new(&e.to_string()))?;
@@ -199,7 +207,21 @@ fn format_doc(
         "markdown" | "md" => output::markdown::to_markdown(doc),
         "html" => output::html::to_html(doc),
         "text" | "txt" => output::text::to_text(doc),
-        _ => output::json::to_json_string(doc),
+        // Match the CLI: compact legacy JSON, not the internal pretty model.
+        "json" => {
+            let stem = doc
+                .file_name
+                .trim_end_matches(".pdf")
+                .trim_end_matches(".PDF");
+            output::legacy_json::to_legacy_json_string(doc, stem)
+        }
+        _ => {
+            let stem = doc
+                .file_name
+                .trim_end_matches(".pdf")
+                .trim_end_matches(".PDF");
+            output::legacy_json::to_legacy_json_string(doc, stem)
+        }
     };
     result.map_err(|e| JsError::new(&e.to_string()))
 }
@@ -213,16 +235,58 @@ fn opts_string(opts: &JsValue, key: &str) -> Option<String> {
     v.as_string()
 }
 
+/// Read a boolean option. Also treats string `"off"` / `"false"` / `"0"` as false
+/// and `"on"` / `"true"` / `"1"` as true.
+fn opts_bool(opts: &JsValue, key: &str) -> Option<bool> {
+    if opts.is_null() || opts.is_undefined() {
+        return None;
+    }
+    let obj = js_sys::Object::try_from(opts)?;
+    let v = js_sys::Reflect::get(obj, &JsValue::from_str(key)).ok()?;
+    if v.is_undefined() || v.is_null() {
+        return None;
+    }
+    if let Some(b) = v.as_bool() {
+        return Some(b);
+    }
+    if let Some(s) = v.as_string() {
+        return match s.to_ascii_lowercase().as_str() {
+            "off" | "false" | "0" | "no" => Some(false),
+            "on" | "true" | "1" | "yes" => Some(true),
+            _ => None,
+        };
+    }
+    None
+}
+
+/// Effective raster OCR enable from opts (`rasterTableOcr`, or alias `ocr`).
+fn opts_raster_table_ocr(opts: &JsValue) -> Option<bool> {
+    if let Some(b) = opts_bool(opts, "rasterTableOcr") {
+        return Some(b);
+    }
+    // Alias: `ocr: false` / `"off"` disables; `ocr: true` enables.
+    // String model tiers like "small" are ignored here (handled by the JS SDK).
+    if let Some(b) = opts_bool(opts, "ocr") {
+        return Some(b);
+    }
+    None
+}
+
 fn config_from_opts(opts: &JsValue) -> ProcessingConfig {
     let pages = opts_string(opts, "pages");
     let reading_order = opts_string(opts, "readingOrder");
     let table_method = opts_string(opts, "tableMethod");
-    build_config(
+    let mut config = build_config(
         None,
         pages.as_deref(),
         reading_order.as_deref(),
         table_method.as_deref(),
-    )
+        None,
+    );
+    if let Some(enabled) = opts_raster_table_ocr(opts) {
+        config.raster_table_ocr = enabled;
+    }
+    config
 }
 
 /// Convert PDF bytes to a structured document object (returned as JS value).
@@ -239,6 +303,7 @@ pub fn convert(
         pages.as_deref(),
         reading_order.as_deref(),
         table_method.as_deref(),
+        None,
     );
 
     let doc = edgeparse_core::convert_bytes(pdf_bytes, "uploaded.pdf", &config)
@@ -261,6 +326,7 @@ pub fn convert_to_string(
         pages.as_deref(),
         reading_order.as_deref(),
         table_method.as_deref(),
+        None,
     );
 
     let doc = edgeparse_core::convert_bytes(pdf_bytes, "uploaded.pdf", &config)
@@ -285,6 +351,7 @@ pub fn convert_hybrid(
         pages.as_deref(),
         reading_order.as_deref(),
         table_method.as_deref(),
+        None,
     );
     config.hybrid = HybridBackend::DoclingFast;
     config.hybrid_mode = HybridMode::Auto;
@@ -395,6 +462,7 @@ fn build_config(
     pages: Option<&str>,
     reading_order: Option<&str>,
     table_method: Option<&str>,
+    raster_table_ocr: Option<bool>,
 ) -> ProcessingConfig {
     let mut config = ProcessingConfig::default();
     config.image_output = ImageOutput::Off;
@@ -417,6 +485,10 @@ fn build_config(
             "cluster" => TableMethod::Cluster,
             _ => TableMethod::Default,
         };
+    }
+
+    if let Some(enabled) = raster_table_ocr {
+        config.raster_table_ocr = enabled;
     }
 
     config

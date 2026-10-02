@@ -7,6 +7,40 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.2] — 2026-10-02
+
+### Fixed
+- **Type 3 / Skia font widths** — `/Widths` and `/FontBBox` are normalized through `/FontMatrix` into per-mille text space, restoring word boundaries on Chrome/Skia PDFs (previously ~90% of spaces were lost)
+- **Type 3 font metadata** — fall back to `FontDescriptor/FontName` and prefer `/FontWeight` over StemV so variable-font Skia faces are not all marked bold
+- **Header/footer swallowing** — tighter margin zones, max edge depth, and no absorption of images/figures into running headers (top-of-page charts stay in the body)
+- **Raster OCR routing** — classify charts/photos/UI before table OCR so bar charts are not turned into junk markdown tables; shared `ImageRegionClassifier` + optional `ocr_budget_ms`
+- **WASM JSON** — `convert_to_string("json")` / `finishAll` emit the same compact legacy schema as the CLI (was multi-MB pretty internal model)
+- **Content-stream `/ActualText`** — BDC/EMC spans honor ISO 32000-1 §14.9.4; ActualText replaces glyph/ToUnicode text for extraction
+- **TJ word gaps** — large negative TJ adjustments insert explicit spaces via named `SpaceThreshold` (TeX/InDesign)
+- **CID / Identity-H** — layered Unicode fallback (ToUnicode → Differences/AGL → embedded TTF cmap); ASCII-range CID fallback without WinAnsi mojibake
+- **Encrypted PDFs** — Standard Security Handler decrypt via `--password` / `ProcessingConfig.password` (pdf-cos revisions 2–6)
+- **OCG visibility** — catalog `/OCProperties` default ON/OFF wired to `TextChunk.ocg_visible` (content filter drops hidden layers)
+
+### Added
+- `pdf::font_type3` / `pdf::font_style` — DRY Type 3 metric normalization and shared name/weight helpers
+- `pdf::font_type3_ocr` — CharProc → Unicode OCR cache seam (`GlyphOcrProvider`)
+- `pdf::image_region` — `ImageRegionClassifier` trait, heuristic classifier, `OcrBudget`, `TableStructureModel` + `ClassifyingRegionRouter` for TableFormer/SLANet plug-in
+- `pdf::image_codecs` — DCT/Flate/CCITT decode for OCR; optional `codecs-jbig2` / `codecs-jpx` features
+- `pdf::ocg` — Optional Content Group default visibility from catalog
+- `pdf::pdf_string` — UTF-16BE / PDFDocEncoding string decode for ActualText
+- Auto-enable structure tree when `/StructTreeRoot` is present; PDF 2.0 tags (`Title`, `Aside`, `FENote`, `Strong`, `Em`, `Hn`)
+- `benchmark/scripts/assess_pdf.py` — shared native/WASM quality harness for Skia-style PDFs
+- `crates/edgeparse-wasm/scripts/smoke-native-wasm.mjs` — native↔WASM markdown parity smoke test
+- **OCR on/off** — `ParseOptions.enableOcr` / WASM `rasterTableOcr` / Python `raster_table_ocr` / Node `rasterTableOcr`; demo toolbar OCR toggle re-parses without recreating the client
+- **Docs** — OCR Models guide (tiers, OPFS/Cache, Hugging Face + CSP, self-host / offline); npm optionalDeps synced to release version
+
+### Changed
+- Raster table recovery is gated through one helper that respects `ocr_budget_ms`
+- Site / Web SDK docs: OPFS+Cache (not IndexedDB); CSP `connect-src` includes `huggingface.co`
+- Benchmark MHS floor lowered to **0.47** (caption demotion / heading precision); harness board refreshed for 0.3.2
+
+---
+
 ## [0.3.1] — 2026-10-02
 
 ### Fixed

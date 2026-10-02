@@ -4068,7 +4068,7 @@ fn render_layout_toc_document_cached(
     for entry in entries {
         let line = format!("{} {}", entry.title.trim(), entry.page.trim());
         output.push_str(&escape_md_line_start(line.trim()));
-        output.push_str("\n");
+        output.push('\n');
     }
     output.push('\n');
     Some(output)
@@ -7165,7 +7165,7 @@ fn render_structural_caption_block(blocks: &[&str], start: usize) -> Option<(Str
         return None;
     }
 
-    Some((format!("{}", caption.trim()), consumed))
+    Some((caption.trim().to_string(), consumed))
 }
 
 fn split_chart_caption_and_values(block: &str) -> Option<(String, Vec<String>)> {
@@ -7706,10 +7706,7 @@ fn normalize_list_text(text: &str) -> String {
 }
 
 fn push_rendered_list_item(out: &mut String, item: &str) {
-    if item.starts_with("- [") {
-        out.push_str(item);
-        out.push('\n');
-    } else if starts_with_enumerated_marker(item) {
+    if item.starts_with("- [") || starts_with_enumerated_marker(item) {
         out.push_str(item);
         out.push('\n');
     } else {

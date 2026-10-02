@@ -541,22 +541,22 @@ publish-wasm-dry: ## Dry-run: build the WASM package and preview the npm tarball
 	  $(call err,wasm-pack not found — install: cargo install wasm-pack); \
 	  exit 1; }
 	@cd crates/edgeparse-wasm && wasm-pack build --target web --release
-	@node -e "const fs=require('fs');const p='crates/edgeparse-wasm/pkg/package.json';const pkg=JSON.parse(fs.readFileSync(p,'utf8'));pkg.name='@edgeparse/edgeparse-wasm';pkg.version='$(VERSION)';fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n');"
+	@node -e "const fs=require('fs');const p='crates/edgeparse-wasm/pkg/package.json';const pkg=JSON.parse(fs.readFileSync(p,'utf8'));pkg.name='edgeparse-wasm';pkg.version='$(VERSION)';fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n');"
 	@cd crates/edgeparse-wasm/pkg && npm pack --dry-run
 	$(call ok,WASM dry-run passed — ready for npm)
 
-publish-wasm: ## Build and publish the WASM npm package (@edgeparse/edgeparse-wasm)
+publish-wasm: ## Build and publish the WASM npm package (edgeparse-wasm)
 ifndef NPM_TOKEN
 	$(call err,NPM_TOKEN is required.  Usage:  NPM_TOKEN=<token> make publish-wasm)
 	@exit 1
 endif
-	$(call log,Publishing @edgeparse/edgeparse-wasm to npm ...)
+	$(call log,Publishing edgeparse-wasm to npm ...)
 	@command -v wasm-pack >/dev/null 2>&1 || { \
 	  $(call err,wasm-pack not found — install: cargo install wasm-pack); \
 	  exit 1; }
 	@printf "//registry.npmjs.org/:_authToken=%s\n" "$(NPM_TOKEN)" > ~/.npmrc
 	@cd crates/edgeparse-wasm && wasm-pack build --target web --release
-	@node -e "const fs=require('fs');const p='crates/edgeparse-wasm/pkg/package.json';const pkg=JSON.parse(fs.readFileSync(p,'utf8'));pkg.name='@edgeparse/edgeparse-wasm';pkg.version='$(VERSION)';fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n');"
+	@node -e "const fs=require('fs');const p='crates/edgeparse-wasm/pkg/package.json';const pkg=JSON.parse(fs.readFileSync(p,'utf8'));pkg.name='edgeparse-wasm';pkg.version='$(VERSION)';fs.writeFileSync(p,JSON.stringify(pkg,null,2)+'\n');"
 	@cd crates/edgeparse-wasm/pkg && npm publish --access public
 	@rm -f ~/.npmrc
 	$(call ok,WASM package published to npm)

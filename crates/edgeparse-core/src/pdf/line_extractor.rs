@@ -69,14 +69,13 @@ pub fn extract_line_chunks(
             // Graphics state
             "q" => gs_stack.save(),
             "Q" => gs_stack.restore(),
-            "cm" => {
-                if op.operands.len() >= 6 {
+            "cm"
+                if op.operands.len() >= 6 => {
                     let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 6 {
                         gs_stack.concat_ctm(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
                     }
                 }
-            }
             // Line width
             "w" => {
                 if let Some(w) = op.operands.first().and_then(get_number) {
@@ -84,9 +83,9 @@ pub fn extract_line_chunks(
                 }
             }
             // Path construction
-            "m" => {
+            "m"
                 // moveto
-                if op.operands.len() >= 2 {
+                if op.operands.len() >= 2 => {
                     if let (Some(x), Some(y)) = (
                         op.operands.first().and_then(get_number),
                         op.operands.get(1).and_then(get_number),
@@ -96,10 +95,9 @@ pub fn extract_line_chunks(
                         current_point = Some((tx, ty));
                     }
                 }
-            }
-            "l" => {
+            "l"
                 // lineto
-                if op.operands.len() >= 2 {
+                if op.operands.len() >= 2 => {
                     if let (Some(x), Some(y)) = (
                         op.operands.first().and_then(get_number),
                         op.operands.get(1).and_then(get_number),
@@ -116,10 +114,9 @@ pub fn extract_line_chunks(
                         current_point = Some((tx, ty));
                     }
                 }
-            }
-            "c" => {
+            "c"
                 // curveto (cubic Bézier)
-                if op.operands.len() >= 6 {
+                if op.operands.len() >= 6 => {
                     let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 6 {
                         let (tx, ty) = transform_point(&gs_stack, vals[4], vals[5]);
@@ -140,10 +137,9 @@ pub fn extract_line_chunks(
                         current_point = Some((tx, ty));
                     }
                 }
-            }
-            "v" => {
+            "v"
                 // curveto (initial point replicated)
-                if op.operands.len() >= 4 {
+                if op.operands.len() >= 4 => {
                     let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 4 {
                         let (tx, ty) = transform_point(&gs_stack, vals[2], vals[3]);
@@ -163,10 +159,9 @@ pub fn extract_line_chunks(
                         current_point = Some((tx, ty));
                     }
                 }
-            }
-            "y" => {
+            "y"
                 // curveto (final point replicated)
-                if op.operands.len() >= 4 {
+                if op.operands.len() >= 4 => {
                     let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 4 {
                         let (tx, ty) = transform_point(&gs_stack, vals[2], vals[3]);
@@ -186,7 +181,6 @@ pub fn extract_line_chunks(
                         current_point = Some((tx, ty));
                     }
                 }
-            }
             "h" => {
                 // closepath
                 if let (Some((sx, sy)), Some((cx, cy))) = (subpath_start, current_point) {
@@ -201,9 +195,9 @@ pub fn extract_line_chunks(
                     current_point = subpath_start;
                 }
             }
-            "re" => {
+            "re"
                 // rectangle
-                if op.operands.len() >= 4 {
+                if op.operands.len() >= 4 => {
                     let vals: Vec<f64> = op.operands.iter().filter_map(get_number).collect();
                     if vals.len() >= 4 {
                         let (x, y, w, h) = (vals[0], vals[1], vals[2], vals[3]);
@@ -234,7 +228,6 @@ pub fn extract_line_chunks(
                         current_point = Some((x1, y1));
                     }
                 }
-            }
             // Path painting — stroke
             "S" | "s" => {
                 if op.operator == "s" {

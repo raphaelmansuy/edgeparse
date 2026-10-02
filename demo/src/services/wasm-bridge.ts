@@ -106,6 +106,7 @@ export async function parsePdf(
       wantAllFormats: true,
       tableMethod: 'cluster',
       fileName: store.get('fileName') || 'uploaded.pdf',
+      enableOcr: store.get('enableOcr'),
     });
 
     job.on('progress', (p) => {

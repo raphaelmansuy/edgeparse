@@ -261,6 +261,7 @@ fast on mismatches.
 - Adds provenance attestation (`--provenance`) so the package appears as verified on npmjs.com
 - Publishes `@raphaelmansuy/edgeparse-wasm` to GitHub Packages (secondary) using the built-in `GITHUB_TOKEN` — no extra secret required
 - Builds, tests, and publishes **`@edgeparse/web`** after model hash pin check (`npm run check-models` fails closed on placeholder sha256)
+- The published package includes the **pinned `models/models.json` manifest only** — PP-OCR weight blobs are not bundled; clients download them at runtime from the pinned URLs (Hugging Face / jsDelivr)
 - Uploads the tarball to the GitHub Release (`--clobber` for idempotent re-runs)
 - Both publish steps treat "already published" as non-fatal
 

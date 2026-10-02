@@ -180,8 +180,8 @@ fn process_operations(
             // Graphics state operators
             "q" => state.save(),
             "Q" => state.restore(),
-            "cm" => {
-                if op.operands.len() == 6 {
+            "cm"
+                if op.operands.len() == 6 => {
                     let vals: Vec<f64> = op
                         .operands
                         .iter()
@@ -191,15 +191,14 @@ fn process_operations(
                         state.concat_ctm(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
                     }
                 }
-            }
 
             // Text state operators
             "BT" => state.current.begin_text(),
             "ET" => {} // End text object
 
-            "Tf" => {
+            "Tf"
                 // Set font and size
-                if op.operands.len() == 2 {
+                if op.operands.len() == 2 => {
                     if let Object::Name(ref name) = op.operands[0] {
                         state.current.text_state.font_name =
                             String::from_utf8_lossy(name).to_string();
@@ -208,7 +207,6 @@ fn process_operations(
                         state.current.text_state.font_size = size;
                     }
                 }
-            }
 
             "Tc" => {
                 if let Some(v) = op.operands.first().and_then(|o| obj_to_f64(o.clone())) {
@@ -247,26 +245,24 @@ fn process_operations(
             }
 
             // Text positioning operators
-            "Td" => {
-                if op.operands.len() == 2 {
+            "Td"
+                if op.operands.len() == 2 => {
                     let tx = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                     let ty = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                     state.current.translate_text(tx, ty);
                 }
-            }
 
-            "TD" => {
+            "TD"
                 // Same as Td but also sets leading
-                if op.operands.len() == 2 {
+                if op.operands.len() == 2 => {
                     let tx = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                     let ty = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                     state.current.text_state.leading = -ty;
                     state.current.translate_text(tx, ty);
                 }
-            }
 
-            "Tm" => {
-                if op.operands.len() == 6 {
+            "Tm"
+                if op.operands.len() == 6 => {
                     let vals: Vec<f64> = op
                         .operands
                         .iter()
@@ -278,7 +274,6 @@ fn process_operations(
                             .set_text_matrix(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]);
                     }
                 }
-            }
 
             "T*" => {
                 state.current.next_line();
@@ -370,9 +365,9 @@ fn process_operations(
                 }
             }
 
-            "\"" => {
+            "\""
                 // Set spacing, move to next line, show text
-                if op.operands.len() == 3 {
+                if op.operands.len() == 3 => {
                     if let Some(aw) = obj_to_f64(op.operands[0].clone()) {
                         state.current.text_state.word_spacing = aw;
                     }
@@ -400,7 +395,6 @@ fn process_operations(
                         }
                     }
                 }
-            }
 
             // Color operators — preserve original color space components (reference approach)
             "g" => {
@@ -415,26 +409,24 @@ fn process_operations(
                     state.current.stroke_color_space_components = 1;
                 }
             }
-            "rg" => {
-                if op.operands.len() == 3 {
+            "rg"
+                if op.operands.len() == 3 => {
                     let r = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                     let g = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                     let b = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
                     state.current.fill_color = vec![r, g, b];
                     state.current.fill_color_space_components = 3;
                 }
-            }
-            "RG" => {
-                if op.operands.len() == 3 {
+            "RG"
+                if op.operands.len() == 3 => {
                     let r = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                     let g = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                     let b = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
                     state.current.stroke_color = vec![r, g, b];
                     state.current.stroke_color_space_components = 3;
                 }
-            }
-            "k" => {
-                if op.operands.len() == 4 {
+            "k"
+                if op.operands.len() == 4 => {
                     let c = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                     let m = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                     let y = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
@@ -442,9 +434,8 @@ fn process_operations(
                     state.current.fill_color = vec![c, m, y, k];
                     state.current.fill_color_space_components = 4;
                 }
-            }
-            "K" => {
-                if op.operands.len() == 4 {
+            "K"
+                if op.operands.len() == 4 => {
                     let c = obj_to_f64(op.operands[0].clone()).unwrap_or(0.0);
                     let m = obj_to_f64(op.operands[1].clone()).unwrap_or(0.0);
                     let y = obj_to_f64(op.operands[2].clone()).unwrap_or(0.0);
@@ -452,7 +443,6 @@ fn process_operations(
                     state.current.stroke_color = vec![c, m, y, k];
                     state.current.stroke_color_space_components = 4;
                 }
-            }
             // cs/CS — set color space; sc/SC/scn/SCN — set color in current space
             "cs" => {
                 if let Some(name) = op.operands.first() {

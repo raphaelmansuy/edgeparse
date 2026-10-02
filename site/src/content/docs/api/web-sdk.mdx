@@ -61,8 +61,12 @@ const ep = await EdgeParse.create({
   fileName?: string;
   signal?: AbortSignal;
   backendMarkdown?: string | null;
+  /** Enable raster OCR (candidates + host PP-OCR). Default true. */
+  enableOcr?: boolean;
 }
 ```
+
+Set `enableOcr: false` (or create with `ocr: 'off'`) to skip raster OCR and set core `rasterTableOcr: false`. Born-digital PDF text still extracts.
 
 ## `ParseJob`
 
@@ -169,17 +173,19 @@ Content-Security-Policy:
   default-src 'self';
   script-src 'self' 'wasm-unsafe-eval';
   worker-src 'self' blob:;
-  connect-src 'self' https://cdn.jsdelivr.net https://cdn.jsdelivr.net/gh/;
+  connect-src 'self' https://huggingface.co https://cdn.jsdelivr.net https://cdn.jsdelivr.net/gh/;
   img-src 'self' data: blob:;
   style-src 'self' 'unsafe-inline';
 ```
 
 - **`script-src 'wasm-unsafe-eval'`** — required for WebAssembly instantiate
 - **`worker-src`** — parse + OCR module workers (`blob:` if the bundler inlines workers)
-- **`connect-src`** — allowlist hosts from `models/models.json` only
+- **`connect-src`** — Hugging Face (primary) + jsDelivr (dict failover); add self-hosted CDN hosts from a custom `manifest`
 - The SDK never calls `eval` / `new Function`
 
-Full notes: [`sdks/web/docs/CSP.md`](https://github.com/raphaelmansuy/edgeparse/blob/main/sdks/web/docs/CSP.md)
+Tiers: `tiny` (~6.4 MB) / `small` (~31 MB) / `medium` (~139 MB). Custom `manifest` rewrites `urls` while keeping sha256 pins. Storage is OPFS then Cache API.
+
+Full notes: [`sdks/web/docs/CSP.md`](https://github.com/raphaelmansuy/edgeparse/blob/main/sdks/web/docs/CSP.md) · [OCR Models guide](/guides/ocr-models/)
 
 ## Node adapter
 
@@ -189,10 +195,11 @@ import { parsePdfFile } from '@edgeparse/web/node';
 const result = await parsePdfFile('./doc.pdf', { format: 'markdown' });
 ```
 
-Uses the same `ParseSession` path with host PP-OCR when available.
+Uses the same `ParseSession` path with host PP-OCR when available (`NullOcrBackend` by default; optional `NodePpocrBackend`).
 
 ## See also
 
+- [OCR Models](/guides/ocr-models/) — download, packaging, offline, self-host
 - [Quick Start: Web SDK](/getting-started/quick-start-web-sdk/)
 - [WebAssembly API](/api/wasm/) — `ParseSession`, `convert_to_string`, `version`
 - [WASM Use Cases](/guides/wasm-use-cases/)

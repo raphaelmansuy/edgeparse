@@ -23,10 +23,14 @@ const BBOX_WIDTH_TOLERANCE: f64 = 0.15;
 const FONT_SIZE_TOLERANCE: f64 = 0.15;
 
 /// Fraction of page height that defines the header zone (top portion).
-const HEADER_ZONE_FRACTION: f64 = 1.0 / 3.0;
+/// Kept tight so large top-of-page figures are not swallowed as running headers.
+const HEADER_ZONE_FRACTION: f64 = 0.15;
 
 /// Fraction of page height that defines the footer zone (bottom portion).
-const FOOTER_ZONE_FRACTION: f64 = 1.0 / 3.0;
+const FOOTER_ZONE_FRACTION: f64 = 0.12;
+
+/// Hard cap on how many edge elements can be claimed as header/footer per page.
+const MAX_EDGE_ELEMENTS: usize = 4;
 
 /// Detect and extract headers and footers across all pages.
 ///
@@ -282,6 +286,9 @@ fn count_repeated_from_edge(
             break;
         }
         position_index += 1;
+        if position_index >= MAX_EDGE_ELEMENTS {
+            break;
+        }
     }
 
     counts
@@ -346,8 +353,16 @@ fn elements_match(a: &ContentElement, b: &ContentElement) -> bool {
                 && (pa.base.value() == pb.base.value()
                     || is_sequential_text(&pa.base.value(), &pb.base.value()))
         }
-        // For non-text elements, bbox similarity is sufficient
-        _ => true,
+        // Thin horizontal rules that repeat across pages (page separators).
+        (ContentElement::Line(la), ContentElement::Line(lb)) => {
+            la.is_horizontal_line
+                && lb.is_horizontal_line
+                && la.bbox.height() <= 3.0
+                && lb.bbox.height() <= 3.0
+        }
+        // Images / figures / tables must never be absorbed into headers —
+        // matching on bbox alone previously swallowed top-of-page charts.
+        _ => false,
     }
 }
 

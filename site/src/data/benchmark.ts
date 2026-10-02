@@ -23,7 +23,7 @@ export interface BenchmarkBoard {
 
 /** EdgeParse-native harness (`benchmark/`) — product regression board. */
 export const benchmarkSnapshot: BenchmarkBoard = {
-  lastUpdated: "2026-10-01",
+  lastUpdated: "2026-10-02",
   hardware: "Apple M4 Max",
   documentCount: 200,
   boardName: "EdgeParse harness",
@@ -31,11 +31,11 @@ export const benchmarkSnapshot: BenchmarkBoard = {
   tools: [
     {
       name: "EdgeParse",
-      nid: 0.8855,
-      teds: 0.5635,
-      mhs: 0.5522,
-      overall: 0.7817,
-      speedSeconds: 0.019,
+      nid: 0.8803,
+      teds: 0.5617,
+      mhs: 0.4783,
+      overall: 0.7597,
+      speedSeconds: 0.284,
       isHighlight: true,
       status: "finished",
     },
@@ -260,7 +260,7 @@ const vsPymu = speedMultipleVs("PyMuPDF4LLM");
 
 /** Pre-formatted claims — pages must import these instead of hard-coding numbers. */
 export const claims = {
-  version: "0.3.0",
+  version: "0.3.2",
   copy: {
     noMlStack:
       "No ML stack required for born-digital PDFs; optional in-browser OCR for image tables",

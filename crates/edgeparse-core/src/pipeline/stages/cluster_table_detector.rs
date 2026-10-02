@@ -1066,11 +1066,10 @@ fn find_blank_form_tables(
         let mut stub_rows: Vec<Vec<ChunkRef>> = Vec::new();
         let mut stub_indices: Vec<usize> = Vec::new();
 
-        for gi in next_gi..baseline_groups.len() {
+        for (gi, row_chunks) in baseline_groups.iter().enumerate().skip(next_gi) {
             if used_baselines.contains(&gi) {
                 break;
             }
-            let row_chunks = &baseline_groups[gi];
             let row_fs = row_chunks
                 .iter()
                 .map(|c| c.font_size)
@@ -1090,11 +1089,10 @@ fn find_blank_form_tables(
 
             let row_refs: Vec<&ChunkRef> = row_chunks.iter().collect();
             let segs = split_into_segments(&row_refs, row_fs);
-            if segs.len() != 1 {
-                if segs.is_empty() || segs.iter().any(|s| s.left_x >= header_left - row_fs) {
+            if segs.len() != 1
+                && (segs.is_empty() || segs.iter().any(|s| s.left_x >= header_left - row_fs)) {
                     break;
                 }
-            }
             let stub = &segs[0];
             if stub.right_x > header_left - row_fs * 0.25 {
                 break;
@@ -1405,7 +1403,7 @@ fn projection_column_centers(band: &[(f64, Vec<&ChunkRef>)], median_fs: f64) -> 
         return None;
     }
     let n_bins = ((max_x - min_x) / bin).ceil() as usize + 1;
-    if n_bins < 4 || n_bins > 400 {
+    if !(4..=400).contains(&n_bins) {
         return None;
     }
     let mut hist = vec![0u32; n_bins];
@@ -1570,7 +1568,9 @@ fn build_projection_lattice_from_band(
     };
 
     // Merge stub-only continuation rows into the previous row (wrapped labels).
-    let mut merged: Vec<(f64, Vec<Vec<(String, usize)>>)> = Vec::new(); // text + block
+    type BandCell = (String, usize);
+    type BandRow = (f64, Vec<Vec<BandCell>>);
+    let mut merged: Vec<BandRow> = Vec::new(); // text + block
     for (bl, grp) in band {
         // Full-width single segment ≈ flowing prose, not a grid row.
         if grp.len() == 1 {

@@ -23,6 +23,7 @@ def convert(
     reading_order: str = "xycut",
     table_method: str = "default",
     image_output: str = "off",
+    raster_table_ocr: bool = True,
 ) -> str:
     """Convert a PDF file and return the extracted content as a string.
 
@@ -43,6 +44,8 @@ def convert(
         Table detection method. ``"default"`` or ``"cluster"``.
     image_output:
         Image output mode. ``"off"`` (default), ``"embedded"``, or ``"external"``.
+    raster_table_ocr:
+        Enable raster table / image OCR recovery. Default: ``True``.
 
     Returns
     -------
@@ -57,6 +60,7 @@ def convert(
         reading_order=reading_order,
         table_method=table_method,
         image_output=image_output,
+        raster_table_ocr=raster_table_ocr,
     )
 
 

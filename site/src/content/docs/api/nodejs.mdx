@@ -17,6 +17,7 @@ Convert a PDF file to the specified format.
 | `options.format` | `string` | `"markdown"` | Output format |
 | `options.pages` | `string` | `undefined` | Page range, e.g. `"1-5"` |
 | `options.tableMethod` | `string` | `undefined` | Table detection method |
+| `options.rasterTableOcr` | `boolean` | `true` | Enable raster table / image OCR |
 
 **Returns:** `string` — the converted content.
 
@@ -27,6 +28,7 @@ const markdown = convert("document.pdf", { format: "markdown" });
 const json = convert("document.pdf", { format: "json" });
 const html = convert("document.pdf", { format: "html" });
 const text = convert("document.pdf", { format: "text" });
+const noOcr = convert("document.pdf", { rasterTableOcr: false });
 ```
 
 ### Options Object
@@ -36,5 +38,6 @@ interface ConvertOptions {
   format?: "markdown" | "json" | "html" | "text";
   pages?: string;
   tableMethod?: "border" | "cluster";
+  rasterTableOcr?: boolean;
 }
 ```

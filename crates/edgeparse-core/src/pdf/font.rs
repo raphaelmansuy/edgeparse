@@ -73,6 +73,15 @@ static TEX_GLYPH_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::
 });
 
 /// Represents a resolved PDF font with metrics and encoding info.
+///
+/// # Invariants
+///
+/// `widths`, `default_width`, `ascent`, `descent`, and `font_bbox` are always
+/// stored in **per-mille text-space units** (1000 = 1 em). Callers convert to
+/// user space with `value / 1000.0 * font_size`. Type 3 fonts, whose native
+/// `/Widths` live in glyph space scaled by `/FontMatrix`, are normalized at
+/// resolve time by [`crate::pdf::font_type3`] so this invariant holds for every
+/// subtype.
 #[derive(Debug, Clone)]
 pub struct PdfFont {
     /// Resource name (e.g., "F1")
@@ -81,9 +90,9 @@ pub struct PdfFont {
     pub base_font: String,
     /// Font subtype (Type1, TrueType, Type0, Type3)
     pub subtype: String,
-    /// Glyph widths indexed by character code
+    /// Glyph widths indexed by character code (per-mille text space)
     pub widths: HashMap<u32, f64>,
-    /// Default width for missing glyphs
+    /// Default width for missing glyphs (per-mille text space)
     pub default_width: f64,
     /// ToUnicode mapping: character code → Unicode string
     pub to_unicode: HashMap<u32, String>,
@@ -99,11 +108,11 @@ pub struct PdfFont {
     pub weight: f64,
     /// Bytes per character code (1 for Type1/TrueType, 2 for Type0/CID)
     pub bytes_per_code: u8,
-    /// Font ascent in glyph-space units (per-mille, i.e. 1000 = 1 em)
+    /// Font ascent in per-mille text-space units (1000 = 1 em)
     pub ascent: f64,
-    /// Font descent in glyph-space units (negative, per-mille)
+    /// Font descent in per-mille text-space units (negative)
     pub descent: f64,
-    /// Font bounding box [llx, lly, urx, ury] in glyph-space units
+    /// Font bounding box [llx, lly, urx, ury] in per-mille text-space units
     pub font_bbox: [f64; 4],
 }
 
@@ -135,11 +144,25 @@ impl PdfFont {
     }
 
     /// Get Unicode string for a character code.
+    ///
+    /// Fallback order (ISO 32000 text extraction practice):
+    /// 1. `/ToUnicode` CMap (and Differences / embedded cmap filled at resolve time)
+    /// 2. Declared single-byte encoding (WinAnsi / MacRoman)
+    /// 3. For Type0 / Identity-H: ASCII-range CID → Latin-1; else replacement `.`
     pub fn decode_char(&self, char_code: u32) -> String {
         if let Some(unicode) = self.to_unicode.get(&char_code) {
             return unicode.clone();
         }
-        // Fallback: use the font's declared encoding
+        if self.bytes_per_code == 2 {
+            // Identity-H without mapping: ASCII printable CIDs are common for
+            // simple embedded fonts; avoid WinAnsi on high CIDs (mojibake).
+            if (0x20..=0x7E).contains(&char_code) {
+                return char::from_u32(char_code).unwrap_or('.').to_string();
+            }
+            // Private-use / unmapped — leave a visible placeholder so layout
+            // still advances; callers may OCR glyphs when enabled.
+            return "\u{FFFD}".to_string();
+        }
         match self.encoding.as_str() {
             "MacRomanEncoding" => decode_macroman(char_code),
             _ => decode_winansi(char_code),
@@ -250,18 +273,6 @@ pub(crate) fn resolve_font_dict(
     name: &str,
     dict: &lopdf::Dictionary,
 ) -> PdfFont {
-    let base_font = dict
-        .get(b"BaseFont")
-        .ok()
-        .and_then(|o| {
-            if let lopdf::Object::Name(n) = o {
-                Some(String::from_utf8_lossy(n).to_string())
-            } else {
-                None
-            }
-        })
-        .unwrap_or_else(|| "Unknown".to_string());
-
     let subtype = dict
         .get(b"Subtype")
         .ok()
@@ -274,6 +285,14 @@ pub(crate) fn resolve_font_dict(
         })
         .unwrap_or_else(|| "Type1".to_string());
 
+    let base_font_raw = dict.get(b"BaseFont").ok().and_then(|o| {
+        if let lopdf::Object::Name(n) = o {
+            Some(String::from_utf8_lossy(n).to_string())
+        } else {
+            None
+        }
+    });
+
     let encoding = dict
         .get(b"Encoding")
         .ok()
@@ -281,45 +300,34 @@ pub(crate) fn resolve_font_dict(
             let resolved = resolve_object(doc, o);
             match resolved {
                 lopdf::Object::Name(n) => Some(String::from_utf8_lossy(&n).to_string()),
-                lopdf::Object::Dictionary(ref d) => {
-                    // Dictionary encoding — extract /BaseEncoding if present
-                    d.get(b"BaseEncoding").ok().and_then(|be| {
-                        if let lopdf::Object::Name(n) = be {
-                            Some(String::from_utf8_lossy(n).to_string())
-                        } else {
-                            None
-                        }
-                    })
-                }
+                lopdf::Object::Dictionary(ref d) => d.get(b"BaseEncoding").ok().and_then(|be| {
+                    if let lopdf::Object::Name(n) = be {
+                        Some(String::from_utf8_lossy(n).to_string())
+                    } else {
+                        None
+                    }
+                }),
                 _ => None,
             }
         })
         .unwrap_or_else(|| "WinAnsiEncoding".to_string());
 
-    let is_standard = is_standard_font(&base_font);
-    let mut default_width = if is_standard {
-        standard_font_default_width(&base_font)
-    } else {
-        1000.0
-    };
-
-    // Determine if this is a Type0 (CID) font
     let is_type0 = subtype == "Type0";
+    let is_type3 = subtype == "Type3";
     let bytes_per_code: u8 = if is_type0 { 2 } else { 1 };
 
-    // Resolve widths — for Type0, use descendant font's /W array
     let mut widths = resolve_widths(doc, dict);
-
-    // Resolve ToUnicode CMap
     let mut to_unicode = resolve_tounicode(doc, dict);
 
-    // For Type0 fonts, resolve DescendantFonts for widths and font descriptor
     let mut flags = 0u32;
     let mut italic_angle = 0.0f64;
-    let mut weight = 400.0f64;
+    let mut stem_v = 0.0f64;
+    let mut descriptor_font_weight: Option<f64> = None;
+    let mut descriptor_font_name: Option<String> = None;
     let mut ascent = 800.0f64;
     let mut descent = -200.0f64;
     let mut font_bbox = [0.0f64, -200.0, 1000.0, 800.0];
+    let mut default_width = 1000.0f64;
 
     if is_type0 {
         if let Ok(desc_ref) = dict.get(b"DescendantFonts") {
@@ -328,55 +336,83 @@ pub(crate) fn resolve_font_dict(
                 if let Some(first) = desc_arr.first() {
                     let desc_font_obj = resolve_object(doc, first);
                     if let Ok(desc_dict) = desc_font_obj.as_dict() {
-                        // Get DW (default width) from descendant
                         if let Ok(dw) = desc_dict.get(b"DW") {
                             if let Some(dw_val) = obj_to_f64(resolve_object(doc, dw)) {
                                 default_width = dw_val;
                             }
                         }
-                        // Get W array from descendant
                         resolve_cid_widths(doc, desc_dict, &mut widths);
-                        // Get font descriptor from descendant
-                        let (f, ia, w, a, d, fb) = resolve_font_descriptor(doc, desc_dict);
-                        flags = f;
-                        italic_angle = ia;
-                        weight = w;
-                        ascent = a;
-                        descent = d;
-                        font_bbox = fb;
+                        let desc = resolve_font_descriptor(doc, desc_dict);
+                        flags = desc.flags;
+                        italic_angle = desc.italic_angle;
+                        stem_v = desc.stem_v;
+                        descriptor_font_weight = desc.font_weight;
+                        descriptor_font_name = desc.font_name;
+                        ascent = desc.ascent;
+                        descent = desc.descent;
+                        font_bbox = desc.font_bbox;
+
+                        // Layered Unicode fallback when ToUnicode is missing/sparse:
+                        // Encoding/Differences on Type0 (rare) → embedded TTF cmap.
+                        resolve_encoding_differences(doc, dict, &mut to_unicode);
+                        resolve_cid_font_cmap_fallback(doc, desc_dict, &mut to_unicode);
                     }
                 }
             }
         }
     } else {
-        // Parse /Encoding /Differences array — maps char codes to glyph names → Unicode
         resolve_encoding_differences(doc, dict, &mut to_unicode);
-        // For Type1 fonts without /Encoding or /ToUnicode, try extracting
-        // encoding from the embedded font program (/FontFile stream).
-        // This handles TeX fonts (CMSY, CMMI, CMEX, etc.) that use custom
-        // encodings without explicit /Encoding dictionaries.
         if subtype == "Type1" {
             resolve_type1_font_program_encoding(doc, dict, &mut to_unicode);
         }
-        // Resolve font descriptor
-        let (f, ia, w, a, d, fb) = resolve_font_descriptor(doc, dict);
-        flags = f;
-        italic_angle = ia;
-        weight = w;
-        ascent = a;
-        descent = d;
-        font_bbox = fb;
+        let desc = resolve_font_descriptor(doc, dict);
+        flags = desc.flags;
+        italic_angle = desc.italic_angle;
+        stem_v = desc.stem_v;
+        descriptor_font_weight = desc.font_weight;
+        descriptor_font_name = desc.font_name;
+        ascent = desc.ascent;
+        descent = desc.descent;
+        font_bbox = desc.font_bbox;
+
+        // Type 3: FontBBox often lives on the font dict itself (Skia).
+        if is_type3 {
+            if let Some(bbox) = read_number_array(doc, dict, b"FontBBox") {
+                if bbox.len() >= 4 {
+                    font_bbox = [bbox[0], bbox[1], bbox[2], bbox[3]];
+                }
+            }
+        }
     }
 
-    // If the font name indicates bold but StemV gave a low weight, override.
-    // Many PDFs have "Bold" in the font name but StemV in the 100-140 range
-    // which our heuristic maps to 500 (Medium).  The font name is more reliable.
-    let name_lower = base_font.to_lowercase();
-    let is_name_bold =
-        name_lower.contains("bold") || name_lower.contains("black") || name_lower.contains("heavy");
-    if is_name_bold && weight < 700.0 {
-        weight = 700.0;
+    let base_font = crate::pdf::font_style::resolve_base_font_name(
+        base_font_raw.as_deref(),
+        descriptor_font_name.as_deref(),
+    );
+
+    let is_standard = is_standard_font(&base_font);
+    if is_standard {
+        default_width = standard_font_default_width(&base_font);
     }
+
+    // Type 3: normalize glyph-space widths / bbox through FontMatrix into the
+    // per-mille text-space invariant documented on PdfFont.
+    if is_type3 {
+        let matrix_vals = read_number_array(doc, dict, b"FontMatrix").unwrap_or_default();
+        let matrix = crate::pdf::font_type3::font_matrix_from_array(&matrix_vals);
+        let scale = matrix.em_scale();
+        crate::pdf::font_type3::normalize_widths(&mut widths, scale);
+        default_width *= scale;
+        if desc_missing_ascent_descent(doc, dict) {
+            let (a, d) = crate::pdf::font_type3::vertical_extent(font_bbox, matrix);
+            ascent = a;
+            descent = d;
+        }
+        font_bbox = crate::pdf::font_type3::normalize_font_bbox(font_bbox, matrix);
+    }
+
+    let weight =
+        crate::pdf::font_style::resolve_font_weight(&base_font, descriptor_font_weight, stem_v);
 
     PdfFont {
         name: name.to_string(),
@@ -394,6 +430,37 @@ pub(crate) fn resolve_font_dict(
         ascent,
         descent,
         font_bbox,
+    }
+}
+
+/// True when the font descriptor lacks explicit /Ascent and /Descent.
+fn desc_missing_ascent_descent(doc: &lopdf::Document, dict: &lopdf::Dictionary) -> bool {
+    let Ok(fd_ref) = dict.get(b"FontDescriptor") else {
+        return true;
+    };
+    let fd_obj = resolve_object(doc, fd_ref);
+    let Ok(fd) = fd_obj.as_dict() else {
+        return true;
+    };
+    fd.get(b"Ascent").is_err() && fd.get(b"Descent").is_err()
+}
+
+/// Read a numeric array from a dictionary key (resolving references).
+fn read_number_array(
+    doc: &lopdf::Document,
+    dict: &lopdf::Dictionary,
+    key: &[u8],
+) -> Option<Vec<f64>> {
+    let obj = resolve_object(doc, dict.get(key).ok()?);
+    let arr = obj.as_array().ok()?;
+    let vals: Vec<f64> = arr
+        .iter()
+        .filter_map(|o| obj_to_f64(resolve_object(doc, o)))
+        .collect();
+    if vals.is_empty() {
+        None
+    } else {
+        Some(vals)
     }
 }
 
@@ -638,6 +705,101 @@ fn get_font_file_data(
     let ff_obj = doc.get_object(ff_id).ok()?;
     let stream = ff_obj.as_stream().ok()?;
     stream.decompressed_content().ok()
+}
+
+/// Identity-H / CIDFont Unicode fallback from an embedded TrueType/OpenType cmap.
+///
+/// When `/ToUnicode` is absent, many Type0 fonts still embed a Unicode cmap in
+/// `/FontFile2`. For Identity `CIDToGIDMap`, CID == glyph id.
+fn resolve_cid_font_cmap_fallback(
+    doc: &lopdf::Document,
+    cid_font_dict: &lopdf::Dictionary,
+    to_unicode: &mut HashMap<u32, String>,
+) {
+    // Prefer existing ToUnicode coverage — only fill vacant codes.
+    let fd_obj = match cid_font_dict.get(b"FontDescriptor") {
+        Ok(o) => resolve_object(doc, o),
+        Err(_) => return,
+    };
+    let fd = match fd_obj.as_dict() {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+
+    let data = None
+        .or_else(|| get_font_file_data(doc, fd, b"FontFile2"))
+        .or_else(|| get_font_file_data(doc, fd, b"FontFile3"));
+    let Some(font_bytes) = data else {
+        return;
+    };
+
+    // CIDToGIDMap: Identity (default for Identity-H) or a stream of 2-byte GIDs.
+    let cid_to_gid = resolve_cid_to_gid_map(doc, cid_font_dict);
+
+    let Ok(face) = ttf_parser::Face::parse(&font_bytes, 0) else {
+        return;
+    };
+
+    // Build glyph_id → Unicode from the best Unicode cmap.
+    let mut gid_to_unicode: HashMap<u16, String> = HashMap::new();
+    if let Some(subtable) = face
+        .tables()
+        .cmap
+        .and_then(|c| c.subtables.into_iter().find(|s| s.is_unicode()))
+    {
+        subtable.codepoints(|cp| {
+            if let Some(gid) = subtable.glyph_index(cp) {
+                if let Some(ch) = char::from_u32(cp) {
+                    gid_to_unicode
+                        .entry(gid.0)
+                        .or_insert_with(|| ch.to_string());
+                }
+            }
+        });
+    }
+
+    if gid_to_unicode.is_empty() {
+        return;
+    }
+
+    let max_cid = cid_to_gid
+        .as_ref()
+        .map(|m| m.len() as u32)
+        .unwrap_or_else(|| face.number_of_glyphs() as u32);
+
+    for cid in 0..max_cid {
+        if to_unicode.contains_key(&cid) {
+            continue;
+        }
+        let gid = match &cid_to_gid {
+            Some(map) => map.get(cid as usize).copied().unwrap_or(cid as u16),
+            None => cid as u16,
+        };
+        if let Some(uni) = gid_to_unicode.get(&gid) {
+            to_unicode.insert(cid, uni.clone());
+        }
+    }
+}
+
+/// Parse `/CIDToGIDMap`. `None` means Identity (CID == GID).
+fn resolve_cid_to_gid_map(doc: &lopdf::Document, cid_font_dict: &lopdf::Dictionary) -> Option<Vec<u16>> {
+    let obj = cid_font_dict.get(b"CIDToGIDMap").ok()?;
+    let resolved = resolve_object(doc, obj);
+    match resolved {
+        lopdf::Object::Name(n) if n.as_slice() == b"Identity" => None,
+        lopdf::Object::Stream(stream) => {
+            let data = stream.decompressed_content().ok()?;
+            if data.len() < 2 {
+                return None;
+            }
+            let mut map = Vec::with_capacity(data.len() / 2);
+            for chunk in data.chunks_exact(2) {
+                map.push(u16::from_be_bytes([chunk[0], chunk[1]]));
+            }
+            Some(map)
+        }
+        _ => None,
+    }
 }
 
 /// Map a PostScript/PDF glyph name to its Unicode string representation.
@@ -905,85 +1067,94 @@ fn parse_hex_unicode_str(cleaned: &str) -> Option<String> {
     }
 }
 
+/// Fields extracted from a `/FontDescriptor` dictionary.
+struct FontDescriptorFields {
+    flags: u32,
+    italic_angle: f64,
+    stem_v: f64,
+    font_weight: Option<f64>,
+    font_name: Option<String>,
+    ascent: f64,
+    descent: f64,
+    font_bbox: [f64; 4],
+}
+
 /// Resolve font descriptor fields.
 fn resolve_font_descriptor(
     doc: &lopdf::Document,
     dict: &lopdf::Dictionary,
-) -> (u32, f64, f64, f64, f64, [f64; 4]) {
-    let mut flags = 0u32;
-    let mut italic_angle = 0.0f64;
-    let mut weight = 400.0f64;
-    let mut ascent = 800.0f64;
-    let mut descent = -200.0f64;
-    let mut font_bbox = [0.0f64, -200.0, 1000.0, 800.0];
+) -> FontDescriptorFields {
+    let mut fields = FontDescriptorFields {
+        flags: 0,
+        italic_angle: 0.0,
+        stem_v: 0.0,
+        font_weight: None,
+        font_name: None,
+        ascent: 800.0,
+        descent: -200.0,
+        font_bbox: [0.0, -200.0, 1000.0, 800.0],
+    };
 
     if let Ok(fd_ref) = dict.get(b"FontDescriptor") {
         let fd_obj = resolve_object(doc, fd_ref);
         if let Ok(fd) = fd_obj.as_dict() {
-            flags = fd
+            fields.flags = fd
                 .get(b"Flags")
                 .ok()
                 .and_then(|o| obj_to_i64(resolve_object(doc, o)))
                 .unwrap_or(0) as u32;
 
-            italic_angle = fd
+            fields.italic_angle = fd
                 .get(b"ItalicAngle")
                 .ok()
                 .and_then(|o| obj_to_f64(resolve_object(doc, o)))
                 .unwrap_or(0.0);
 
-            // StemV can approximate weight
-            let stem_v = fd
+            fields.stem_v = fd
                 .get(b"StemV")
                 .ok()
                 .and_then(|o| obj_to_f64(resolve_object(doc, o)))
                 .unwrap_or(0.0);
 
-            weight = if stem_v >= 140.0 {
-                700.0 // Bold
-            } else if stem_v >= 100.0 {
-                500.0 // Medium
-            } else {
-                400.0 // Normal
-            };
+            fields.font_weight = fd
+                .get(b"FontWeight")
+                .ok()
+                .and_then(|o| obj_to_f64(resolve_object(doc, o)));
 
-            // Read font bounding box
-            if let Ok(bbox_ref) = fd.get(b"FontBBox") {
-                let bbox_obj = resolve_object(doc, bbox_ref);
-                if let Ok(bbox_arr) = bbox_obj.as_array() {
-                    if bbox_arr.len() >= 4 {
-                        let vals: Vec<f64> = bbox_arr
-                            .iter()
-                            .filter_map(|o| obj_to_f64(resolve_object(doc, o)))
-                            .collect();
-                        if vals.len() >= 4 {
-                            font_bbox = [vals[0], vals[1], vals[2], vals[3]];
-                        }
-                    }
+            fields.font_name = fd.get(b"FontName").ok().and_then(|o| {
+                let resolved = resolve_object(doc, o);
+                if let lopdf::Object::Name(n) = resolved {
+                    Some(String::from_utf8_lossy(&n).to_string())
+                } else {
+                    None
+                }
+            });
+
+            if let Some(vals) = read_number_array(doc, fd, b"FontBBox") {
+                if vals.len() >= 4 {
+                    fields.font_bbox = [vals[0], vals[1], vals[2], vals[3]];
                 }
             }
 
-            // Read ascent (with fallback to font bbox)
             if let Ok(a_ref) = fd.get(b"Ascent") {
                 if let Some(a) = obj_to_f64(resolve_object(doc, a_ref)) {
-                    ascent = a;
+                    fields.ascent = a;
                 }
             } else {
-                ascent = font_bbox[3]; // fallback to font bbox ury
+                fields.ascent = fields.font_bbox[3];
             }
 
-            // Read descent (with fallback to font bbox)
             if let Ok(d_ref) = fd.get(b"Descent") {
                 if let Some(d) = obj_to_f64(resolve_object(doc, d_ref)) {
-                    descent = d;
+                    fields.descent = d;
                 }
             } else {
-                descent = font_bbox[1]; // fallback to font bbox lly
+                fields.descent = fields.font_bbox[1];
             }
         }
     }
 
-    (flags, italic_angle, weight, ascent, descent, font_bbox)
+    fields
 }
 
 /// Resolve a PDF object reference.
@@ -1281,6 +1452,261 @@ mod tests {
         assert!(is_standard_font("Helvetica"));
         assert!(is_standard_font("Courier-Bold"));
         assert!(!is_standard_font("ArialMT"));
+    }
+
+    #[test]
+    fn type3_skia_widths_normalized_to_per_mille() {
+        use lopdf::{dictionary, Document, Object, Stream};
+
+        let mut doc = Document::with_version("1.5");
+        // Minimal empty CharProc (glyph drawing not needed for metrics).
+        let proc_id = doc.add_object(Stream::new(dictionary! {}, Vec::new()));
+        let fd_id = doc.add_object(dictionary! {
+            "Type" => "FontDescriptor",
+            "FontName" => "AAAA+.SFNS-Regular_wght2580000",
+            "FontWeight" => 600,
+            "StemV" => 262,
+            "Flags" => 4,
+            "ItalicAngle" => 0,
+        });
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type3",
+            "FontMatrix" => vec![
+                Object::Real(1.0 / 2048.0),
+                Object::Integer(0),
+                Object::Integer(0),
+                Object::Real(-1.0 / 2048.0),
+                Object::Integer(0),
+                Object::Integer(0),
+            ],
+            "FirstChar" => 0,
+            "LastChar" => 3,
+            "Widths" => vec![
+                Object::Integer(2048),       // em-wide glyph → 1000 per-mille
+                Object::Real(544.00195),     // space-like
+                Object::Integer(1334),       // ~651 per-mille
+                Object::Integer(0),
+            ],
+            "FontBBox" => vec![91.into(), 495.into(), 1949.into(), (-1951).into()],
+            "FontDescriptor" => fd_id,
+            "CharProcs" => dictionary! { "g0" => proc_id },
+            "Encoding" => dictionary! {
+                "Type" => "Encoding",
+                "Differences" => vec![Object::Integer(0), Object::Name(b"g0".to_vec())],
+            },
+        });
+
+        let font_obj = doc.get_object(font_id).unwrap().as_dict().unwrap();
+        // Clone dict because resolve needs owned-style access through doc refs
+        let font = resolve_font_dict(&doc, "F4", font_obj);
+
+        assert_eq!(font.subtype, "Type3");
+        assert!(
+            font.base_font.contains("SFNS"),
+            "expected descriptor FontName fallback, got {}",
+            font.base_font
+        );
+        assert!(
+            (font.weight - 600.0).abs() < 1e-6,
+            "expected FontWeight=600 over StemV, got {}",
+            font.weight
+        );
+        let w0 = font.glyph_width(0);
+        assert!(
+            (w0 - 1000.0).abs() < 1.0,
+            "2048 glyph-space units → 1000 per-mille, got {w0}"
+        );
+        let w1 = font.glyph_width(1);
+        let expected_space = 544.00195 * 1000.0 / 2048.0;
+        assert!(
+            (w1 - expected_space).abs() < 0.1,
+            "space width got {w1}, expected ~{expected_space}"
+        );
+    }
+
+    /// End-to-end: Skia-like Type3 PDF must preserve the word space in "Hi there".
+    #[test]
+    fn type3_skia_pdf_preserves_word_space() {
+        use crate::api::config::ProcessingConfig;
+        use crate::convert_bytes;
+        use crate::output::markdown::to_markdown;
+        use lopdf::content::{Content, Operation};
+        use lopdf::{dictionary, Document, Object, Stream};
+
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let proc_id = doc.add_object(Stream::new(dictionary! {}, Vec::new()));
+
+        let fd_id = doc.add_object(dictionary! {
+            "Type" => "FontDescriptor",
+            "FontName" => "AAAA+.SFNS-Regular",
+            "FontWeight" => 400,
+            "StemV" => 80,
+            "Flags" => 32,
+        });
+
+        // Widths in 1/2048 glyph space (Skia). After normalize: *1000/2048.
+        // Codes: H i space t h e r e
+        let widths: Vec<Object> = [1200, 500, 544, 600, 700, 650, 550, 650]
+            .into_iter()
+            .map(Object::Integer)
+            .collect();
+
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type3",
+            "FontMatrix" => vec![
+                Object::Real(1.0 / 2048.0),
+                0.into(),
+                0.into(),
+                Object::Real(-1.0 / 2048.0),
+                0.into(),
+                0.into(),
+            ],
+            "FirstChar" => 0,
+            "LastChar" => 7,
+            "Widths" => widths,
+            "FontBBox" => vec![0.into(), 0.into(), 2048.into(), (-2048).into()],
+            "FontDescriptor" => fd_id,
+            "CharProcs" => dictionary! { "g0" => proc_id },
+            // AGL glyph names so Differences → Unicode without ToUnicode.
+            "Encoding" => dictionary! {
+                "Type" => "Encoding",
+                "Differences" => vec![
+                    Object::Integer(0),
+                    Object::Name(b"H".to_vec()),
+                    Object::Name(b"i".to_vec()),
+                    Object::Name(b"space".to_vec()),
+                    Object::Name(b"t".to_vec()),
+                    Object::Name(b"h".to_vec()),
+                    Object::Name(b"e".to_vec()),
+                    Object::Name(b"r".to_vec()),
+                    Object::Name(b"e".to_vec()),
+                ],
+            },
+        });
+
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+
+        // One Tj per glyph (Skia style). Space glyph is filtered by
+        // TextLine::value(); needs_space must re-insert it from the gap,
+        // which only works when Type3 widths are normalized.
+        let mut ops = vec![
+            Operation::new("BT", vec![]),
+            Operation::new("Tf", vec!["F1".into(), Object::Real(24.0)]),
+            Operation::new("Td", vec![72.into(), 700.into()]),
+        ];
+        for code in [0u8, 1, 2, 3, 4, 5, 6, 7] {
+            ops.push(Operation::new(
+                "Tj",
+                vec![Object::String(vec![code], lopdf::StringFormat::Hexadecimal)],
+            ));
+        }
+        ops.push(Operation::new("ET", vec![]));
+
+        let content_id = doc.add_object(Stream::new(
+            dictionary! {},
+            Content { operations: ops }.encode().unwrap(),
+        ));
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "Resources" => resources_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        });
+        doc.objects.insert(
+            pages_id,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page_id.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+
+        let mut bytes = Vec::new();
+        doc.save_to(&mut bytes).unwrap();
+
+        let mut config = ProcessingConfig::default();
+        config.raster_table_ocr = false;
+        config.image_output = crate::api::config::ImageOutput::Off;
+        let parsed = convert_bytes(&bytes, "skia-type3.pdf", &config).unwrap();
+        let md = to_markdown(&parsed).unwrap();
+        assert!(
+            md.contains("Hi there"),
+            "Type3 width normalization must preserve word space; got: {md:?}"
+        );
+    }
+
+    #[test]
+    fn identity_h_ascii_cid_fallback_without_tounicode() {
+        // Type0 Identity-H, no ToUnicode: ASCII-range CIDs must still decode.
+        use lopdf::{dictionary, Document, Object};
+
+        let mut doc = Document::with_version("1.5");
+        let desc_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "CIDFontType2",
+            "BaseFont" => "Dummy",
+            "CIDSystemInfo" => dictionary! {
+                "Registry" => Object::string_literal("Adobe"),
+                "Ordering" => Object::string_literal("Identity"),
+                "Supplement" => 0,
+            },
+            "DW" => 1000,
+        });
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type0",
+            "BaseFont" => "Dummy",
+            "Encoding" => "Identity-H",
+            "DescendantFonts" => vec![desc_id.into()],
+        });
+        let font_obj = doc.get_object(font_id).unwrap().as_dict().unwrap().clone();
+        let font = resolve_font_dict(&doc, "F1", &font_obj);
+        assert_eq!(font.bytes_per_code, 2);
+        assert_eq!(font.decode_char(0x0041), "A");
+        assert_eq!(font.decode_char(0x0020), " ");
+        // High unmapped CID must not WinAnsi-mojibake.
+        assert_eq!(font.decode_char(0x1234), "\u{FFFD}");
+    }
+
+    /// Optional local-only check against a Skia Chrome PDF on disk.
+    #[test]
+    fn type3_real_skia_pdf_word_ratio_env_gated() {
+        let path = match std::env::var("EDGEPARSE_SKIA_PDF") {
+            Ok(p) => std::path::PathBuf::from(p),
+            Err(_) => return, // skip quietly when unset
+        };
+        if !path.exists() {
+            return;
+        }
+        use crate::api::config::ProcessingConfig;
+        use crate::convert;
+        use crate::output::markdown::to_markdown;
+
+        let mut config = ProcessingConfig::default();
+        config.raster_table_ocr = false;
+        config.image_output = crate::api::config::ImageOutput::Off;
+        let doc = convert(&path, &config).unwrap();
+        let md = to_markdown(&doc).unwrap();
+        let words = md.split_whitespace().count();
+        assert!(
+            words > 2000,
+            "expected dense word-spaced markdown, got {words} words"
+        );
+        assert!(
+            !md.contains("W e ") && !md.contains("W ikipedia"),
+            "stray W fragments still present"
+        );
     }
 
     #[test]

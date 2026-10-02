@@ -483,18 +483,17 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
     }
 
     // Phase 3: Assign levels (BTreeMap iterates in Ord order: largest/boldest first)
-    let mut level = 1u32;
-    for positions in heading_styles.values() {
+    for (level, positions) in heading_styles.values().enumerate() {
+        let level = (level as u32 + 1).min(6);
         for &(page_idx, elem_idx) in positions {
             if let ContentElement::Paragraph(p) = &pages[page_idx][elem_idx] {
                 let heading = SemanticHeading {
                     base: p.clone(),
-                    heading_level: Some(level.min(6)),
+                    heading_level: Some(level),
                 };
                 pages[page_idx][elem_idx] = ContentElement::Heading(heading);
             }
         }
-        level += 1;
     }
 }
 
@@ -524,12 +523,12 @@ pub fn refine_heading_hierarchy(pages: &mut [Vec<ContentElement>], bookmarks: &[
             let normalized = normalize_heading_key(&text);
 
             if let Some(level) = outline_levels.get(&normalized).copied() {
-                heading.heading_level = Some(level.min(6).max(1));
+                heading.heading_level = Some(level.clamp(1, 6));
                 continue;
             }
 
             if let Some(level) = section_number_level(&text) {
-                heading.heading_level = Some(level.min(6).max(1));
+                heading.heading_level = Some(level.clamp(1, 6));
             }
         }
     }
@@ -582,7 +581,7 @@ fn promote_outline_paragraphs(
             };
             let heading = SemanticHeading {
                 base: para.clone(),
-                heading_level: Some(level.min(6).max(1)),
+                heading_level: Some(level.clamp(1, 6)),
             };
             *elem = ContentElement::Heading(heading);
         }
@@ -612,8 +611,6 @@ fn normalize_heading_key(text: &str) -> String {
         .map(|c| {
             if c.is_alphanumeric() {
                 c.to_ascii_lowercase()
-            } else if c.is_whitespace() {
-                ' '
             } else {
                 ' '
             }

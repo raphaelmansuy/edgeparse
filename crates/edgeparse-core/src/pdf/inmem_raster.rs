@@ -299,6 +299,7 @@ pub fn collect_raster_candidates(
 
 /// Decode + pre-filter a single Image XObject into an OCR candidate.
 #[cfg(feature = "image")]
+#[allow(clippy::too_many_arguments)]
 pub fn prepare_candidate(
     id: u32,
     data: &[u8],
@@ -684,37 +685,7 @@ fn recognize_words_ocrs_only(gray: &GrayImage) -> Option<Vec<crate::pdf::ocr::Oc
 
 #[cfg(feature = "image")]
 fn decode_to_gray(data: &[u8], filter: &str, width: u32, height: u32) -> Option<GrayImage> {
-    if filter == "DCTDecode" || data.starts_with(&[0xFF, 0xD8]) {
-        return image::load_from_memory(data).ok().map(|img| img.to_luma8());
-    }
-    if width == 0 || height == 0 {
-        return None;
-    }
-    let n = (width as usize).checked_mul(height as usize)?;
-    if data.len() == n {
-        return GrayImage::from_raw(width, height, data.to_vec());
-    }
-    if data.len() == n * 3 {
-        let mut luma = Vec::with_capacity(n);
-        for px in data.chunks_exact(3) {
-            let y = (0.299 * f64::from(px[0]) + 0.587 * f64::from(px[1]) + 0.114 * f64::from(px[2]))
-                .round()
-                .clamp(0.0, 255.0) as u8;
-            luma.push(y);
-        }
-        return GrayImage::from_raw(width, height, luma);
-    }
-    if data.len() == n * 4 {
-        let mut luma = Vec::with_capacity(n);
-        for px in data.chunks_exact(4) {
-            let y = (0.299 * f64::from(px[0]) + 0.587 * f64::from(px[1]) + 0.114 * f64::from(px[2]))
-                .round()
-                .clamp(0.0, 255.0) as u8;
-            luma.push(y);
-        }
-        return GrayImage::from_raw(width, height, luma);
-    }
-    image::load_from_memory(data).ok().map(|img| img.to_luma8())
+    crate::pdf::image_codecs::decode_image_to_gray(data, filter, width, height).map(|d| d.gray)
 }
 
 #[cfg(feature = "image")]
@@ -1073,7 +1044,7 @@ fn words_in_cell(words: &[crate::pdf::ocr::OcrWord], x1: u32, y1: u32, x2: u32, 
             cx >= x1 && cx < x2 && cy >= y1 && cy < y2
         })
         .collect();
-    hit.sort_by(|a, b| (a.top, a.left).cmp(&(b.top, b.left)));
+    hit.sort_by_key(|a| (a.top, a.left));
     hit.iter()
         .map(|w| w.text.as_str())
         .collect::<Vec<_>>()

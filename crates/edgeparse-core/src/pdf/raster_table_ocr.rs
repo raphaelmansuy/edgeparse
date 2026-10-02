@@ -258,19 +258,18 @@ pub fn recover_raster_table_borders(
             Some(g) => g,
             None => continue,
         };
-        // Ruled lattices are tables, not charts — do not discard via the
-        // axis-label OCR heuristic (columnar worksheet text shares that pattern).
+        // Classify before any OCR / lattice work so charts never become junk tables.
+        if matches!(
+            classify_raster_region(&gray),
+            crate::pdf::image_region::ImageRegionKind::Skip
+        ) {
+            continue;
+        }
         if let Some(table) = recover_bordered_raster_table_from_gray(&gray, image) {
             if bordered_raster_table_is_plausible(&table) {
                 tables.push(table);
                 continue;
             }
-        }
-        if is_obvious_bar_chart_raster(&gray)
-            || is_natural_photograph_raster(&gray)
-            || is_dark_ui_screenshot_raster(&gray)
-        {
-            continue;
         }
         let Some(words) = run_tesseract_tsv_words_best(&gray, &["6", "11"], |candidate| {
             looks_like_table_ocr(candidate)
@@ -701,7 +700,7 @@ fn enrich_empty_table_from_page_raster(
         if parts.is_empty() {
             continue;
         }
-        parts.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        parts.sort_by_key(|a| (a.0, a.1));
         let raw = parts
             .into_iter()
             .map(|(_, _, t)| t)
@@ -2232,7 +2231,7 @@ fn recover_bordered_raster_table_from_gray(
                 if parts.is_empty() {
                     String::new()
                 } else {
-                    parts.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+                    parts.sort_by_key(|a| (a.0, a.1));
                     let raw = parts
                         .iter()
                         .map(|(_, _, text)| text.as_str())
@@ -2397,6 +2396,23 @@ fn collect_bordered_table_ocr_buckets(
     }
 
     Some(buckets)
+}
+
+/// Classify a grayscale raster for OCR routing.
+///
+/// Charts / photos / UI chrome → skip. Ruled lattices → table. Otherwise prose.
+pub fn classify_raster_region(gray: &GrayImage) -> crate::pdf::image_region::ImageRegionKind {
+    use crate::pdf::image_region::ImageRegionKind;
+    if is_obvious_bar_chart_raster(gray)
+        || is_natural_photograph_raster(gray)
+        || is_dark_ui_screenshot_raster(gray)
+    {
+        return ImageRegionKind::Skip;
+    }
+    if detect_bordered_raster_grid_single(gray).is_some() {
+        return ImageRegionKind::Table;
+    }
+    ImageRegionKind::Prose
 }
 
 fn is_obvious_bar_chart_raster(gray: &GrayImage) -> bool {

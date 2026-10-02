@@ -66,6 +66,7 @@ Converts a PDF file and returns the content as a string.
 | `options.readingOrder` | `'xycut' \| 'default'` | Reading order algorithm (default: `'xycut'`) |
 | `options.tableMethod` | `'border' \| 'cluster'` | Table detection method (default: `'border'`) |
 | `options.imageOutput` | `'embedded' \| 'external' \| 'none'` | Image handling (default: `'none'`) |
+| `options.rasterTableOcr` | `boolean` | Enable raster table / image OCR (default: `true`) |
 
 ### `version(): string`
 

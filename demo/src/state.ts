@@ -27,6 +27,8 @@ export interface AppState {
   renderStatus: RenderStatus;
   errorMessage: string | null;
   showOverlay: boolean;
+  /** When true, raster OCR runs during parse (default). */
+  enableOcr: boolean;
   activeSemanticFilters: Set<SemanticType>;
   darkMode: boolean;
 }
@@ -54,6 +56,7 @@ class StateStore extends EventTarget {
       renderStatus: 'idle',
       errorMessage: null,
       showOverlay: true,
+      enableOcr: true,
       activeSemanticFilters: new Set([
         'TextBlock', 'Heading', 'Table', 'TableBorder',
         'Figure', 'Image', 'List', 'Other',

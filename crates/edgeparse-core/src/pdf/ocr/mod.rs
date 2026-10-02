@@ -83,7 +83,7 @@ pub fn default_engine() -> Arc<dyn OcrEngine> {
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        return Arc::new(TesseractCliEngine::default());
+        Arc::new(TesseractCliEngine::default())
     }
     #[cfg(target_arch = "wasm32")]
     {

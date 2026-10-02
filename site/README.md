@@ -1,6 +1,6 @@
 # EdgeParse documentation site
 
-Astro + Starlight site for [edgeparse.com](https://edgeparse.com) — product landing page, API docs, guides, and benchmark boards for EdgeParse **v0.3.0**.
+Astro + Starlight site for [edgeparse.com](https://edgeparse.com) — product landing page, API docs, guides, and benchmark boards for EdgeParse **v0.3.2**.
 
 ## Develop
 

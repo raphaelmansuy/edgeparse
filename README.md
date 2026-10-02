@@ -399,7 +399,7 @@ EdgeParse compiles to WebAssembly — **client-side PDF extraction in any modern
 - Same Rust engine, identical output to CLI/Python/Node
 - PDF data never leaves the user's device (privacy by design)
 - Works offline after initial WASM load (~4 MB cached)
-- Optional PP-OCRv6 for image-embedded tables via `@edgeparse/web` (consent + IndexedDB cache)
+- Optional PP-OCRv6 for image-embedded tables via `@edgeparse/web` (consent + OPFS/Cache)
 - Zero infrastructure cost — static hosting only
 
 ### Preferred: `@edgeparse/web` (observable SDK)
@@ -423,7 +423,7 @@ job.on('progress', (p) => console.log(p.label, p.fraction));
 const { markdown, quality, warnings } = await job.result;
 ```
 
-Docs: [quick-start Web SDK](https://www.edgeparse.com/getting-started/quick-start-web-sdk/) · [API](https://www.edgeparse.com/api/web-sdk/)
+Docs: [quick-start Web SDK](https://www.edgeparse.com/getting-started/quick-start-web-sdk/) · [OCR models](https://www.edgeparse.com/guides/ocr-models/) · [API](https://www.edgeparse.com/api/web-sdk/)
 
 ### Low-level WASM
 

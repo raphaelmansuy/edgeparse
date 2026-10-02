@@ -308,6 +308,7 @@ fn build_config(cli: &Cli) -> edgeparse_core::api::config::ProcessingConfig {
         },
         image_dir: cli.image_dir.clone(),
         raster_table_ocr,
+        ocr_budget_ms: None,
         pages: cli.pages.clone(),
         include_header_footer: cli.include_header_footer,
         hybrid: match cli.hybrid.as_str() {

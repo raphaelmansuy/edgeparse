@@ -19,7 +19,17 @@ declare module 'edgeparse-wasm' {
   export class ParseSession {
     static open(
       bytes: Uint8Array,
-      opts: Record<string, unknown>,
+      opts: {
+        pages?: string;
+        readingOrder?: string;
+        tableMethod?: string;
+        fileName?: string;
+        /** When false, skip raster OCR candidate collection (core gate). */
+        rasterTableOcr?: boolean;
+        /** Alias: `false` / `"off"` disables raster OCR. */
+        ocr?: boolean | string;
+        [key: string]: unknown;
+      },
       on_progress: ((phase: string, done: number, total: number) => void) | null,
     ): ParseSession;
     candidates(): Array<{

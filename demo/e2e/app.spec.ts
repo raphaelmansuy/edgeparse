@@ -94,8 +94,9 @@ test.describe('EdgeParse Demo', () => {
       await expect(page.getByRole('tab', { name: fmt })).toBeVisible();
     }
 
-    // Overlay & dark-mode controls
+    // Overlay, OCR & dark-mode controls
     await expect(page.locator('.toolbar__btn--overlay')).toBeVisible();
+    await expect(page.locator('.toolbar__btn--ocr')).toBeVisible();
     await expect(page.locator('.toolbar__btn--dark')).toBeVisible();
 
     // Output actions
@@ -397,6 +398,23 @@ test.describe('EdgeParse Demo', () => {
 
     await page.locator('.toolbar__btn--overlay').click();
     await expect(page.locator('.toolbar__btn--overlay')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  // ── 5b. OCR toggle ──────────────────────────────────────────────────────────
+
+  test('5.3 − OCR toggle starts in active state', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.toolbar__btn--ocr')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('5.4 − OCR toggle changes aria-pressed on click', async ({ page }) => {
+    await page.goto('/');
+
+    await page.locator('.toolbar__btn--ocr').click();
+    await expect(page.locator('.toolbar__btn--ocr')).toHaveAttribute('aria-pressed', 'false');
+
+    await page.locator('.toolbar__btn--ocr').click();
+    await expect(page.locator('.toolbar__btn--ocr')).toHaveAttribute('aria-pressed', 'true');
   });
 
   // ── 6. Dark mode ────────────────────────────────────────────────────────────

@@ -61,6 +61,10 @@ console.log(result.markdown);
 | `manual` | Call `ep.models.preload()` / `ensure()` yourself |
 | `off` | Never download models; image tables degrade to PDF text |
 
+Tiers: `tiny` (~6.4 MB), `small` (~31 MB, default), `medium` (~139 MB). Preload once online, then that tier works offline. Disable per parse with `enableOcr: false`.
+
+Full packaging / self-host / CSP: [OCR Models](/guides/ocr-models/).
+
 ## Architecture
 
 1. **Parse worker** — `ParseSession` (Rust/WASM): extract OCR candidates, finish with OCR words
@@ -75,6 +79,7 @@ Try it: **[edgeparse.com/demo/](https://edgeparse.com/demo/)**
 
 ## Next steps
 
+- [OCR Models](/guides/ocr-models/) — tiers, download, offline, self-host, CSP
 - [Web SDK API](/api/web-sdk/) — state, events, consent, errors, CSP, capabilities
 - [WebAssembly API](/api/wasm/) — low-level `ParseSession` / `convert_to_string`
 - [WASM Use Cases](/guides/wasm-use-cases/) — RAG, offline PWA, privacy-first apps

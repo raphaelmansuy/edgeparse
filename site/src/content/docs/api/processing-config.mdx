@@ -53,4 +53,5 @@ const result = convert("document.pdf", {
 | `format` | string | `"markdown"` | Output format |
 | `pages` | string | all pages | Page range |
 | `table_method` | string | `"auto"` | Table detection: `"border"`, `"cluster"`, `"auto"` |
-| `hybrid` | string | none | Hybrid backend; also enables OCR recovery for raster-backed tables |
+| `raster_table_ocr` | bool | `true` | Raster table / image OCR recovery (JS: `rasterTableOcr` / `enableOcr`) |
+| `hybrid` | string | none | Hybrid backend (Docling); independent of `raster_table_ocr` |

@@ -47,6 +47,7 @@ export function convert(
     reading_order: options.readingOrder,
     table_method: options.tableMethod,
     image_output: options.imageOutput,
+    raster_table_ocr: options.rasterTableOcr,
   } : undefined);
 }
 

@@ -31,8 +31,49 @@ use crate::pdf::raster_table_ocr::{
 };
 use crate::pipeline::orchestrator::{run_pipeline, PipelineState};
 use crate::pipeline::stages::heading_detector::refine_heading_hierarchy;
-use crate::tagged::struct_tree::build_mcid_map;
+use crate::tagged::struct_tree::{build_mcid_map, should_use_struct_tree};
 use std::time::Instant;
+
+/// Run dominant-image text + raster-table recovery for one page (native only).
+///
+/// Single gate for OCR enablement + wall-clock budget so callers stay DRY.
+#[cfg(not(target_arch = "wasm32"))]
+fn recover_page_image_content(
+    input_path: &std::path::Path,
+    config: &ProcessingConfig,
+    page_info_by_number: &[Option<&page_info::PageInfo>],
+    page_num: u32,
+    page_chunks: &crate::pdf::chunk_parser::PageChunks,
+    ocr_budget: &mut crate::pdf::image_region::OcrBudget,
+) -> (
+    Vec<crate::models::chunks::TextChunk>,
+    Vec<crate::models::table::TableBorder>,
+) {
+    if !config.raster_table_ocr_enabled() || ocr_budget.exhausted() {
+        return (Vec::new(), Vec::new());
+    }
+    let Some(Some(page_info)) = page_info_by_number.get(page_num as usize) else {
+        return (Vec::new(), Vec::new());
+    };
+    let text = recover_dominant_image_text_chunks(
+        input_path,
+        &page_info.crop_box,
+        page_num,
+        &page_chunks.text_chunks,
+        &page_chunks.image_chunks,
+    );
+    if ocr_budget.exhausted() {
+        return (text, Vec::new());
+    }
+    let tables = recover_raster_table_borders(
+        input_path,
+        &page_info.crop_box,
+        page_num,
+        &page_chunks.text_chunks,
+        &page_chunks.image_chunks,
+    );
+    (text, tables)
+}
 
 /// Main entry point: convert a PDF file to structured data.
 ///
@@ -81,28 +122,17 @@ pub fn convert(
     let mut page_contents = Vec::with_capacity(pages_map.len());
 
     let phase_start = Instant::now();
+    let mut ocr_budget = config.ocr_budget();
     for (&page_num, &page_id) in &pages_map {
         let page_chunks = extract_page_chunks(&raw_doc.document, page_num, page_id)?;
-        let mut recovered_text_chunks = Vec::new();
-        let mut recovered_tables = Vec::new();
-        if config.raster_table_ocr_enabled() {
-            if let Some(Some(page_info)) = page_info_by_number.get(page_num as usize) {
-                recovered_text_chunks = recover_dominant_image_text_chunks(
-                    input_path,
-                    &page_info.crop_box,
-                    page_num,
-                    &page_chunks.text_chunks,
-                    &page_chunks.image_chunks,
-                );
-                recovered_tables = recover_raster_table_borders(
-                    input_path,
-                    &page_info.crop_box,
-                    page_num,
-                    &page_chunks.text_chunks,
-                    &page_chunks.image_chunks,
-                );
-            }
-        }
+        let (recovered_text_chunks, recovered_tables) = recover_page_image_content(
+            input_path,
+            config,
+            &page_info_by_number,
+            page_num,
+            &page_chunks,
+            &mut ocr_budget,
+        );
         let mut elements: Vec<ContentElement> = page_chunks
             .text_chunks
             .into_iter()
@@ -142,9 +172,12 @@ pub fn convert(
     }
     log_phase_duration(timing_enabled, "extract_page_chunks", phase_start);
 
-    // Run the processing pipeline
     let phase_start = Instant::now();
-    let mcid_map = build_mcid_map(&raw_doc.document);
+    let mcid_map = if should_use_struct_tree(&raw_doc.document, config.use_struct_tree) {
+        build_mcid_map(&raw_doc.document)
+    } else {
+        Default::default()
+    };
     let mut pipeline_state = PipelineState::with_mcid_map(page_contents, config.clone(), mcid_map)
         .with_page_info(page_info_list);
     run_pipeline(&mut pipeline_state)?;
@@ -355,7 +388,11 @@ pub fn extract_session(
         }
     }
 
-    let mcid_map = build_mcid_map(&raw_doc.document);
+    let mcid_map = if should_use_struct_tree(&raw_doc.document, config.use_struct_tree) {
+        build_mcid_map(&raw_doc.document)
+    } else {
+        Default::default()
+    };
     let bookmarks = extract_bookmarks(&raw_doc.document);
 
     Ok(ExtractSession {
@@ -463,7 +500,7 @@ pub fn assemble(
             match cand.kind {
                 RasterCandidateKind::Table => {
                     let table = pdf::inmem_raster::build_table_from_candidate(cand, &words)
-                        .filter(|t| pdf::inmem_raster::bordered_table_is_plausible(t));
+                        .filter(pdf::inmem_raster::bordered_table_is_plausible);
                     if let Some(table) = table {
                         if let Some(page) = session.page_contents.get_mut(page_idx) {
                             page.push(ContentElement::TableBorder(table));

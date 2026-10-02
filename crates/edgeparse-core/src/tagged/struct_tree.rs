@@ -146,14 +146,17 @@ fn resolve_struct_type<'a>(raw_type: &'a str, role_map: &'a HashMap<String, Stri
 
 /// Parse heading level from a structure type tag.
 fn heading_level_from_tag(tag: &str) -> Option<u32> {
+    let tag = strip_struct_namespace(tag);
     match tag {
-        "H" => Some(1), // Generic heading defaults to level 1
+        "H" | "Title" => Some(1), // Generic / PDF 2.0 Title → level 1
         "H1" => Some(1),
         "H2" => Some(2),
         "H3" => Some(3),
         "H4" => Some(4),
         "H5" => Some(5),
         "H6" => Some(6),
+        // PDF 2.0 allows Hn beyond H6; clamp at 6 for markdown headings.
+        other if is_hn_heading(other) => other[1..].parse::<u32>().ok().map(|n| n.clamp(1, 6)),
         _ => None,
     }
 }
@@ -230,14 +233,30 @@ pub fn is_tagged(doc: &Document) -> bool {
     catalog.get(b"StructTreeRoot").is_ok()
 }
 
+/// Whether structure-tree semantics should drive extraction.
+///
+/// Auto-enables when `/StructTreeRoot` is present even if the config flag is
+/// off, so tagged / PDF 2.0 docs get correct heading roles by default.
+pub fn should_use_struct_tree(doc: &Document, config_flag: bool) -> bool {
+    config_flag || is_tagged(doc)
+}
+
 /// Map common PDF structure types to semantic roles.
+///
+/// Includes PDF 1.7 standard tags plus PDF 2.0 / WTPDF additions
+/// (`Title`, `Aside`, `FENote`, `Strong`, `Em`, `H7`+).
 pub fn classify_struct_type(tag: &str) -> &'static str {
+    // Strip PDF 2.0 namespace prefixes if present (RoleMap may store bare names).
+    let tag = strip_struct_namespace(tag);
     match tag {
-        "Document" => "document",
+        "Document" | "DocumentFragment" => "document",
         "Part" => "section",
-        "Art" | "Sect" | "Div" => "section",
+        "Art" | "Sect" | "Div" | "Aside" => "section",
         "P" => "paragraph",
+        "Title" => "heading",
         "H" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6" => "heading",
+        // PDF 2.0 Hn (H7+) — treat as heading; level clamped later.
+        t if is_hn_heading(t) => "heading",
         "L" => "list",
         "LI" => "list-item",
         "Lbl" => "list-label",
@@ -253,8 +272,9 @@ pub fn classify_struct_type(tag: &str) -> &'static str {
         "Formula" => "formula",
         "Form" => "form",
         "Span" => "span",
+        "Strong" | "Em" => "span",
         "Link" => "link",
-        "Note" => "note",
+        "Note" | "FENote" => "note",
         "Reference" => "reference",
         "BibEntry" => "bibliography-entry",
         "Code" => "code",
@@ -266,6 +286,34 @@ pub fn classify_struct_type(tag: &str) -> &'static str {
         "NonStruct" => "non-structural",
         _ => "unknown",
     }
+}
+
+/// PDF 2.0 structure namespaces (ISO 32000-2).
+const PDF_SSN: &str = "http://iso.org/pdf/ssn";
+const PDF2_SSN: &str = "http://iso.org/pdf2/ssn";
+
+/// Strip a known PDF structure namespace URI prefix from a role name.
+fn strip_struct_namespace(tag: &str) -> &str {
+    if let Some(rest) = tag.strip_prefix("pdf2:") {
+        return rest;
+    }
+    if let Some(rest) = tag.strip_prefix("pdf:") {
+        return rest;
+    }
+    for ns in [PDF_SSN, PDF2_SSN] {
+        if let Some(rest) = tag.strip_prefix(ns) {
+            return rest.trim_start_matches([':', '/']);
+        }
+    }
+    tag
+}
+
+fn is_hn_heading(tag: &str) -> bool {
+    let bytes = tag.as_bytes();
+    if bytes.len() < 2 || bytes[0] != b'H' {
+        return false;
+    }
+    bytes[1..].iter().all(|b| b.is_ascii_digit())
 }
 
 /// Parse the /K entry which can be an integer MCID, a dictionary (struct element),
@@ -431,8 +479,29 @@ mod tests {
         assert_eq!(heading_level_from_tag("H1"), Some(1));
         assert_eq!(heading_level_from_tag("H2"), Some(2));
         assert_eq!(heading_level_from_tag("H6"), Some(6));
+        assert_eq!(heading_level_from_tag("Title"), Some(1));
+        assert_eq!(heading_level_from_tag("H7"), Some(6)); // PDF 2.0 Hn clamped
         assert_eq!(heading_level_from_tag("P"), None);
         assert_eq!(heading_level_from_tag("Table"), None);
+    }
+
+    #[test]
+    fn test_pdf2_struct_types() {
+        assert_eq!(classify_struct_type("Title"), "heading");
+        assert_eq!(classify_struct_type("Aside"), "section");
+        assert_eq!(classify_struct_type("FENote"), "note");
+        assert_eq!(classify_struct_type("Strong"), "span");
+        assert_eq!(classify_struct_type("Em"), "span");
+        assert_eq!(classify_struct_type("H8"), "heading");
+        assert_eq!(classify_struct_type("pdf2:Title"), "heading");
+        assert_eq!(classify_struct_type("DocumentFragment"), "document");
+    }
+
+    #[test]
+    fn test_should_use_struct_tree_auto() {
+        let doc = Document::new();
+        assert!(!should_use_struct_tree(&doc, false));
+        assert!(should_use_struct_tree(&doc, true));
     }
 
     #[test]

@@ -101,6 +101,7 @@ export async function parsePdfNode(
   let imagesOcred = 0;
 
   if (wasm.ParseSession) {
+    const rasterTableOcr = opts.enableOcr !== false;
     const session = wasm.ParseSession.open(
       pdfBytes,
       {
@@ -108,38 +109,41 @@ export async function parsePdfNode(
         readingOrder: opts.readingOrder,
         tableMethod: opts.tableMethod,
         fileName: opts.fileName ?? 'document.pdf',
+        rasterTableOcr,
       },
       null,
     );
     const candidates = session.candidates();
     imagesTotal = candidates.length;
     const tOcr = performance.now();
-    for (const cand of candidates) {
-      const cached = cache.get(cand.hash);
-      let words: OcrWord[];
-      if (cached) {
-        words = cached;
-      } else {
-        const gray = session.candidate_gray(cand.id);
-        try {
-          words = await ocr.recognize({
-            id: String(cand.id),
-            hash: cand.hash,
-            width: cand.width,
-            height: cand.height,
-            gray,
-          });
-          cache.set(cand.hash, words);
-          if (words.length) imagesOcred += 1;
-        } catch (err) {
-          words = [];
-          quality = 'degraded';
-          warnings.push(
-            `OCR failed for ${cand.id}: ${err instanceof Error ? err.message : String(err)}`,
-          );
+    if (rasterTableOcr) {
+      for (const cand of candidates) {
+        const cached = cache.get(cand.hash);
+        let words: OcrWord[];
+        if (cached) {
+          words = cached;
+        } else {
+          const gray = session.candidate_gray(cand.id);
+          try {
+            words = await ocr.recognize({
+              id: String(cand.id),
+              hash: cand.hash,
+              width: cand.width,
+              height: cand.height,
+              gray,
+            });
+            cache.set(cand.hash, words);
+            if (words.length) imagesOcred += 1;
+          } catch (err) {
+            words = [];
+            quality = 'degraded';
+            warnings.push(
+              `OCR failed for ${cand.id}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
         }
+        session.provide_ocr(cand.id, words);
       }
-      session.provide_ocr(cand.id, words);
     }
     timings.ocrMs = performance.now() - tOcr;
     if (imagesTotal > 0 && imagesOcred === 0) quality = 'degraded';

@@ -17,6 +17,8 @@ pub struct ConvertOptions {
     pub reading_order: Option<String>,
     pub table_method: Option<String>,
     pub image_output: Option<String>,
+    /// Enable raster table / image OCR recovery. Default true when omitted.
+    pub raster_table_ocr: Option<bool>,
 }
 
 #[napi]
@@ -28,6 +30,7 @@ pub fn convert(input_path: String, options: Option<ConvertOptions>) -> napi::Res
         reading_order: None,
         table_method: None,
         image_output: None,
+        raster_table_ocr: None,
     });
 
     let format_str = opts.format.as_deref().unwrap_or("markdown");
@@ -70,6 +73,7 @@ pub fn convert(input_path: String, options: Option<ConvertOptions>) -> napi::Res
             Some("external") => ImageOutput::External,
             _ => ImageOutput::Off,
         },
+        raster_table_ocr: opts.raster_table_ocr.unwrap_or(true),
         ..ProcessingConfig::default()
     };
 

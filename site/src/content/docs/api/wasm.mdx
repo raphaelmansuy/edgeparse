@@ -9,7 +9,7 @@ import { claims } from '../../../data/benchmark';
 
 **npm:** `edgeparse-wasm` · **Version:** {claims.version} · **Source:** [`crates/edgeparse-wasm/`](https://github.com/raphaelmansuy/edgeparse/tree/main/crates/edgeparse-wasm)
 
-For observable progress, consent-gated OCR, and React-friendly state, prefer **[`@edgeparse/web`](/api/web-sdk/)**.
+For observable progress, consent-gated OCR, and React-friendly state, prefer **[`@edgeparse/web`](/api/web-sdk/)**. Model download and packaging: [OCR Models](/guides/ocr-models/).
 
 ## Initialization
 
@@ -37,6 +37,10 @@ class ParseSession {
       readingOrder?: string;
       tableMethod?: string;
       fileName?: string;
+      /** When false, skip raster OCR candidate collection. */
+      rasterTableOcr?: boolean;
+      /** Alias: `false` / `"off"` disables raster OCR. */
+      ocr?: boolean | string;
     },
     on_progress?: (phase: string, done: number, total: number) => void,
   ): ParseSession;

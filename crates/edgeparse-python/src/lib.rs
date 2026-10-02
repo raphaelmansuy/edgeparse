@@ -18,6 +18,7 @@ use std::path::Path;
 ///   reading_order: Reading order algorithm — "xycut" or "off". Default: "xycut".
 ///   table_method: Table detection method — "default" or "cluster". Default: "default".
 ///   image_output: Image output mode — "off", "embedded", or "external". Default: "off".
+///   raster_table_ocr: Enable raster table / image OCR recovery. Default: True.
 ///
 /// Returns:
 ///   The extracted content as a string in the requested format.
@@ -31,6 +32,7 @@ use std::path::Path;
     reading_order = "xycut",
     table_method = "default",
     image_output = "off",
+    raster_table_ocr = true,
 ))]
 fn convert(
     input_path: &str,
@@ -40,6 +42,7 @@ fn convert(
     reading_order: &str,
     table_method: &str,
     image_output: &str,
+    raster_table_ocr: bool,
 ) -> PyResult<String> {
     let pdf_path = Path::new(input_path);
     if !pdf_path.exists() {
@@ -78,6 +81,7 @@ fn convert(
             _ => ImageOutput::Off,
         },
         image_format: ImageFormat::Png,
+        raster_table_ocr,
         ..ProcessingConfig::default()
     };
 
@@ -138,7 +142,7 @@ fn convert_file(
     password: Option<&str>,
 ) -> PyResult<String> {
     let content = convert(
-        input_path, format, pages, password, "xycut", "default", "off",
+        input_path, format, pages, password, "xycut", "default", "off", true,
     )?;
 
     let out_dir = Path::new(output_dir);

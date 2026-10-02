@@ -6,6 +6,8 @@ use lopdf::Document;
 
 use crate::EdgePdfError;
 
+use super::encryption::decrypt_document;
+
 /// Raw loaded PDF document with page data.
 pub struct RawPdfDocument {
     /// The lopdf Document handle
@@ -46,11 +48,11 @@ pub struct PdfMetadata {
 ///
 /// # Arguments
 /// * `path` - Path to the PDF file
-/// * `password` - Optional decryption password
+/// * `password` - Optional decryption password (Standard Security Handler)
 ///
 /// # Errors
-/// Returns `EdgePdfError::LoadError` if the file cannot be read or parsed.
-pub fn load_pdf(path: &Path, _password: Option<&str>) -> Result<RawPdfDocument, EdgePdfError> {
+/// Returns `EdgePdfError::LoadError` if the file cannot be read, parsed, or decrypted.
+pub fn load_pdf(path: &Path, password: Option<&str>) -> Result<RawPdfDocument, EdgePdfError> {
     if !path.exists() {
         return Err(EdgePdfError::LoadError(format!(
             "File not found: {}",
@@ -58,9 +60,11 @@ pub fn load_pdf(path: &Path, _password: Option<&str>) -> Result<RawPdfDocument, 
         )));
     }
 
-    let document = Document::load(path).map_err(|e| {
+    let mut document = Document::load(path).map_err(|e| {
         EdgePdfError::LoadError(format!("Failed to load PDF {}: {}", path.display(), e))
     })?;
+
+    decrypt_document(&mut document, password)?;
 
     let pages = document.get_pages();
     let num_pages = pages.len() as u32;
@@ -103,20 +107,22 @@ fn extract_metadata(doc: &Document) -> PdfMetadata {
 ///
 /// # Arguments
 /// * `data` — raw PDF bytes
-/// * `_password` — optional decryption password (not yet implemented)
+/// * `password` — optional decryption password (Standard Security Handler)
 ///
 /// # Errors
-/// Returns `EdgePdfError::LoadError` if the bytes cannot be parsed as PDF.
+/// Returns `EdgePdfError::LoadError` if the bytes cannot be parsed or decrypted.
 pub fn load_pdf_from_bytes(
     data: &[u8],
-    _password: Option<&str>,
+    password: Option<&str>,
 ) -> Result<RawPdfDocument, EdgePdfError> {
     if data.is_empty() {
         return Err(EdgePdfError::LoadError("Empty PDF data".to_string()));
     }
 
-    let document = Document::load_mem(data)
+    let mut document = Document::load_mem(data)
         .map_err(|e| EdgePdfError::LoadError(format!("Failed to parse PDF from bytes: {e}")))?;
+
+    decrypt_document(&mut document, password)?;
 
     let pages = document.get_pages();
     let num_pages = pages.len() as u32;

@@ -11,4 +11,6 @@ export interface ConvertOptions {
   tableMethod?: string;
   /** Image output mode: "off" (default), "embedded", or "external". */
   imageOutput?: string;
+  /** Enable raster table / image OCR recovery. Default true. */
+  rasterTableOcr?: boolean;
 }
