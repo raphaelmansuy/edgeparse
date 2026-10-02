@@ -1278,6 +1278,7 @@ mod tests {
             bbox: BoundingBox::new(Some(1), 72.0, 500.0, 372.0, 680.0),
             index: Some(1),
             level: None,
+            source: Default::default(),
         };
         let line2 = make_line("After image", 72.0, 480.0, 200.0, 12.0);
 

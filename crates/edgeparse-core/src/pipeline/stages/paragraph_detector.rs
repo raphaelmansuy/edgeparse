@@ -993,6 +993,7 @@ mod tests {
                 bbox: BoundingBox::new(Some(1), 72.0, 500.0, 200.0, 600.0),
                 index: None,
                 level: None,
+                source: Default::default(),
             }),
             make_text_block("After", 1, 72.0, 400.0, 300.0, 412.0),
         ];

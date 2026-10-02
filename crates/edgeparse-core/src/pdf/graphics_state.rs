@@ -129,10 +129,16 @@ pub struct GraphicsState {
     pub fill_color: Vec<f64>,
     /// Stroke color — original PDF color components
     pub stroke_color: Vec<f64>,
-    /// Number of components in current non-stroking color space (1=Gray, 3=RGB, 4=CMYK)
+    /// Number of components in current non-stroking color space (1=Gray, 3=RGB, 4=CMYK).
+    /// `0` means Pattern (no numeric components).
     pub fill_color_space_components: u8,
-    /// Number of components in current stroking color space
+    /// Number of components in current stroking color space.
+    /// `0` means Pattern (no numeric components).
     pub stroke_color_space_components: u8,
+    /// Active non-stroking Pattern resource name (from `scn` with a name operand).
+    pub fill_pattern: Option<Vec<u8>>,
+    /// Active stroking Pattern resource name (from `SCN` with a name operand).
+    pub stroke_pattern: Option<Vec<u8>>,
 }
 
 impl Default for GraphicsState {
@@ -146,6 +152,8 @@ impl Default for GraphicsState {
             stroke_color: vec![0.0],
             fill_color_space_components: 1, // Default: DeviceGray
             stroke_color_space_components: 1,
+            fill_pattern: None,
+            stroke_pattern: None,
         }
     }
 }

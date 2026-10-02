@@ -1,6 +1,6 @@
 {
   "name": "@edgeparse/web",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "EdgeParse Web SDK — observable PDF parsing with lazy PP-OCRv6 models",
   "type": "module",
   "license": "Apache-2.0",

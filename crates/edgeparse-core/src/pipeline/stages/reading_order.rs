@@ -67,6 +67,7 @@ mod tests {
             bbox: BoundingBox::new(Some(page), left, bottom, right, top),
             index: None,
             level: None,
+            source: Default::default(),
         })
     }
 

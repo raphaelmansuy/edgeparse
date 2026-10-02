@@ -14,7 +14,7 @@
 use lopdf::{content::Content, Dictionary, Document, Object, ObjectId};
 
 use crate::models::bbox::{BoundingBox, Vertex};
-use crate::models::chunks::{ImageChunk, LineArtChunk, LineChunk, TextChunk};
+use crate::models::chunks::{ImageChunk, ImagePaintSource, LineArtChunk, LineChunk, TextChunk};
 use crate::EdgePdfError;
 
 use super::font::{resolve_page_fonts, FontCache, PdfFont};
@@ -31,6 +31,15 @@ const LINE_ASPECT_RATIO: f64 = 3.0;
 
 /// Maximum thickness for a line (vs rectangle classification).
 const MAX_LINE_THICKNESS: f64 = 10.0;
+
+/// How a path was painted — fill vs stroke change what counts as a Line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PathPaint {
+    /// `S` / `s` — path edges are stroked geometry (rules, box borders).
+    Stroke,
+    /// `f` / `f*` — path fills a region; only thin strips are rules.
+    Fill,
+}
 
 /// All chunks extracted from a single page.
 #[derive(Debug, Default)]
@@ -377,6 +386,7 @@ impl ChunkParserState {
                         self.gs_stack.current.fill_color_space_components = comps;
                         // PDF spec 8.6.5.3: reset color to default for new space
                         self.gs_stack.current.fill_color = default_color_for_space(comps);
+                        self.gs_stack.current.fill_pattern = None;
                     }
                 }
                 "CS" => {
@@ -386,26 +396,38 @@ impl ChunkParserState {
                         self.gs_stack.current.stroke_color_space_components = comps;
                         // PDF spec 8.6.5.3: reset color to default for new space
                         self.gs_stack.current.stroke_color = default_color_for_space(comps);
+                        self.gs_stack.current.stroke_pattern = None;
                     }
                 }
                 "sc" | "scn" => {
-                    let components: Vec<f64> = op
-                        .operands
-                        .iter()
-                        .filter_map(|o| obj_to_f64(o.clone()))
-                        .collect();
-                    if !components.is_empty() {
-                        self.gs_stack.current.fill_color = components;
+                    // Pattern color spaces take a name operand (e.g. `/P6 scn`).
+                    if let Some(name) = op.operands.first().and_then(obj_name_bytes) {
+                        self.gs_stack.current.fill_pattern = Some(name);
+                    } else {
+                        let components: Vec<f64> = op
+                            .operands
+                            .iter()
+                            .filter_map(|o| obj_to_f64(o.clone()))
+                            .collect();
+                        if !components.is_empty() {
+                            self.gs_stack.current.fill_color = components;
+                            self.gs_stack.current.fill_pattern = None;
+                        }
                     }
                 }
                 "SC" | "SCN" => {
-                    let components: Vec<f64> = op
-                        .operands
-                        .iter()
-                        .filter_map(|o| obj_to_f64(o.clone()))
-                        .collect();
-                    if !components.is_empty() {
-                        self.gs_stack.current.stroke_color = components;
+                    if let Some(name) = op.operands.first().and_then(obj_name_bytes) {
+                        self.gs_stack.current.stroke_pattern = Some(name);
+                    } else {
+                        let components: Vec<f64> = op
+                            .operands
+                            .iter()
+                            .filter_map(|o| obj_to_f64(o.clone()))
+                            .collect();
+                        if !components.is_empty() {
+                            self.gs_stack.current.stroke_color = components;
+                            self.gs_stack.current.stroke_pattern = None;
+                        }
                     }
                 }
 
@@ -582,21 +604,31 @@ impl ChunkParserState {
 
                 // ── Path painting ──
                 "S" => {
-                    self.classify_and_emit_path();
+                    self.classify_and_emit_path(PathPaint::Stroke);
                 }
                 "s" => {
                     // close and stroke
                     self.close_subpath();
-                    self.classify_and_emit_path();
+                    self.classify_and_emit_path(PathPaint::Stroke);
                 }
                 "f" | "F" | "f*" => {
-                    self.classify_and_emit_path();
+                    if self.try_emit_pattern_fill_image(doc, resources) {
+                        // Pattern-painted image — drop path so it is not
+                        // misclassified as page-edge line art.
+                    } else {
+                        self.classify_and_emit_path(PathPaint::Fill);
+                    }
                 }
                 "B" | "B*" | "b" | "b*" => {
                     if op.operator.starts_with('b') {
                         self.close_subpath();
                     }
-                    self.classify_and_emit_path();
+                    if self.try_emit_pattern_fill_image(doc, resources) {
+                        // filled+stroked with a pattern fill
+                    } else {
+                        // Stroke edges define geometry; fill is incidental paint.
+                        self.classify_and_emit_path(PathPaint::Stroke);
+                    }
                 }
                 "n" => {
                     // End path without painting
@@ -758,23 +790,91 @@ impl ChunkParserState {
         let min_y = y0.min(y1).min(y2).min(y3);
         let max_y = y0.max(y1).max(y2).max(y3);
 
+        self.emit_image_bbox(min_x, min_y, max_x, max_y, None, ImagePaintSource::Do);
+    }
+
+    /// Emit an ImageChunk with an explicit bbox and optional forced index.
+    fn emit_image_bbox(
+        &mut self,
+        min_x: f64,
+        min_y: f64,
+        max_x: f64,
+        max_y: f64,
+        forced_index: Option<u32>,
+        source: ImagePaintSource,
+    ) {
         // Skip degenerate images
         if (max_x - min_x).abs() < 0.1 || (max_y - min_y).abs() < 0.1 {
             return;
         }
 
-        self.image_index += 1;
+        let index = if let Some(idx) = forced_index {
+            self.image_index = self.image_index.max(idx);
+            idx
+        } else {
+            self.image_index += 1;
+            self.image_index
+        };
+
         self.image_chunks.push(ImageChunk {
             bbox: BoundingBox::new(Some(self.page_number), min_x, min_y, max_x, max_y),
-            index: Some(self.image_index),
+            index: Some(index),
             level: None,
+            source,
         });
+    }
+
+    /// If the current fill color is a tiling Pattern that paints an Image
+    /// XObject, emit that image with the current path's bounding box and clear
+    /// the path. Returns true when handled (caller must not emit line art).
+    fn try_emit_pattern_fill_image(&mut self, doc: &Document, resources: &Dictionary) -> bool {
+        let Some(pattern_name) = self.gs_stack.current.fill_pattern.clone() else {
+            return false;
+        };
+
+        let path = std::mem::take(&mut self.current_path);
+        self.subpath_start = None;
+        self.current_point = None;
+        if path.is_empty() {
+            return true;
+        }
+
+        let (min_x, min_y, max_x, max_y) = path_bbox(&path);
+        if (max_x - min_x).abs() < 0.1 || (max_y - min_y).abs() < 0.1 {
+            return true;
+        }
+
+        let Some(index) =
+            super::image_extractor::find_pattern_image_index(doc, resources, &pattern_name)
+        else {
+            // Pattern fill without a usable image — swallow the path to avoid
+            // page-edge line noise from full-page pattern rects.
+            return true;
+        };
+
+        self.emit_image_bbox(
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+            Some(index),
+            ImagePaintSource::PatternFill,
+        );
+        true
     }
 
     /// Create an ImageChunk for an inline image (BI/ID/EI).
     fn emit_inline_image(&mut self) {
-        // Inline images also use the current CTM for positioning
-        self.emit_image_from_ctm();
+        let ctm = &self.gs_stack.current.ctm;
+        let (x0, y0) = ctm.transform_point(0.0, 0.0);
+        let (x1, y1) = ctm.transform_point(1.0, 0.0);
+        let (x2, y2) = ctm.transform_point(1.0, 1.0);
+        let (x3, y3) = ctm.transform_point(0.0, 1.0);
+        let min_x = x0.min(x1).min(x2).min(x3);
+        let max_x = x0.max(x1).max(x2).max(x3);
+        let min_y = y0.min(y1).min(y2).min(y3);
+        let max_y = y0.max(y1).max(y2).max(y3);
+        self.emit_image_bbox(min_x, min_y, max_x, max_y, None, ImagePaintSource::Inline);
     }
 
     /// Process a Form XObject — recursively parse its content stream.
@@ -914,12 +1014,27 @@ impl ChunkParserState {
         }
     }
 
-    fn classify_and_emit_path(&mut self) {
+    fn classify_and_emit_path(&mut self, paint: PathPaint) {
         let path = std::mem::take(&mut self.current_path);
         self.subpath_start = None;
         self.current_point = None;
 
         if path.is_empty() || self.line_width < MIN_LINE_WIDTH {
+            return;
+        }
+
+        // Fill paints a region. Only a thin strip is a geometric rule (table
+        // border drawn as a 1pt filled rect). Equidimensional fills — including
+        // Skia soft-circle AA as thousands of 1×1 `re f` — are decoration, not
+        // lines. Emitting their path edges floods LineChunks and blows JSON.
+        if matches!(paint, PathPaint::Fill) {
+            if let Some(mut line) =
+                thin_filled_strip_line(&path, self.line_width, self.page_number)
+            {
+                self.line_index += 1;
+                line.index = Some(self.line_index);
+                self.line_chunks.push(line);
+            }
             return;
         }
 
@@ -1281,7 +1396,12 @@ fn try_classify_rectangle(
         return None;
     }
 
-    let is_square = (w - h).abs() / w.max(h) < 0.3;
+    let is_horizontal = w > h * LINE_ASPECT_RATIO;
+    let is_vertical = h > w * LINE_ASPECT_RATIO;
+    // Filled/stroked boxes and AA dots are regions, not geometric rules.
+    if !is_horizontal && !is_vertical {
+        return None;
+    }
 
     Some(LineChunk {
         bbox: BoundingBox::new(Some(page_number), min_x, min_y, max_x, max_y),
@@ -1298,9 +1418,75 @@ fn try_classify_rectangle(
             radius: 0.0,
         },
         width: w.min(h),
-        is_horizontal_line: w > h * LINE_ASPECT_RATIO,
-        is_vertical_line: h > w * LINE_ASPECT_RATIO,
-        is_square,
+        is_horizontal_line: is_horizontal,
+        is_vertical_line: is_vertical,
+        is_square: false,
+    })
+}
+
+/// A filled path is a Line only when the painted region is a thin strip
+/// (one axis ≪ the other). Used for table rules drawn as filled 1pt rects.
+fn thin_filled_strip_line(
+    segments: &[PathSegment],
+    _line_width: f64,
+    page_number: u32,
+) -> Option<LineChunk> {
+    let mut min_x = f64::MAX;
+    let mut min_y = f64::MAX;
+    let mut max_x = f64::MIN;
+    let mut max_y = f64::MIN;
+
+    for seg in segments {
+        let (sx, sy, ex, ey) = match seg {
+            PathSegment::Line { x1, y1, x2, y2 } => (*x1, *y1, *x2, *y2),
+            PathSegment::Curve { x1, y1, x2, y2, .. } => (*x1, *y1, *x2, *y2),
+        };
+        min_x = min_x.min(sx).min(ex);
+        min_y = min_y.min(sy).min(ey);
+        max_x = max_x.max(sx).max(ex);
+        max_y = max_y.max(sy).max(ey);
+    }
+
+    if !min_x.is_finite() {
+        return None;
+    }
+
+    let w = max_x - min_x;
+    let h = max_y - min_y;
+    if w < MIN_LINE_WIDTH || h < MIN_LINE_WIDTH {
+        return None;
+    }
+
+    let is_horizontal = h <= MAX_LINE_THICKNESS && w > h * LINE_ASPECT_RATIO;
+    let is_vertical = w <= MAX_LINE_THICKNESS && h > w * LINE_ASPECT_RATIO;
+    if !is_horizontal && !is_vertical {
+        return None;
+    }
+
+    let (sx, sy, ex, ey) = if is_horizontal {
+        (min_x, (min_y + max_y) * 0.5, max_x, (min_y + max_y) * 0.5)
+    } else {
+        ((min_x + max_x) * 0.5, min_y, (min_x + max_x) * 0.5, max_y)
+    };
+
+    Some(LineChunk {
+        bbox: BoundingBox::new(Some(page_number), min_x, min_y, max_x, max_y),
+        index: None,
+        level: None,
+        start: Vertex {
+            x: sx,
+            y: sy,
+            radius: 0.0,
+        },
+        end: Vertex {
+            x: ex,
+            y: ey,
+            radius: 0.0,
+        },
+        width: w.min(h),
+        is_horizontal_line: is_horizontal,
+        is_vertical_line: is_vertical,
+        is_square: false,
     })
 }
 
@@ -1405,6 +1591,7 @@ fn color_space_components(name: &str) -> u8 {
         "DeviceGray" | "CalGray" | "G" => 1,
         "DeviceRGB" | "CalRGB" | "RGB" => 3,
         "DeviceCMYK" | "CMYK" => 4,
+        "Pattern" => 0,
         _ => 3,
     }
 }
@@ -1412,6 +1599,7 @@ fn color_space_components(name: &str) -> u8 {
 /// Default color for a given color space component count (PDF spec 8.6.5.3).
 fn default_color_for_space(components: u8) -> Vec<f64> {
     match components {
+        0 => Vec::new(),               // Pattern: no numeric default
         4 => vec![0.0, 0.0, 0.0, 1.0], // CMYK: default black
         3 => vec![0.0, 0.0, 0.0],      // RGB: default black
         _ => vec![0.0],                // Gray: default black
@@ -1423,6 +1611,28 @@ fn resolve_obj(doc: &Document, obj: &Object) -> Object {
         Object::Reference(id) => doc.get_object(*id).cloned().unwrap_or(Object::Null),
         other => other.clone(),
     }
+}
+
+/// Axis-aligned bbox of a path in page space.
+fn path_bbox(path: &[PathSegment]) -> (f64, f64, f64, f64) {
+    let mut min_x = f64::MAX;
+    let mut min_y = f64::MAX;
+    let mut max_x = f64::MIN;
+    let mut max_y = f64::MIN;
+    for seg in path {
+        let (sx, sy, ex, ey) = match seg {
+            PathSegment::Line { x1, y1, x2, y2 } => (*x1, *y1, *x2, *y2),
+            PathSegment::Curve { x1, y1, x2, y2, .. } => (*x1, *y1, *x2, *y2),
+        };
+        min_x = min_x.min(sx).min(ex);
+        min_y = min_y.min(sy).min(ey);
+        max_x = max_x.max(sx).max(ex);
+        max_y = max_y.max(sy).max(ey);
+    }
+    if !min_x.is_finite() {
+        return (0.0, 0.0, 0.0, 0.0);
+    }
+    (min_x, min_y, max_x, max_y)
 }
 
 #[cfg(test)]
@@ -1593,6 +1803,179 @@ mod tests {
             "Expected top_y ~600, got {}",
             img.bbox.top_y
         );
+    }
+
+    #[test]
+    fn test_pattern_fill_emits_image_not_lines() {
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+
+        let img_id = doc.add_object(Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => 200,
+                "Height" => 100,
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => 8,
+            },
+            vec![2u8; 200],
+        ));
+
+        let pattern_id = doc.add_object(dictionary! {
+            "Type" => "Pattern",
+            "PatternType" => 1,
+            "PaintType" => 1,
+            "TilingType" => 1,
+            "BBox" => vec![0.into(), 0.into(), 200.into(), 100.into()],
+            "XStep" => 200,
+            "YStep" => 100,
+            "Resources" => dictionary! {
+                "XObject" => dictionary! {
+                    "X1" => img_id,
+                },
+            },
+        });
+
+        let resources_id = doc.add_object(dictionary! {
+            "Pattern" => dictionary! {
+                "P1" => pattern_id,
+            },
+        });
+
+        // Pattern fill a rectangle — Skia/Penpot style page paint.
+        let content = Content {
+            operations: vec![
+                Operation::new("cs", vec!["Pattern".into()]),
+                Operation::new("scn", vec!["P1".into()]),
+                Operation::new(
+                    "re",
+                    vec![
+                        Object::Real(10.0),
+                        Object::Real(20.0),
+                        Object::Real(400.0),
+                        Object::Real(300.0),
+                    ],
+                ),
+                Operation::new("f", vec![]),
+            ],
+        };
+
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "Resources" => resources_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => 1,
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+
+        let pages = doc.get_pages();
+        let (&page_num, &page_id) = pages.iter().next().unwrap();
+
+        let chunks = extract_page_chunks(&doc, page_num, page_id).unwrap();
+        assert_eq!(chunks.image_chunks.len(), 1, "Expected 1 pattern image");
+        assert!(
+            chunks.line_chunks.is_empty(),
+            "Pattern fill must not emit page-edge lines, got {}",
+            chunks.line_chunks.len()
+        );
+
+        let img = &chunks.image_chunks[0];
+        assert_eq!(img.index, Some(1));
+        assert!((img.bbox.left_x - 10.0).abs() < 1.0);
+        assert!((img.bbox.bottom_y - 20.0).abs() < 1.0);
+        assert!((img.bbox.right_x - 410.0).abs() < 1.0);
+        assert!((img.bbox.top_y - 320.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_filled_aa_dots_do_not_emit_lines() {
+        // Skia soft shapes are often thousands of 1×1 filled rects. Those are
+        // region paint, not geometric rules. A thin filled strip must still
+        // become a single horizontal Line (table rule drawn as fill).
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+
+        let mut ops = vec![
+            Operation::new("rg", vec![Object::Real(0.8), Object::Real(0.7), Object::Real(0.9)]),
+        ];
+        for i in 0..50 {
+            let x = 10.0 + (i % 10) as f64;
+            let y = 10.0 + (i / 10) as f64;
+            ops.push(Operation::new(
+                "re",
+                vec![
+                    Object::Real(x),
+                    Object::Real(y),
+                    Object::Real(1.0),
+                    Object::Real(1.0),
+                ],
+            ));
+            ops.push(Operation::new("f", vec![]));
+        }
+        // Thin horizontal rule as filled rect
+        ops.push(Operation::new(
+            "re",
+            vec![
+                Object::Real(50.0),
+                Object::Real(200.0),
+                Object::Real(200.0),
+                Object::Real(1.0),
+            ],
+        ));
+        ops.push(Operation::new("f", vec![]));
+
+        let content = Content { operations: ops };
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "Resources" => dictionary! {},
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => 1,
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+
+        let pages = doc.get_pages();
+        let (&page_num, &page_id) = pages.iter().next().unwrap();
+        let chunks = extract_page_chunks(&doc, page_num, page_id).unwrap();
+
+        assert_eq!(
+            chunks.line_chunks.len(),
+            1,
+            "expected only the thin filled strip as a Line, got {}",
+            chunks.line_chunks.len()
+        );
+        assert!(chunks.line_chunks[0].is_horizontal_line);
+        assert!(chunks.line_art_chunks.is_empty());
     }
 
     #[test]

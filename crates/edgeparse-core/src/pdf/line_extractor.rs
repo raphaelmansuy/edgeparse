@@ -262,16 +262,15 @@ pub fn extract_line_chunks(
                 subpath_start = None;
                 current_point = None;
             }
-            // Fill (also acts as implicit close)
+            // Fill (also acts as implicit close) — only thin strips are lines
             "f" | "F" | "f*" => {
-                classify_path(
-                    &current_path,
-                    line_width,
-                    page_number,
-                    &mut line_chunks,
-                    &mut line_art_chunks,
-                    &mut line_index,
-                );
+                if let Some(mut line) =
+                    thin_filled_strip_line(&current_path, line_width, page_number)
+                {
+                    line_index += 1;
+                    line.index = Some(line_index);
+                    line_chunks.push(line);
+                }
                 current_path.clear();
                 subpath_start = None;
                 current_point = None;
@@ -510,8 +509,13 @@ fn try_classify_rectangle(
         return None;
     }
 
-    // Determine if it's a thin rectangle (line) or a square-like shape
-    let is_square = (w - h).abs() / w.max(h) < 0.3;
+    // Determine if it's a thin rectangle (line). Equidimensional fills/boxes
+    // are regions, not geometric rules.
+    let is_horizontal = w > h * LINE_ASPECT_RATIO;
+    let is_vertical = h > w * LINE_ASPECT_RATIO;
+    if !is_horizontal && !is_vertical {
+        return None;
+    }
 
     *index += 1;
     Some(LineChunk {
@@ -529,9 +533,74 @@ fn try_classify_rectangle(
             radius: 0.0,
         },
         width: w.min(h),
-        is_horizontal_line: w > h * LINE_ASPECT_RATIO,
-        is_vertical_line: h > w * LINE_ASPECT_RATIO,
-        is_square,
+        is_horizontal_line: is_horizontal,
+        is_vertical_line: is_vertical,
+        is_square: false,
+    })
+}
+
+/// A filled path is a Line only when the painted region is a thin strip.
+fn thin_filled_strip_line(
+    segments: &[PathSegment],
+    _line_width: f64,
+    page_number: u32,
+) -> Option<LineChunk> {
+    let mut min_x = f64::MAX;
+    let mut min_y = f64::MAX;
+    let mut max_x = f64::MIN;
+    let mut max_y = f64::MIN;
+
+    for seg in segments {
+        let (sx, sy, ex, ey) = match seg {
+            PathSegment::Line { x1, y1, x2, y2 } => (*x1, *y1, *x2, *y2),
+            PathSegment::Curve { x1, y1, x2, y2, .. } => (*x1, *y1, *x2, *y2),
+        };
+        min_x = min_x.min(sx).min(ex);
+        min_y = min_y.min(sy).min(ey);
+        max_x = max_x.max(sx).max(ex);
+        max_y = max_y.max(sy).max(ey);
+    }
+
+    if !min_x.is_finite() {
+        return None;
+    }
+
+    let w = max_x - min_x;
+    let h = max_y - min_y;
+    if w < MIN_LINE_WIDTH || h < MIN_LINE_WIDTH {
+        return None;
+    }
+
+    let is_horizontal = h <= MAX_LINE_THICKNESS && w > h * LINE_ASPECT_RATIO;
+    let is_vertical = w <= MAX_LINE_THICKNESS && h > w * LINE_ASPECT_RATIO;
+    if !is_horizontal && !is_vertical {
+        return None;
+    }
+
+    let (sx, sy, ex, ey) = if is_horizontal {
+        (min_x, (min_y + max_y) * 0.5, max_x, (min_y + max_y) * 0.5)
+    } else {
+        ((min_x + max_x) * 0.5, min_y, (min_x + max_x) * 0.5, max_y)
+    };
+
+    Some(LineChunk {
+        bbox: BoundingBox::new(Some(page_number), min_x, min_y, max_x, max_y),
+        index: None,
+        level: None,
+        start: Vertex {
+            x: sx,
+            y: sy,
+            radius: 0.0,
+        },
+        end: Vertex {
+            x: ex,
+            y: ey,
+            radius: 0.0,
+        },
+        width: w.min(h),
+        is_horizontal_line: is_horizontal,
+        is_vertical_line: is_vertical,
+        is_square: false,
     })
 }
 

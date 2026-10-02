@@ -19,6 +19,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SAMPLE_PDF = path.resolve(__dirname, '../public/sample.pdf');
 const LOREM_PDF  = path.resolve(__dirname, '../../examples/pdf/lorem.pdf');
+const PATTERN_FORM_PDF = path.resolve(__dirname, './fixtures/pattern_form.pdf');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -268,6 +269,32 @@ test.describe('EdgeParse Demo', () => {
     });
     const content = await page.locator('.output-viewer__rendered').textContent();
     expect(content!.length).toBeGreaterThan(10);
+  });
+
+  test('3.2c − pattern-form PDF skips artifact title and shows native text', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.toolbar__btn--upload')).toBeVisible();
+
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.locator('.toolbar__btn--upload').click(),
+    ]);
+    await fileChooser.setFiles(PATTERN_FORM_PDF);
+
+    await page.waitForFunction(
+      () => {
+        const cm = document.querySelector('.cm-content');
+        return cm?.textContent?.trimStart().startsWith('{');
+      },
+      { timeout: 60_000 },
+    );
+
+    await page.getByRole('tab', { name: 'MARKDOWN' }).click();
+    await expect(page.locator('.output-viewer__rendered')).toBeVisible();
+    await expect(page.locator('.output-viewer__rendered')).not.toContainText('Penpot - Render');
+    await expect(page.locator('.output-viewer__rendered')).toContainText(/ACME|NAME VALUE/, {
+      timeout: 20_000,
+    });
   });
 
   test('3.3 − HTML tab shows rendered HTML content', async ({ page }) => {

@@ -79,6 +79,42 @@ fn column_index(chunk: &TextChunk, layout: Option<&ColumnLayout>) -> usize {
     }
 }
 
+/// Drop TextChunks that are the same glyphs painted twice in nearly the same
+/// place (PDF faux-bold / repeated Form paint). Geometry: identical string and
+/// centers within a sub-glyph offset, with nearly equal widths.
+fn dedupe_overpainted_text_chunks(chunks: &mut Vec<TextChunk>) {
+    if chunks.len() < 2 {
+        return;
+    }
+
+    let mut kept: Vec<TextChunk> = Vec::with_capacity(chunks.len());
+    'next: for chunk in chunks.drain(..) {
+        for existing in &kept {
+            if is_overpaint_duplicate(existing, &chunk) {
+                continue 'next;
+            }
+        }
+        kept.push(chunk);
+    }
+    *chunks = kept;
+}
+
+/// Two chunks are overpaint duplicates when they carry the same text and their
+/// painted origins coincide within ~1.5 pt (typical faux-bold offset).
+fn is_overpaint_duplicate(a: &TextChunk, b: &TextChunk) -> bool {
+    if a.value != b.value || a.value.is_empty() {
+        return false;
+    }
+    let dx = (a.bbox.center_x() - b.bbox.center_x()).abs();
+    let dy = (a.bbox.center_y() - b.bbox.center_y()).abs();
+    if dx > 1.5 || dy > 1.5 {
+        return false;
+    }
+    let aw = a.bbox.width();
+    let bw = b.bbox.width();
+    (aw - bw).abs() <= aw.max(bw).max(1.0) * 0.15
+}
+
 /// Pre-merge adjacent TextChunks that have the same style, same baseline,
 /// and are spatially close.  Matches the reference `TextProcessor.mergeCloseTextChunks()`.
 ///
@@ -164,6 +200,11 @@ pub fn group_text_lines(
     if text_chunks.is_empty() {
         return other_elements;
     }
+
+    // Drop overpainted duplicates (identical glyphs redrawn at the same place —
+    // Skia faux-bold / double `Tj`). Must run before close-merge so we do not
+    // concatenate "THE BASICS"+"THE BASICS" into one line.
+    dedupe_overpainted_text_chunks(&mut text_chunks);
 
     // Pre-merge adjacent same-style chunks (the reference mergeCloseTextChunks).
     // Must run BEFORE sorting/grouping so fragments like "ar"+"e" → "are"
@@ -678,5 +719,26 @@ mod tests {
             2,
             "tiny page number should stay separate from TOC text"
         );
+    }
+
+    #[test]
+    fn test_overpainted_duplicate_chunks_deduped() {
+        // Same glyphs painted twice at the same origin (Skia faux-bold).
+        let elements = vec![
+            make_tc("THE BASICS", 71.0, 583.0, 160.0, 9.0),
+            make_tc("THE BASICS", 71.0, 583.0, 160.0, 9.0),
+            make_tc("body", 71.0, 500.0, 40.0, 12.0),
+        ];
+        let result = group_text_lines(elements, None);
+        let texts: Vec<String> = result
+            .iter()
+            .filter_map(|e| match e {
+                ContentElement::TextLine(l) => Some(l.value()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts.len(), 2);
+        assert_eq!(texts[0], "THE BASICS");
+        assert_eq!(texts[1], "body");
     }
 }

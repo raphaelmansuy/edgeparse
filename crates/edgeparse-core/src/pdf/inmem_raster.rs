@@ -7,7 +7,7 @@
 use lopdf::Document;
 
 use crate::models::bbox::BoundingBox;
-use crate::models::chunks::{ImageChunk, TextChunk};
+use crate::models::chunks::{ImageChunk, ImagePaintSource, TextChunk};
 use crate::models::enums::{PdfLayer, TextFormat, TextType};
 use crate::models::table::{
     TableBorder, TableBorderCell, TableBorderRow, TableToken, TableTokenType,
@@ -25,6 +25,16 @@ const MIN_BORDERED_HORIZONTAL_LINES: usize = 3;
 const MIN_BORDERED_INKED_CELL_RATIO: f64 = 0.18;
 const MIN_BORDERED_ROWS_WITH_INK: usize = 2;
 const RASTER_DARK_THRESHOLD: u8 = 180;
+
+/// How OCR words from a raster candidate should be assembled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RasterCandidateKind {
+    /// Ruled / table-like image → [`TableBorder`].
+    Table,
+    /// Pattern-painted (or otherwise non-tabular) raster → free-form [`TextChunk`]s.
+    TextBlocks,
+}
 
 /// Recover bordered tables from embedded Image XObjects on a page.
 pub fn recover_embedded_raster_tables(
@@ -87,19 +97,87 @@ fn is_table_image_candidate(image: &ImageChunk, text_chunks: &[TextChunk]) -> bo
     if w < 80.0 || h < 40.0 {
         return false;
     }
-    let native_chars: usize = text_chunks
+    native_text_chars_in_image(image, text_chunks) <= MAX_NATIVE_TEXT_CHARS_IN_IMAGE
+}
+
+fn native_text_chars_in_image(image: &ImageChunk, text_chunks: &[TextChunk]) -> usize {
+    text_chunks
         .iter()
-        .filter(|t| image.bbox.intersection_percent(&t.bbox) >= 0.7)
+        .filter(|t| native_text_overlaps_image(t, image))
         .map(|t| t.value.chars().filter(|c| !c.is_whitespace()).count())
-        .sum();
-    native_chars <= MAX_NATIVE_TEXT_CHARS_IN_IMAGE
+        .sum()
+}
+
+/// Native PDF text that intersects the image bbox (operator texts painted on
+/// top of / inside the image placement).
+fn native_text_overlaps_image(text: &TextChunk, image: &ImageChunk) -> bool {
+    // Center-in-bbox: the glyph run's position is defined by PDF text operators.
+    let cx = text.bbox.center_x();
+    let cy = text.bbox.center_y();
+    cx >= image.bbox.left_x
+        && cx <= image.bbox.right_x
+        && cy >= image.bbox.bottom_y
+        && cy <= image.bbox.top_y
+}
+
+/// True when the image placement coincides with the page box (full-bleed
+/// slide / scan). Uses ±1 pt PDF coordinate epsilon — geometric identity,
+/// not a coverage heuristic.
+fn is_full_page_image(image: &ImageChunk, page_width: f64, page_height: f64) -> bool {
+    if page_width <= 1.0 || page_height <= 1.0 {
+        return false;
+    }
+    const EPS: f64 = 1.0;
+    image.bbox.width() + EPS >= page_width && image.bbox.height() + EPS >= page_height
+}
+
+/// Decide whether OCR can add information, and which assembly path to use.
+///
+/// First principles (ISO 32000):
+/// 1. PDF text operators are authoritative where present.
+/// 2. An Image XObject may encode glyphs the text layer lacks → OCR candidate.
+/// 3. Assembly kind:
+///    - page-paint rasters (Pattern fill, or `Do` spanning the MediaBox, or
+///      image-only pages) → [`TextBlocks`]
+///    - embedded figures with sparse native text → [`Table`] (ruled / word lattice)
+/// 4. Pixel ruled-grid detection in [`prepare_candidate`] may upgrade to Table.
+fn classify_raster_candidate(
+    image: &ImageChunk,
+    text_chunks: &[TextChunk],
+    page_width: f64,
+    page_height: f64,
+) -> Option<RasterCandidateKind> {
+    let sparse_native =
+        native_text_chars_in_image(image, text_chunks) <= MAX_NATIVE_TEXT_CHARS_IN_IMAGE;
+
+    // Pattern-painted images *are* the page content (Skia/Penpot/print).
+    if image.source == ImagePaintSource::PatternFill {
+        return Some(RasterCandidateKind::TextBlocks);
+    }
+
+    // Full-bleed Do/Inline: the image placement is the page.
+    if is_full_page_image(image, page_width, page_height) && sparse_native {
+        return Some(RasterCandidateKind::TextBlocks);
+    }
+
+    // Image-only page (no PDF text operators): every substantial image is content.
+    if text_chunks.is_empty() && image.bbox.width() >= 80.0 && image.bbox.height() >= 40.0 {
+        return Some(RasterCandidateKind::TextBlocks);
+    }
+
+    // Embedded figure that may encode a table lattice.
+    if is_table_image_candidate(image, text_chunks) {
+        return Some(RasterCandidateKind::Table);
+    }
+
+    None
 }
 
 /// Prepared OCR candidate for the two-phase (plan → OCR → finish) path.
 ///
-/// Emitted only when OCR can change the output (table-like Image XObject that
-/// is not an obvious bar chart). Missing OCR words at finish time degrades to
-/// PDF-text cells when a bordered grid is already known.
+/// Emitted when OCR can change the output (table-like or pattern-painted Image
+/// XObject). Missing OCR words at finish time degrades to PDF-text cells when
+/// a bordered grid is already known (tables only).
 #[cfg(feature = "image")]
 #[derive(Debug, Clone)]
 pub struct RasterCandidate {
@@ -117,8 +195,12 @@ pub struct RasterCandidate {
     pub hash: String,
     /// Image placement in PDF user space.
     pub image_bbox: BoundingBox,
+    /// 1-based Image XObject index (matches [`ImageChunk::index`]).
+    pub image_index: Option<u32>,
     /// Overlapping native text (PDF fallback when OCR is absent).
     pub text_chunks: Vec<TextChunk>,
+    /// How OCR words should be assembled.
+    pub kind: RasterCandidateKind,
     /// Precomputed ruled grid when ink lines are strong enough.
     bordered_grid: Option<Grid>,
 }
@@ -133,6 +215,7 @@ impl RasterCandidate {
             width: self.width,
             height: self.height,
             hash: self.hash.clone(),
+            kind: self.kind,
         }
     }
 }
@@ -150,6 +233,13 @@ pub struct RasterCandidateMeta {
     pub height: u32,
     /// Content hash for cache keys.
     pub hash: String,
+    /// How OCR words should be assembled.
+    #[serde(default = "default_candidate_kind")]
+    pub kind: RasterCandidateKind,
+}
+
+fn default_candidate_kind() -> RasterCandidateKind {
+    RasterCandidateKind::Table
 }
 
 /// Collect OCR candidates from Image XObjects (no OCR yet).
@@ -159,13 +249,16 @@ pub fn collect_raster_candidates(
     page_id: lopdf::ObjectId,
     image_chunks: &[ImageChunk],
     text_chunks: &[TextChunk],
+    page_width: f64,
+    page_height: f64,
     next_id: &mut u32,
 ) -> Vec<RasterCandidate> {
     let mut out = Vec::new();
     for image in image_chunks {
-        if !is_table_image_candidate(image, text_chunks) {
+        let Some(kind) = classify_raster_candidate(image, text_chunks, page_width, page_height)
+        else {
             continue;
-        }
+        };
         let Some(raw_index) = image.index else {
             continue;
         };
@@ -181,6 +274,7 @@ pub fn collect_raster_candidates(
             extracted.height,
             image,
             text_chunks,
+            kind,
         ) {
             *next_id = next_id.saturating_add(1);
             out.push(cand);
@@ -196,6 +290,8 @@ pub fn collect_raster_candidates(
     _page_id: lopdf::ObjectId,
     _image_chunks: &[ImageChunk],
     _text_chunks: &[TextChunk],
+    _page_width: f64,
+    _page_height: f64,
     _next_id: &mut u32,
 ) -> Vec<()> {
     Vec::new()
@@ -211,18 +307,29 @@ pub fn prepare_candidate(
     height: u32,
     image: &ImageChunk,
     text_chunks: &[TextChunk],
+    kind: RasterCandidateKind,
 ) -> Option<RasterCandidate> {
     let gray = decode_to_gray(data, filter, width, height)?;
     if is_obvious_bar_chart(&gray) {
         return None;
     }
     let bordered = detect_bordered_grid(&gray).filter(|g| grid_has_cell_ink(&gray, g));
-    // Emit even without a ruled grid: host OCR word centers can seed the lattice
-    // (docs like 122 / BamHI). Cheap size gate already applied upstream.
+    // Ruled lattice in pixels → Table assembly. Otherwise keep the provisional
+    // kind from paint/page geometry (page-paint → TextBlocks, embedded → Table).
+    let kind = if bordered.is_some() {
+        RasterCandidateKind::Table
+    } else {
+        kind
+    };
+    let bordered = if kind == RasterCandidateKind::Table {
+        bordered
+    } else {
+        None
+    };
     let hash = fnv1a_hex(gray.as_raw());
     let overlapping: Vec<TextChunk> = text_chunks
         .iter()
-        .filter(|t| image.bbox.intersection_percent(&t.bbox) >= 0.7)
+        .filter(|t| native_text_overlaps_image(t, image))
         .cloned()
         .collect();
     let (gw, gh) = (gray.width(), gray.height());
@@ -234,7 +341,9 @@ pub fn prepare_candidate(
         height: gh,
         hash,
         image_bbox: image.bbox.clone(),
+        image_index: image.index,
         text_chunks: overlapping,
+        kind,
         bordered_grid: bordered,
     })
 }
@@ -245,6 +354,9 @@ pub fn build_table_from_candidate(
     candidate: &RasterCandidate,
     words: &[crate::pdf::ocr::OcrWord],
 ) -> Option<TableBorder> {
+    if candidate.kind != RasterCandidateKind::Table {
+        return None;
+    }
     let gray = GrayImage::from_raw(candidate.width, candidate.height, candidate.gray.clone())?;
     let mut words = words.to_vec();
     let mut grid = candidate
@@ -273,6 +385,86 @@ pub fn build_table_from_candidate(
     )
 }
 
+/// Convert OCR words from a text-blocks candidate into page-space [`TextChunk`]s.
+///
+/// Native PDF text operators are authoritative for glyphs they paint. OCR words
+/// whose center falls inside a native text bbox are skipped (no IoU thresholds).
+#[cfg(feature = "image")]
+pub fn build_text_chunks_from_candidate(
+    candidate: &RasterCandidate,
+    words: &[crate::pdf::ocr::OcrWord],
+) -> Vec<TextChunk> {
+    ocr_words_to_text_chunks(candidate, words)
+}
+
+/// Map OCR words into page-space text chunks (shared by TextBlocks assembly and
+/// Table→text fallback when a lattice cannot be formed).
+#[cfg(feature = "image")]
+pub fn ocr_words_to_text_chunks(
+    candidate: &RasterCandidate,
+    words: &[crate::pdf::ocr::OcrWord],
+) -> Vec<TextChunk> {
+    if words.is_empty() {
+        return Vec::new();
+    }
+    let img = &candidate.image_bbox;
+    let pw = candidate.width.max(1) as f64;
+    let ph = candidate.height.max(1) as f64;
+    let mut out = Vec::with_capacity(words.len());
+    for (i, w) in words.iter().enumerate() {
+        let text = w.text.trim();
+        if text.is_empty() {
+            continue;
+        }
+        // Map pixel box → PDF user space. Image Y grows down; PDF Y grows up.
+        let left = img.left_x + (w.left as f64 / pw) * img.width();
+        let right = img.left_x + ((w.left + w.width) as f64 / pw) * img.width();
+        let top = img.top_y - (w.top as f64 / ph) * img.height();
+        let bottom = img.top_y - ((w.top + w.height) as f64 / ph) * img.height();
+        let bbox = BoundingBox::new(
+            Some(candidate.page),
+            left.min(right),
+            bottom.min(top),
+            left.max(right),
+            bottom.max(top),
+        );
+        let cx = bbox.center_x();
+        let cy = bbox.center_y();
+        // Skip OCR that lands on native PDF text (center-in-bbox).
+        let covered_by_native = candidate.text_chunks.iter().any(|t| {
+            cx >= t.bbox.left_x
+                && cx <= t.bbox.right_x
+                && cy >= t.bbox.bottom_y
+                && cy <= t.bbox.top_y
+        });
+        if covered_by_native {
+            continue;
+        }
+
+        let font_size = bbox.height().clamp(6.0, 72.0);
+        out.push(TextChunk {
+            value: text.to_string(),
+            bbox: bbox.clone(),
+            font_name: "OCR".to_string(),
+            font_size,
+            font_weight: 400.0,
+            italic_angle: 0.0,
+            font_color: "#000000".to_string(),
+            contrast_ratio: 21.0,
+            symbol_ends: vec![bbox.right_x],
+            text_format: TextFormat::Normal,
+            text_type: TextType::Regular,
+            pdf_layer: PdfLayer::Content,
+            ocg_visible: true,
+            index: Some(i),
+            page_number: Some(candidate.page),
+            level: None,
+            mcid: None,
+        });
+    }
+    out
+}
+
 #[cfg(feature = "image")]
 fn table_from_extracted(
     data: &[u8],
@@ -282,7 +474,16 @@ fn table_from_extracted(
     image: &ImageChunk,
     text_chunks: &[TextChunk],
 ) -> Option<TableBorder> {
-    let candidate = prepare_candidate(0, data, filter, width, height, image, text_chunks)?;
+    let candidate = prepare_candidate(
+        0,
+        data,
+        filter,
+        width,
+        height,
+        image,
+        text_chunks,
+        RasterCandidateKind::Table,
+    )?;
     let gray = GrayImage::from_raw(candidate.width, candidate.height, candidate.gray.clone())?;
     let mut words = recognize_words(&gray);
     let mut grid = candidate
@@ -939,4 +1140,66 @@ pub fn bordered_table_is_plausible(table: &TableBorder) -> bool {
     let median = sorted[sorted.len() / 2].max(1);
     let max = *token_counts.iter().max().unwrap_or(&0);
     !(max >= 8 && max >= median.saturating_mul(8))
+}
+
+#[cfg(all(test, feature = "image"))]
+mod classify_tests {
+    use super::*;
+    use crate::models::chunks::ImagePaintSource;
+    use crate::models::enums::{PdfLayer, TextFormat, TextType};
+
+    fn img(source: ImagePaintSource, w: f64, h: f64) -> ImageChunk {
+        ImageChunk {
+            bbox: BoundingBox::new(Some(1), 0.0, 0.0, w, h),
+            index: Some(1),
+            level: None,
+            source,
+        }
+    }
+
+    #[test]
+    fn full_bleed_do_image_is_text_blocks() {
+        let image = img(ImagePaintSource::Do, 959.76, 539.41);
+        let kind = classify_raster_candidate(&image, &[], 959.76, 540.0);
+        assert_eq!(kind, Some(RasterCandidateKind::TextBlocks));
+        assert!(is_full_page_image(&image, 959.76, 540.0));
+    }
+
+    #[test]
+    fn pattern_fill_is_text_blocks() {
+        let image = img(ImagePaintSource::PatternFill, 400.0, 300.0);
+        let kind = classify_raster_candidate(&image, &[], 400.0, 300.0);
+        assert_eq!(kind, Some(RasterCandidateKind::TextBlocks));
+    }
+
+    #[test]
+    fn small_embedded_do_with_sparse_text_is_table() {
+        let image = img(ImagePaintSource::Do, 200.0, 100.0);
+        let kind = classify_raster_candidate(&image, &[], 612.0, 792.0);
+        // Empty page text + substantial image → TextBlocks (image-only page rule)
+        assert_eq!(kind, Some(RasterCandidateKind::TextBlocks));
+
+        // With surrounding native text outside the image → Table path for embedded figure
+        let outside = TextChunk {
+            value: "Caption outside".into(),
+            bbox: BoundingBox::new(Some(1), 0.0, 700.0, 200.0, 720.0),
+            font_name: "Helvetica".into(),
+            font_size: 12.0,
+            font_weight: 400.0,
+            italic_angle: 0.0,
+            font_color: "#000".into(),
+            contrast_ratio: 21.0,
+            symbol_ends: vec![],
+            text_format: TextFormat::Normal,
+            text_type: TextType::Regular,
+            pdf_layer: PdfLayer::Main,
+            ocg_visible: true,
+            index: None,
+            page_number: Some(1),
+            level: None,
+            mcid: None,
+        };
+        let kind = classify_raster_candidate(&image, &[outside], 612.0, 792.0);
+        assert_eq!(kind, Some(RasterCandidateKind::Table));
+    }
 }

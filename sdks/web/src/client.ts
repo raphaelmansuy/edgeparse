@@ -19,6 +19,7 @@ type CandidateMeta = {
   width: number;
   height: number;
   hash: string;
+  kind?: 'table' | 'textBlocks';
 };
 
 let jobSeq = 0;
@@ -437,8 +438,11 @@ export class EdgeParse {
         ocrReady = await this.tryWarmCachedOcrModels();
         if (!ocrReady) {
           quality = 'degraded';
+          const hasTextBlocks = candidates.some((c) => c.kind === 'textBlocks');
           warnings.push(
-            'OCR models not cached — using PDF text only. Download models to OCR image tables.',
+            hasTextBlocks
+              ? 'Page is mostly raster; download OCR models for full text.'
+              : 'OCR models not cached — using PDF text only. Download models to OCR image tables.',
           );
         }
       } catch (err) {
