@@ -277,9 +277,7 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
         // quantized one step above the mode. When a size hierarchy exists, skip
         // them — and also skip anything not in the higher-size inventory
         // (smaller diagram labels etc.).
-        if stats.has_larger_font_sizes()
-            && (stats.is_body_font_size(font_size) || !is_above_body)
-        {
+        if stats.has_larger_font_sizes() && (stats.is_body_font_size(font_size) || !is_above_body) {
             continue;
         }
 
@@ -1441,8 +1439,7 @@ impl DocFontStats {
     /// or lies within a half-point of the mode (CTM/rounding noise from
     /// design-tool PDFs that is not a typographic step).
     fn is_body_font_size(&self, size: f64) -> bool {
-        self.mode_size
-            .is_some_and(|m| (size - m).abs() <= 0.5)
+        self.mode_size.is_some_and(|m| (size - m).abs() <= 0.5)
     }
 }
 

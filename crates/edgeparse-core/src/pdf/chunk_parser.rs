@@ -1028,8 +1028,7 @@ impl ChunkParserState {
         // Skia soft-circle AA as thousands of 1×1 `re f` — are decoration, not
         // lines. Emitting their path edges floods LineChunks and blows JSON.
         if matches!(paint, PathPaint::Fill) {
-            if let Some(mut line) =
-                thin_filled_strip_line(&path, self.line_width, self.page_number)
+            if let Some(mut line) = thin_filled_strip_line(&path, self.line_width, self.page_number)
             {
                 self.line_index += 1;
                 line.index = Some(self.line_index);
@@ -1911,9 +1910,10 @@ mod tests {
         let mut doc = Document::with_version("1.5");
         let pages_id = doc.new_object_id();
 
-        let mut ops = vec![
-            Operation::new("rg", vec![Object::Real(0.8), Object::Real(0.7), Object::Real(0.9)]),
-        ];
+        let mut ops = vec![Operation::new(
+            "rg",
+            vec![Object::Real(0.8), Object::Real(0.7), Object::Real(0.9)],
+        )];
         for i in 0..50 {
             let x = 10.0 + (i % 10) as f64;
             let y = 10.0 + (i / 10) as f64;
