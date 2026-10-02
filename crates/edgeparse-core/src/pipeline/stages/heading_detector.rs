@@ -331,6 +331,13 @@ pub fn detect_headings(pages: &mut [Vec<ContentElement>], mcid_map: Option<&Mcid
             continue;
         }
 
+        // Short labels sitting on an image are float titles/captions, not
+        // outline nodes. Promoting them also disables captioned-media layout
+        // which requires a heading-free page.
+        if is_image_adjacent_title(pages, page_idx, elem_idx, p) {
+            continue;
+        }
+
         // Skip text containing email addresses — "EMAIL FOO@BAR.COM" or
         // "Contact: user@domain.org" are contact info, never section headings.
         if contains_email_address(&trimmed_text) {
@@ -1232,27 +1239,65 @@ fn is_standalone_page_number(para: &SemanticParagraph, stats: &DocFontStats) -> 
 }
 
 /// Check if text starts with a figure/table caption prefix.
-/// "Figure 1.", "Table 2:", "Fig. 3", "FIGURE 4" are captions.
+/// "Figure 1.", "Table 2:", "Fig. 3", "FIGURE 4", "Diagram 5" are captions.
 fn is_caption_prefix(text: &str) -> bool {
     let lower = text.to_lowercase();
-    // Match "figure N", "fig. N", "fig N", "table N"
-    if lower.starts_with("figure ")
-        || lower.starts_with("fig. ")
-        || lower.starts_with("fig ")
-        || lower.starts_with("table ")
-    {
-        // Check if the next non-space character is a digit
-        let rest = if lower.starts_with("figure ") {
-            &text[7..]
-        } else if lower.starts_with("fig. ") {
-            &text[5..]
-        } else if lower.starts_with("fig ") {
-            &text[4..]
-        } else {
-            &text[6..]
+    // Match "figure N", "fig. N", "fig N", "table N", "diagram N"
+    let (prefix_len, matched) = if lower.starts_with("figure ") {
+        (7usize, true)
+    } else if lower.starts_with("diagram ") {
+        (8, true)
+    } else if lower.starts_with("fig. ") {
+        (5, true)
+    } else if lower.starts_with("fig ") {
+        (4, true)
+    } else if lower.starts_with("table ") {
+        (6, true)
+    } else {
+        (0, false)
+    };
+    if !matched {
+        return false;
+    }
+    let rest = &text[prefix_len..];
+    let first_non_space = rest.trim_start().chars().next();
+    first_non_space.is_some_and(|c| c.is_ascii_digit())
+}
+
+/// True when a short paragraph sits as a title/caption next to a page image.
+/// Those labels describe floats; they are not section-outline headings.
+fn is_image_adjacent_title(
+    pages: &[Vec<ContentElement>],
+    page_idx: usize,
+    elem_idx: usize,
+    para: &SemanticParagraph,
+) -> bool {
+    let text_len = para.base.value().trim().len();
+    if text_len == 0 || text_len > 120 {
+        return false;
+    }
+    let pb = &para.base.bbox;
+    let page = &pages[page_idx];
+    for (i, elem) in page.iter().enumerate() {
+        if i == elem_idx {
+            continue;
+        }
+        let ib = match elem {
+            ContentElement::Image(img) => &img.bbox,
+            ContentElement::Figure(fig) => &fig.bbox,
+            ContentElement::Picture(pic) => &pic.bbox,
+            _ => continue,
         };
-        let first_non_space = rest.trim_start().chars().next();
-        return first_non_space.is_some_and(|c| c.is_ascii_digit());
+        let overlap = pb.right_x.min(ib.right_x) - pb.left_x.max(ib.left_x);
+        if overlap <= 0.0 {
+            continue;
+        }
+        // Caption/title above the image (common) or tightly below.
+        let gap_above = pb.bottom_y - ib.top_y;
+        let gap_below = ib.bottom_y - pb.top_y;
+        if (0.0..=72.0).contains(&gap_above) || (0.0..=48.0).contains(&gap_below) {
+            return true;
+        }
     }
     false
 }
