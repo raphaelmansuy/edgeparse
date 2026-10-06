@@ -1,6 +1,6 @@
 ---
 name: edgeparse
-description: Extract structured content from any PDF for AI agents, RAG pipelines, and Copilot Skills. Use this skill whenever the user wants to read, analyze, or reason about a PDF document; needs to feed document content to an LLM; mentions PDF extraction, parsing, or conversion; wants tables, headings, or bounding boxes from a PDF; is building a RAG pipeline; or asks an agent to process a document. Install with: pip install edgeparse
+description: "Extract structured content from any PDF for AI agents, RAG pipelines, and Copilot Skills. Use this skill whenever the user wants to read, analyze, or reason about a PDF document; needs to feed document content to an LLM; mentions PDF extraction, parsing, or conversion; wants tables, headings, or bounding boxes from a PDF; is building a RAG pipeline; or asks an agent to process a document. Install with: pip install edgeparse"
 license: Apache-2.0
 metadata:
   authors: "EdgeParse Contributors"
