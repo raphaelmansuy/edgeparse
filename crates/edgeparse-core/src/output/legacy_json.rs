@@ -507,12 +507,62 @@ fn list_to_legacy(list: &PDFList, stem: &str, img_idx: &mut u64) -> Value {
     Value::Object(obj)
 }
 
+/// Build a paragraph node from a border-detected cell's raw text tokens.
+///
+/// Returns `None` when the cell has no textual tokens.
+fn table_cell_tokens_to_paragraph(cell: &TableBorderCell) -> Option<Value> {
+    let text = cell
+        .content
+        .iter()
+        .map(|t| t.base.value.as_str())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if text.is_empty() {
+        return None;
+    }
+
+    let mut para = Map::new();
+    para.insert("type".into(), json!("paragraph"));
+    para.insert("id".into(), json!(next_id()));
+    para.insert("page number".into(), json!(page_num(&cell.bbox)));
+    para.insert("bounding box".into(), bbox_array(&cell.bbox));
+    if let Some(tok) = cell.content.iter().find(|t| !t.base.value.trim().is_empty()) {
+        para.insert(
+            "font".into(),
+            json!(strip_font_prefix(&tok.base.font_name)),
+        );
+        para.insert("font size".into(), json!(tok.base.font_size));
+        para.insert(
+            "text color".into(),
+            json!(format_font_color(&tok.base.font_color)),
+        );
+    }
+    para.insert("content".into(), json!(text));
+    Some(Value::Object(para))
+}
+
 fn table_cell_to_legacy(cell: &TableBorderCell, stem: &str, img_idx: &mut u64) -> Value {
-    let kids: Vec<Value> = cell
+    let mut kids: Vec<Value> = cell
         .contents
         .iter()
         .flat_map(|el| elements_to_legacy(el, stem, img_idx))
         .collect();
+
+    // Fallback: cells populated by the table border-detection path store their
+    // text in `content` (raw TableTokens), not `contents` (semantic elements),
+    // and raw tokens are not emitted by `elements_to_legacy`. Without this, such
+    // cells serialize with empty `kids` even though the text is present and
+    // rendered correctly in the Markdown/HTML/text outputs. Synthesize a
+    // paragraph kid from the token text so JSON matches the other formats.
+    if kids.is_empty() {
+        if let Some(kid) = table_cell_tokens_to_paragraph(cell) {
+            kids.push(kid);
+        }
+    }
+
     let mut obj = Map::new();
     obj.insert("type".into(), json!("table cell"));
     obj.insert("page number".into(), json!(page_num(&cell.bbox)));
