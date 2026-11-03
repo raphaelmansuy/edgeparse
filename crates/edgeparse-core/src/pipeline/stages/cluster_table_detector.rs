@@ -2506,6 +2506,15 @@ fn is_flow_label_text(text: &str) -> bool {
     })
 }
 
+/// Yields `(byte_offset, word)` for each whitespace-separated word of `s`.
+/// The offsets are real byte offsets into `s`, so they are always char
+/// boundaries, whatever whitespace (runs of spaces, U+00A0, tabs) sits
+/// between the words.
+fn word_byte_offsets(s: &str) -> impl Iterator<Item = (usize, &str)> {
+    s.split_whitespace()
+        .map(move |w| (w.as_ptr() as usize - s.as_ptr() as usize, w))
+}
+
 fn split_merged_key_value_text(text: &str, width: f64) -> Option<(&str, &str)> {
     if width < 260.0 {
         return None;
@@ -2513,16 +2522,14 @@ fn split_merged_key_value_text(text: &str, width: f64) -> Option<(&str, &str)> {
 
     let trimmed = text.trim();
     let mut split_idx = None;
-    let mut cursor = 0usize;
-    for (i, word) in trimmed.split_whitespace().enumerate() {
+    for (i, (start, word)) in word_byte_offsets(trimmed).enumerate() {
         if i >= 4 {
             break;
         }
         if i > 0 && looks_like_sentence_start(word) {
-            split_idx = Some(cursor.saturating_sub(1));
+            split_idx = Some(start);
             break;
         }
-        cursor += word.len() + 1;
     }
 
     let idx = split_idx?;
@@ -2577,15 +2584,13 @@ fn split_compact_header_row(text: &str, width: f64) -> Option<(&str, &str)> {
     }
 
     let trimmed = text.trim();
-    let words: Vec<&str> = trimmed.split_whitespace().collect();
+    let words: Vec<(usize, &str)> = word_byte_offsets(trimmed).collect();
     if words.len() < 4 {
         return None;
     }
 
-    let mut cursor = 0usize;
-    for split_word_idx in 1..words.len() {
-        cursor += words[split_word_idx - 1].len() + 1;
-        let (left, right) = trimmed.split_at(cursor.saturating_sub(1));
+    for &(start, _) in &words[1..] {
+        let (left, right) = trimmed.split_at(start);
         let left = left.trim();
         let right = right.trim();
         if !is_compact_header_text(left) || !is_compact_header_text(right) {
@@ -5981,5 +5986,29 @@ mod tests {
         let md = crate::output::markdown::to_markdown(&doc).unwrap();
         eprintln!("markdown has pipe table {}", md.contains("| --- |"));
         eprintln!("{md}");
+    }
+
+    // Splitting must use real byte offsets: a run of spaces or a U+00A0
+    // before a multi-byte char (here U+2019) used to make `split_at` panic
+    // with "end byte index ... is not a char boundary".
+    #[test]
+    fn split_compact_header_row_handles_double_space_before_multibyte_char() {
+        assert_eq!(
+            split_compact_header_row("Aaa  Bbb\u{2019} Ccc Ddd", 100.0),
+            Some(("Aaa  Bbb\u{2019}", "Ccc Ddd"))
+        );
+    }
+
+    #[test]
+    fn split_compact_header_row_handles_nbsp_before_multibyte_char() {
+        assert_eq!(
+            split_compact_header_row("Aaa\u{a0}Bbb\u{2019} Ccc Ddd", 100.0),
+            Some(("Aaa\u{a0}Bbb\u{2019}", "Ccc Ddd"))
+        );
+    }
+
+    #[test]
+    fn split_merged_key_value_text_handles_double_space_before_multibyte_char() {
+        let _ = split_merged_key_value_text("Aaa  Bbb\u{2019} To configure the thing", 300.0);
     }
 }
