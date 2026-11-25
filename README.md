@@ -1,6 +1,6 @@
 # EdgeParse
 
-**Fastest PDF extraction engine. Rust-native. No ML stack required for born-digital PDFs; optional in-browser OCR for image tables.**
+**Fast PDF extraction engine. Rust-native. No ML stack required for born-digital PDFs; optional in-browser OCR for image tables.**
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
